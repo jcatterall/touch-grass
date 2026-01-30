@@ -1,931 +1,1015 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TouchGrass Design Tokens</title>
-  <style>
-    :root {
-      /* Primary Colors */
-      --primary-orange: #F47D31;
-      --primary-orange-light: #FF9F4A;
-      --primary-blue: #3478F6;
-      --primary-blue-dark: #2E6BD6;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TouchGrass Design Tokens</title>
+    <style>
+      :root {
+        /* Primary Colors */
+        --primary-orange: #f47d31;
+        --primary-orange-light: #ff9f4a;
+        --primary-blue: #3478f6;
+        --primary-blue-dark: #2e6bd6;
 
-      /* Gradient Colors */
-      --gradient-yellow: #FFE566;
-      --gradient-yellow-mid: #FFD54F;
-      --gradient-orange-light: #FFAB40;
-      --gradient-orange-dark: #F47D31;
-      --gradient-sky-blue: #87CEEB;
-      --gradient-sky-blue-light: #B0E0E6;
+        /* Gradient Colors */
+        --gradient-yellow: #ffe566;
+        --gradient-yellow-mid: #ffd54f;
+        --gradient-orange-light: #ffab40;
+        --gradient-orange-dark: #f47d31;
+        --gradient-sky-blue: #87ceeb;
+        --gradient-sky-blue-light: #b0e0e6;
 
-      /* Neutral Colors */
-      --neutral-white: #FFFFFF;
-      --neutral-background: #FAFAFA;
-      --neutral-card-background: #F5F3EF;
-      --neutral-gray-100: #F5F5F5;
-      --neutral-gray-200: #E8E8E8;
-      --neutral-gray-300: #D1D1D1;
-      --neutral-gray-400: #9E9E9E;
-      --neutral-gray-600: #666666;
-      --neutral-gray-800: #333333;
-      --neutral-black: #1A1A1A;
+        /* Neutral Colors */
+        --neutral-white: #ffffff;
+        --neutral-background: #fafafa;
+        --neutral-card-background: #f5f3ef;
+        --neutral-gray-100: #f5f5f5;
+        --neutral-gray-200: #e8e8e8;
+        --neutral-gray-300: #d1d1d1;
+        --neutral-gray-400: #9e9e9e;
+        --neutral-gray-600: #666666;
+        --neutral-gray-800: #333333;
+        --neutral-black: #1a1a1a;
 
-      /* Dark Theme */
-      --dark-background: #0F1535;
-      --dark-surface: #1A1F3D;
-      --dark-card-background: #252A4A;
-      --dark-card-background-hover: #2D3250;
-      --dark-border: #3D4470;
-      --dark-text-primary: #FFFFFF;
-      --dark-text-secondary: #B8BDD4;
-      --dark-text-tertiary: #6B7194;
+        /* Dark Theme */
+        --dark-background: #0f1535;
+        --dark-surface: #1a1f3d;
+        --dark-card-background: #252a4a;
+        --dark-card-background-hover: #2d3250;
+        --dark-border: #3d4470;
+        --dark-text-primary: #ffffff;
+        --dark-text-secondary: #b8bdd4;
+        --dark-text-tertiary: #6b7194;
 
-      /* Accent Colors */
-      --accent-purple: #9B59B6;
-      --accent-pink: #FFB6C1;
-      --accent-pink-light: #FFC0CB;
-      --accent-teal: #4ECDC4;
-      --accent-mint: #7ED9A6;
-      --accent-yellow: #FFD93D;
-      --accent-peach: #FFAB91;
+        /* Accent Colors */
+        --accent-purple: #9b59b6;
+        --accent-pink: #ffb6c1;
+        --accent-pink-light: #ffc0cb;
+        --accent-teal: #4ecdc4;
+        --accent-mint: #7ed9a6;
+        --accent-yellow: #ffd93d;
+        --accent-peach: #ffab91;
 
-      /* Spacing */
-      --spacing-xxxs: 2px;
-      --spacing-xxs: 4px;
-      --spacing-xs: 8px;
-      --spacing-sm: 12px;
-      --spacing-md: 16px;
-      --spacing-lg: 20px;
-      --spacing-xl: 24px;
-      --spacing-xxl: 32px;
-      --spacing-xxxl: 40px;
-      --spacing-xxxxl: 48px;
+        /* Spacing */
+        --spacing-xxxs: 2px;
+        --spacing-xxs: 4px;
+        --spacing-xs: 8px;
+        --spacing-sm: 12px;
+        --spacing-md: 16px;
+        --spacing-lg: 20px;
+        --spacing-xl: 24px;
+        --spacing-xxl: 32px;
+        --spacing-xxxl: 40px;
+        --spacing-xxxxl: 48px;
+
+        /* Border Radius */
+        --radius-xs: 4px;
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --radius-xl: 20px;
+        --radius-xxl: 24px;
+        --radius-pill: 9999px;
+        --radius-button: 28px;
+        --radius-card: 12px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          Oxygen, Ubuntu, sans-serif;
+        background-color: #f5f5f5;
+        color: #1a1a1a;
+        line-height: 1.6;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 24px;
+      }
+
+      h1 {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      .subtitle {
+        font-size: 18px;
+        color: #666;
+        margin-bottom: 40px;
+      }
+
+      h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-top: 48px;
+        margin-bottom: 24px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #e8e8e8;
+      }
+
+      h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-top: 32px;
+        margin-bottom: 16px;
+        color: #333;
+      }
+
+      /* Color Swatches */
+      .color-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+      }
+
+      .color-swatch {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
+
+      .color-preview {
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .color-info {
+        padding: 12px;
+      }
+
+      .color-name {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .color-value {
+        font-size: 12px;
+        color: #666;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+      }
+
+      /* Spacing Demo */
+      .spacing-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .spacing-item {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .spacing-bar {
+        height: 24px;
+        background: linear-gradient(
+          90deg,
+          var(--primary-blue),
+          var(--primary-blue-dark)
+        );
+        border-radius: 4px;
+      }
+
+      .spacing-label {
+        min-width: 80px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .spacing-value {
+        font-size: 13px;
+        color: #666;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+      }
+
+      /* Typography */
+      .typography-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .type-item {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
+
+      .type-label {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+      }
+
+      .type-title {
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 32px;
+        color: #1a1a1a;
+      }
+      .type-heading {
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 28px;
+        color: #1a1a1a;
+      }
+      .type-subheading {
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 24px;
+        color: #1a1a1a;
+      }
+      .type-body {
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 24px;
+        color: #666666;
+      }
+      .type-caption {
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 20px;
+        color: #9e9e9e;
+      }
+      .type-button {
+        font-size: 17px;
+        font-weight: 600;
+        line-height: 22px;
+        color: #1a1a1a;
+      }
+      .type-link {
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 20px;
+        color: #f47d31;
+      }
 
       /* Border Radius */
-      --radius-xs: 4px;
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 16px;
-      --radius-xl: 20px;
-      --radius-xxl: 24px;
-      --radius-pill: 9999px;
-      --radius-button: 28px;
-      --radius-card: 12px;
-    }
+      .radius-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 24px;
+      }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+      .radius-item {
+        text-align: center;
+      }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      background-color: #f5f5f5;
-      color: #1a1a1a;
-      line-height: 1.6;
-    }
+      .radius-preview {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(
+          135deg,
+          var(--primary-orange),
+          var(--primary-orange-light)
+        );
+        margin: 0 auto 12px;
+      }
 
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 40px 24px;
-    }
+      .radius-label {
+        font-size: 14px;
+        font-weight: 500;
+      }
 
-    h1 {
-      font-size: 32px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
+      .radius-value {
+        font-size: 12px;
+        color: #666;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+      }
 
-    .subtitle {
-      font-size: 18px;
-      color: #666;
-      margin-bottom: 40px;
-    }
+      /* Shadows */
+      .shadow-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 24px;
+      }
 
-    h2 {
-      font-size: 24px;
-      font-weight: 600;
-      margin-top: 48px;
-      margin-bottom: 24px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #e8e8e8;
-    }
+      .shadow-item {
+        background: white;
+        padding: 32px;
+        border-radius: 12px;
+        text-align: center;
+      }
 
-    h3 {
-      font-size: 18px;
-      font-weight: 600;
-      margin-top: 32px;
-      margin-bottom: 16px;
-      color: #333;
-    }
+      .shadow-none {
+        box-shadow: none;
+      }
+      .shadow-sm {
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      }
+      .shadow-md {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+      }
+      .shadow-lg {
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
 
-    /* Color Swatches */
-    .color-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
-    }
+      .shadow-label {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
 
-    .color-swatch {
-      background: white;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
+      .shadow-value {
+        font-size: 11px;
+        color: #666;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+      }
 
-    .color-preview {
-      height: 80px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+      /* Component Previews */
+      .component-preview {
+        background: white;
+        padding: 32px;
+        border-radius: 16px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        margin-bottom: 24px;
+      }
 
-    .color-info {
-      padding: 12px;
-    }
+      .component-preview.dark {
+        background: var(--dark-background);
+      }
 
-    .color-name {
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
+      .preview-label {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 16px;
+      }
 
-    .color-value {
-      font-size: 12px;
-      color: #666;
-      font-family: 'SF Mono', Monaco, Consolas, monospace;
-    }
+      .component-preview.dark .preview-label {
+        color: var(--dark-text-secondary);
+      }
 
-    /* Spacing Demo */
-    .spacing-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+      /* Button Styles */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px 24px;
+        border-radius: var(--radius-button);
+        font-size: 17px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        min-height: 56px;
+        width: 100%;
+        margin-bottom: 12px;
+      }
 
-    .spacing-item {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
+      .btn:last-child {
+        margin-bottom: 0;
+      }
 
-    .spacing-bar {
-      height: 24px;
-      background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-dark));
-      border-radius: 4px;
-    }
+      .btn-primary {
+        background: var(--primary-blue);
+        color: white;
+      }
 
-    .spacing-label {
-      min-width: 80px;
-      font-size: 14px;
-      font-weight: 500;
-    }
+      .btn-primary:hover {
+        background: var(--primary-blue-dark);
+      }
 
-    .spacing-value {
-      font-size: 13px;
-      color: #666;
-      font-family: 'SF Mono', Monaco, Consolas, monospace;
-    }
+      .btn-secondary {
+        background: var(--neutral-card-background);
+        color: var(--neutral-black);
+      }
 
-    /* Typography */
-    .typography-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
+      .btn-outline {
+        background: transparent;
+        border: 1.5px solid var(--neutral-gray-200);
+        color: var(--neutral-black);
+      }
 
-    .type-item {
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
+      /* Pill Button */
+      .pill-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px 24px;
+        border-radius: var(--radius-pill);
+        font-size: 16px;
+        font-weight: 500;
+        border: 1.5px solid var(--neutral-gray-200);
+        background: transparent;
+        color: var(--neutral-black);
+        cursor: pointer;
+        transition: all 0.2s;
+        min-height: 52px;
+        margin-bottom: 12px;
+      }
 
-    .type-label {
-      font-size: 12px;
-      color: #666;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
+      .pill-btn:hover {
+        background: var(--neutral-gray-100);
+      }
 
-    .type-title { font-size: 24px; font-weight: 700; line-height: 32px; color: #1a1a1a; }
-    .type-heading { font-size: 22px; font-weight: 700; line-height: 28px; color: #1a1a1a; }
-    .type-subheading { font-size: 18px; font-weight: 600; line-height: 24px; color: #1a1a1a; }
-    .type-body { font-size: 16px; font-weight: 400; line-height: 24px; color: #666666; }
-    .type-caption { font-size: 14px; font-weight: 400; line-height: 20px; color: #9e9e9e; }
-    .type-button { font-size: 17px; font-weight: 600; line-height: 22px; color: #1a1a1a; }
-    .type-link { font-size: 14px; font-weight: 500; line-height: 20px; color: #F47D31; }
+      .pill-btn.selected {
+        background: var(--neutral-card-background);
+        border-color: var(--neutral-card-background);
+      }
 
-    /* Border Radius */
-    .radius-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 24px;
-    }
+      /* Selectable List Item */
+      .list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-radius: var(--radius-pill);
+        background: var(--dark-card-background);
+        color: white;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+      }
 
-    .radius-item {
-      text-align: center;
-    }
+      .list-item:hover {
+        background: var(--dark-card-background-hover);
+      }
 
-    .radius-preview {
-      width: 80px;
-      height: 80px;
-      background: linear-gradient(135deg, var(--primary-orange), var(--primary-orange-light));
-      margin: 0 auto 12px;
-    }
+      .checkbox {
+        width: 28px;
+        height: 28px;
+        border-radius: 14px;
+        background: var(--dark-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
 
-    .radius-label {
-      font-size: 14px;
-      font-weight: 500;
-    }
+      .checkbox.checked {
+        background: var(--primary-blue);
+      }
 
-    .radius-value {
-      font-size: 12px;
-      color: #666;
-      font-family: 'SF Mono', Monaco, Consolas, monospace;
-    }
+      .checkbox.checked::after {
+        content: '✓';
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+      }
 
-    /* Shadows */
-    .shadow-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 24px;
-    }
+      /* Feature Card */
+      .feature-card {
+        display: flex;
+        align-items: center;
+        padding: 16px;
+        border-radius: var(--radius-md);
+        background: var(--dark-card-background);
+        color: white;
+        cursor: pointer;
+        margin-bottom: 12px;
+        transition: all 0.2s;
+      }
 
-    .shadow-item {
-      background: white;
-      padding: 32px;
-      border-radius: 12px;
-      text-align: center;
-    }
+      .feature-card:hover {
+        background: var(--dark-card-background-hover);
+      }
 
-    .shadow-none { box-shadow: none; }
-    .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .shadow-md { box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
-    .shadow-lg { box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+      .feature-card-content {
+        flex: 1;
+        padding-right: 12px;
+      }
 
-    .shadow-label {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
+      .feature-card-title {
+        font-size: 16px;
+        line-height: 22px;
+      }
 
-    .shadow-value {
-      font-size: 11px;
-      color: #666;
-      font-family: 'SF Mono', Monaco, Consolas, monospace;
-    }
+      .feature-card-title strong {
+        font-weight: 700;
+      }
 
-    /* Component Previews */
-    .component-preview {
-      background: white;
-      padding: 32px;
-      border-radius: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      margin-bottom: 24px;
-    }
+      .feature-card-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 32px;
+        background: linear-gradient(
+          135deg,
+          var(--primary-orange),
+          var(--gradient-orange-light)
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+      }
 
-    .component-preview.dark {
-      background: var(--dark-background);
-    }
+      /* Page Indicator */
+      .page-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 16px;
+      }
 
-    .preview-label {
-      font-size: 12px;
-      color: #666;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 16px;
-    }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: var(--neutral-gray-300);
+        transition: all 0.2s;
+      }
 
-    .component-preview.dark .preview-label {
-      color: var(--dark-text-secondary);
-    }
+      .dot.active {
+        background: var(--neutral-gray-800);
+      }
 
-    /* Button Styles */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px 24px;
-      border-radius: var(--radius-button);
-      font-size: 17px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: all 0.2s;
-      min-height: 56px;
-      width: 100%;
-      margin-bottom: 12px;
-    }
+      /* Code Block */
+      .code-block {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 16px;
+        border-radius: 8px;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+        font-size: 13px;
+        overflow-x: auto;
+        margin-top: 16px;
+      }
 
-    .btn:last-child {
-      margin-bottom: 0;
-    }
+      .code-comment {
+        color: #6a9955;
+      }
+      .code-keyword {
+        color: #569cd6;
+      }
+      .code-string {
+        color: #ce9178;
+      }
+      .code-property {
+        color: #9cdcfe;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>TouchGrass Design Tokens</h1>
+      <p class="subtitle">
+        Visual reference for the Headspace-inspired design system
+      </p>
 
-    .btn-primary {
-      background: var(--primary-blue);
-      color: white;
-    }
+      <!-- Colors -->
+      <h2>Colors</h2>
 
-    .btn-primary:hover {
-      background: var(--primary-blue-dark);
-    }
-
-    .btn-secondary {
-      background: var(--neutral-card-background);
-      color: var(--neutral-black);
-    }
-
-    .btn-outline {
-      background: transparent;
-      border: 1.5px solid var(--neutral-gray-200);
-      color: var(--neutral-black);
-    }
-
-    /* Pill Button */
-    .pill-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px 24px;
-      border-radius: var(--radius-pill);
-      font-size: 16px;
-      font-weight: 500;
-      border: 1.5px solid var(--neutral-gray-200);
-      background: transparent;
-      color: var(--neutral-black);
-      cursor: pointer;
-      transition: all 0.2s;
-      min-height: 52px;
-      margin-bottom: 12px;
-    }
-
-    .pill-btn:hover {
-      background: var(--neutral-gray-100);
-    }
-
-    .pill-btn.selected {
-      background: var(--neutral-card-background);
-      border-color: var(--neutral-card-background);
-    }
-
-    /* Selectable List Item */
-    .list-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 20px;
-      border-radius: var(--radius-pill);
-      background: var(--dark-card-background);
-      color: white;
-      font-size: 16px;
-      font-weight: 500;
-      cursor: pointer;
-      margin-bottom: 12px;
-      transition: all 0.2s;
-    }
-
-    .list-item:hover {
-      background: var(--dark-card-background-hover);
-    }
-
-    .checkbox {
-      width: 28px;
-      height: 28px;
-      border-radius: 14px;
-      background: var(--dark-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .checkbox.checked {
-      background: var(--primary-blue);
-    }
-
-    .checkbox.checked::after {
-      content: '✓';
-      color: white;
-      font-size: 14px;
-      font-weight: bold;
-    }
-
-    /* Feature Card */
-    .feature-card {
-      display: flex;
-      align-items: center;
-      padding: 16px;
-      border-radius: var(--radius-md);
-      background: var(--dark-card-background);
-      color: white;
-      cursor: pointer;
-      margin-bottom: 12px;
-      transition: all 0.2s;
-    }
-
-    .feature-card:hover {
-      background: var(--dark-card-background-hover);
-    }
-
-    .feature-card-content {
-      flex: 1;
-      padding-right: 12px;
-    }
-
-    .feature-card-title {
-      font-size: 16px;
-      line-height: 22px;
-    }
-
-    .feature-card-title strong {
-      font-weight: 700;
-    }
-
-    .feature-card-icon {
-      width: 64px;
-      height: 64px;
-      border-radius: 32px;
-      background: linear-gradient(135deg, var(--primary-orange), var(--gradient-orange-light));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-    }
-
-    /* Page Indicator */
-    .page-indicator {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 16px;
-    }
-
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 4px;
-      background: var(--neutral-gray-300);
-      transition: all 0.2s;
-    }
-
-    .dot.active {
-      background: var(--neutral-gray-800);
-    }
-
-    /* Code Block */
-    .code-block {
-      background: #1e1e1e;
-      color: #d4d4d4;
-      padding: 16px;
-      border-radius: 8px;
-      font-family: 'SF Mono', Monaco, Consolas, monospace;
-      font-size: 13px;
-      overflow-x: auto;
-      margin-top: 16px;
-    }
-
-    .code-comment { color: #6a9955; }
-    .code-keyword { color: #569cd6; }
-    .code-string { color: #ce9178; }
-    .code-property { color: #9cdcfe; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>TouchGrass Design Tokens</h1>
-    <p class="subtitle">Visual reference for the Headspace-inspired design system</p>
-
-    <!-- Colors -->
-    <h2>Colors</h2>
-
-    <h3>Primary Colors</h3>
-    <div class="color-grid">
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--primary-orange);"></div>
-        <div class="color-info">
-          <div class="color-name">Orange</div>
-          <div class="color-value">#F47D31</div>
+      <h3>Primary Colors</h3>
+      <div class="color-grid">
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--primary-orange)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Orange</div>
+            <div class="color-value">#F47D31</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--primary-orange-light)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Orange Light</div>
+            <div class="color-value">#FF9F4A</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--primary-blue)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Blue</div>
+            <div class="color-value">#3478F6</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--primary-blue-dark)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Blue Dark</div>
+            <div class="color-value">#2E6BD6</div>
+          </div>
         </div>
       </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--primary-orange-light);"></div>
-        <div class="color-info">
-          <div class="color-name">Orange Light</div>
-          <div class="color-value">#FF9F4A</div>
+
+      <h3>Neutral Colors</h3>
+      <div class="color-grid">
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--neutral-white); border: 1px solid #e8e8e8"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">White</div>
+            <div class="color-value">#FFFFFF</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--neutral-background)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Background</div>
+            <div class="color-value">#FAFAFA</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--neutral-card-background)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Card BG</div>
+            <div class="color-value">#F5F3EF</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--neutral-gray-200)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Gray 200</div>
+            <div class="color-value">#E8E8E8</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--neutral-gray-400)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Gray 400</div>
+            <div class="color-value">#9E9E9E</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--neutral-gray-600)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Gray 600</div>
+            <div class="color-value">#666666</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--neutral-gray-800)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Gray 800</div>
+            <div class="color-value">#333333</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--neutral-black)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Black</div>
+            <div class="color-value">#1A1A1A</div>
+          </div>
         </div>
       </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--primary-blue);"></div>
-        <div class="color-info">
-          <div class="color-name">Blue</div>
-          <div class="color-value">#3478F6</div>
+
+      <h3>Dark Theme Colors</h3>
+      <div class="color-grid">
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--dark-background)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Background</div>
+            <div class="color-value">#0F1535</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--dark-surface)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Surface</div>
+            <div class="color-value">#1A1F3D</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--dark-card-background)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Card BG</div>
+            <div class="color-value">#252A4A</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--dark-border)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Border</div>
+            <div class="color-value">#3D4470</div>
+          </div>
         </div>
       </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--primary-blue-dark);"></div>
-        <div class="color-info">
-          <div class="color-name">Blue Dark</div>
-          <div class="color-value">#2E6BD6</div>
+
+      <h3>Accent Colors</h3>
+      <div class="color-grid">
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--accent-purple)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Purple</div>
+            <div class="color-value">#9B59B6</div>
+          </div>
         </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--accent-pink)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Pink</div>
+            <div class="color-value">#FFB6C1</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--accent-teal)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Teal</div>
+            <div class="color-value">#4ECDC4</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--accent-mint)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Mint</div>
+            <div class="color-value">#7ED9A6</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--accent-yellow)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Yellow</div>
+            <div class="color-value">#FFD93D</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div
+            class="color-preview"
+            style="background: var(--accent-peach)"
+          ></div>
+          <div class="color-info">
+            <div class="color-name">Peach</div>
+            <div class="color-value">#FFAB91</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spacing -->
+      <h2>Spacing</h2>
+      <div class="spacing-grid">
+        <div class="spacing-item">
+          <span class="spacing-label">xxxs</span>
+          <div class="spacing-bar" style="width: 2px"></div>
+          <span class="spacing-value">2px</span>
+        </div>
+        <div class="spacing-item">
+          <span class="spacing-label">xxs</span>
+          <div class="spacing-bar" style="width: 4px"></div>
+          <span class="spacing-value">4px</span>
+        </div>
+        <div class="spacing-item">
+          <span class="spacing-label">xs</span>
+          <div class="spacing-bar" style="width: 8px"></div>
+          <span class="spacing-value">8px</span>
+        </div>
+        <div class="spacing-item">
+          <span class="spacing-label">sm</span>
+          <div class="spacing-bar" style="width: 12px"></div>
+          <span class="spacing-value">12px</span>
+        </div>
+        <div class="spacing-item">
+          <span class="spacing-label">md</span>
+          <div class="spacing-bar" style="width: 16px"></div>
+          <span class="spacing-value">16px</span>
+        </div>
+        <div class="spacing-item">
+          <span class="spacing-label">lg</span>
+          <div class="spacing-bar" style="width: 20px"></div>
+          <span class="spacing-value">20px</span>
+        </div>
+        <div class="spacing-item">
+          <span class="spacing-label">xl</span>
+          <div class="spacing-bar" style="width: 24px"></div>
+          <span class="spacing-value">24px</span>
+        </div>
+        <div class="spacing-item">
+          <span class="spacing-label">xxl</span>
+          <div class="spacing-bar" style="width: 32px"></div>
+          <span class="spacing-value">32px</span>
+        </div>
+        <div class="spacing-item">
+          <span class="spacing-label">xxxl</span>
+          <div class="spacing-bar" style="width: 40px"></div>
+          <span class="spacing-value">40px</span>
+        </div>
+        <div class="spacing-item">
+          <span class="spacing-label">xxxxl</span>
+          <div class="spacing-bar" style="width: 48px"></div>
+          <span class="spacing-value">48px</span>
+        </div>
+      </div>
+
+      <!-- Typography -->
+      <h2>Typography</h2>
+      <div class="typography-grid">
+        <div class="type-item">
+          <div class="type-label">Title - 24px / Bold</div>
+          <div class="type-title">Mindfulness for any moment</div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Heading - 22px / Bold</div>
+          <div class="type-heading">What's on your mind?</div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Subheading - 18px / SemiBold</div>
+          <div class="type-subheading">Choose one option for now</div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Body - 16px / Regular</div>
+          <div class="type-body">
+            Stress less. Move more. Sleep soundly. There's something for
+            everyone.
+          </div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Caption - 14px / Regular</div>
+          <div class="type-caption">You can explore others later.</div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Button - 17px / SemiBold</div>
+          <div class="type-button">Continue</div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Link - 14px / Medium</div>
+          <div class="type-link">Learn more</div>
+        </div>
+      </div>
+
+      <!-- Border Radius -->
+      <h2>Border Radius</h2>
+      <div class="radius-grid">
+        <div class="radius-item">
+          <div
+            class="radius-preview"
+            style="border-radius: var(--radius-xs)"
+          ></div>
+          <div class="radius-label">xs</div>
+          <div class="radius-value">4px</div>
+        </div>
+        <div class="radius-item">
+          <div
+            class="radius-preview"
+            style="border-radius: var(--radius-sm)"
+          ></div>
+          <div class="radius-label">sm</div>
+          <div class="radius-value">8px</div>
+        </div>
+        <div class="radius-item">
+          <div
+            class="radius-preview"
+            style="border-radius: var(--radius-md)"
+          ></div>
+          <div class="radius-label">md</div>
+          <div class="radius-value">12px</div>
+        </div>
+        <div class="radius-item">
+          <div
+            class="radius-preview"
+            style="border-radius: var(--radius-lg)"
+          ></div>
+          <div class="radius-label">lg</div>
+          <div class="radius-value">16px</div>
+        </div>
+        <div class="radius-item">
+          <div
+            class="radius-preview"
+            style="border-radius: var(--radius-xl)"
+          ></div>
+          <div class="radius-label">xl</div>
+          <div class="radius-value">20px</div>
+        </div>
+        <div class="radius-item">
+          <div
+            class="radius-preview"
+            style="border-radius: var(--radius-xxl)"
+          ></div>
+          <div class="radius-label">xxl</div>
+          <div class="radius-value">24px</div>
+        </div>
+        <div class="radius-item">
+          <div
+            class="radius-preview"
+            style="border-radius: var(--radius-pill)"
+          ></div>
+          <div class="radius-label">pill</div>
+          <div class="radius-value">9999px</div>
+        </div>
+        <div class="radius-item">
+          <div
+            class="radius-preview"
+            style="border-radius: var(--radius-button)"
+          ></div>
+          <div class="radius-label">button</div>
+          <div class="radius-value">28px</div>
+        </div>
+      </div>
+
+      <!-- Shadows -->
+      <h2>Shadows</h2>
+      <div class="shadow-grid">
+        <div class="shadow-item shadow-none">
+          <div class="shadow-label">None</div>
+          <div class="shadow-value">no shadow</div>
+        </div>
+        <div class="shadow-item shadow-sm">
+          <div class="shadow-label">Small</div>
+          <div class="shadow-value">0 1px 2px rgba(0,0,0,0.05)</div>
+        </div>
+        <div class="shadow-item shadow-md">
+          <div class="shadow-label">Medium</div>
+          <div class="shadow-value">0 2px 4px rgba(0,0,0,0.08)</div>
+        </div>
+        <div class="shadow-item shadow-lg">
+          <div class="shadow-label">Large</div>
+          <div class="shadow-value">0 4px 8px rgba(0,0,0,0.1)</div>
+        </div>
+      </div>
+
+      <!-- Usage -->
+      <h2>Usage in React Native</h2>
+      <div class="code-block">
+        <span class="code-comment">// Import tokens</span>
+        <span class="code-keyword">import</span> { colors, spacing, typography }
+        <span class="code-keyword">from</span>
+        <span class="code-string">'../theme/tokens'</span>;
+
+        <span class="code-comment">// Import components</span>
+        <span class="code-keyword">import</span> { Button, PillButton,
+        SelectableListItem, FeatureCard, PageIndicator, }
+        <span class="code-keyword">from</span>
+        <span class="code-string">'../components'</span>;
+
+        <span class="code-comment">// Use in your component</span>
+        <span class="code-keyword">const</span>
+        <span class="code-property">MyScreen</span> = () => ( &lt;View style={{
+        padding: spacing.screenPadding }}&gt; &lt;Text
+        style={typography.styles.title}&gt;Welcome&lt;/Text&gt; &lt;Button
+        title=<span class="code-string">"Get Started"</span>
+        onPress={handlePress} /&gt; &lt;/View&gt; );
       </div>
     </div>
-
-    <h3>Neutral Colors</h3>
-    <div class="color-grid">
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--neutral-white); border: 1px solid #e8e8e8;"></div>
-        <div class="color-info">
-          <div class="color-name">White</div>
-          <div class="color-value">#FFFFFF</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--neutral-background);"></div>
-        <div class="color-info">
-          <div class="color-name">Background</div>
-          <div class="color-value">#FAFAFA</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--neutral-card-background);"></div>
-        <div class="color-info">
-          <div class="color-name">Card BG</div>
-          <div class="color-value">#F5F3EF</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--neutral-gray-200);"></div>
-        <div class="color-info">
-          <div class="color-name">Gray 200</div>
-          <div class="color-value">#E8E8E8</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--neutral-gray-400);"></div>
-        <div class="color-info">
-          <div class="color-name">Gray 400</div>
-          <div class="color-value">#9E9E9E</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--neutral-gray-600);"></div>
-        <div class="color-info">
-          <div class="color-name">Gray 600</div>
-          <div class="color-value">#666666</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--neutral-gray-800);"></div>
-        <div class="color-info">
-          <div class="color-name">Gray 800</div>
-          <div class="color-value">#333333</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--neutral-black);"></div>
-        <div class="color-info">
-          <div class="color-name">Black</div>
-          <div class="color-value">#1A1A1A</div>
-        </div>
-      </div>
-    </div>
-
-    <h3>Dark Theme Colors</h3>
-    <div class="color-grid">
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--dark-background);"></div>
-        <div class="color-info">
-          <div class="color-name">Background</div>
-          <div class="color-value">#0F1535</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--dark-surface);"></div>
-        <div class="color-info">
-          <div class="color-name">Surface</div>
-          <div class="color-value">#1A1F3D</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--dark-card-background);"></div>
-        <div class="color-info">
-          <div class="color-name">Card BG</div>
-          <div class="color-value">#252A4A</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--dark-border);"></div>
-        <div class="color-info">
-          <div class="color-name">Border</div>
-          <div class="color-value">#3D4470</div>
-        </div>
-      </div>
-    </div>
-
-    <h3>Accent Colors</h3>
-    <div class="color-grid">
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--accent-purple);"></div>
-        <div class="color-info">
-          <div class="color-name">Purple</div>
-          <div class="color-value">#9B59B6</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--accent-pink);"></div>
-        <div class="color-info">
-          <div class="color-name">Pink</div>
-          <div class="color-value">#FFB6C1</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--accent-teal);"></div>
-        <div class="color-info">
-          <div class="color-name">Teal</div>
-          <div class="color-value">#4ECDC4</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--accent-mint);"></div>
-        <div class="color-info">
-          <div class="color-name">Mint</div>
-          <div class="color-value">#7ED9A6</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--accent-yellow);"></div>
-        <div class="color-info">
-          <div class="color-name">Yellow</div>
-          <div class="color-value">#FFD93D</div>
-        </div>
-      </div>
-      <div class="color-swatch">
-        <div class="color-preview" style="background: var(--accent-peach);"></div>
-        <div class="color-info">
-          <div class="color-name">Peach</div>
-          <div class="color-value">#FFAB91</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Spacing -->
-    <h2>Spacing</h2>
-    <div class="spacing-grid">
-      <div class="spacing-item">
-        <span class="spacing-label">xxxs</span>
-        <div class="spacing-bar" style="width: 2px;"></div>
-        <span class="spacing-value">2px</span>
-      </div>
-      <div class="spacing-item">
-        <span class="spacing-label">xxs</span>
-        <div class="spacing-bar" style="width: 4px;"></div>
-        <span class="spacing-value">4px</span>
-      </div>
-      <div class="spacing-item">
-        <span class="spacing-label">xs</span>
-        <div class="spacing-bar" style="width: 8px;"></div>
-        <span class="spacing-value">8px</span>
-      </div>
-      <div class="spacing-item">
-        <span class="spacing-label">sm</span>
-        <div class="spacing-bar" style="width: 12px;"></div>
-        <span class="spacing-value">12px</span>
-      </div>
-      <div class="spacing-item">
-        <span class="spacing-label">md</span>
-        <div class="spacing-bar" style="width: 16px;"></div>
-        <span class="spacing-value">16px</span>
-      </div>
-      <div class="spacing-item">
-        <span class="spacing-label">lg</span>
-        <div class="spacing-bar" style="width: 20px;"></div>
-        <span class="spacing-value">20px</span>
-      </div>
-      <div class="spacing-item">
-        <span class="spacing-label">xl</span>
-        <div class="spacing-bar" style="width: 24px;"></div>
-        <span class="spacing-value">24px</span>
-      </div>
-      <div class="spacing-item">
-        <span class="spacing-label">xxl</span>
-        <div class="spacing-bar" style="width: 32px;"></div>
-        <span class="spacing-value">32px</span>
-      </div>
-      <div class="spacing-item">
-        <span class="spacing-label">xxxl</span>
-        <div class="spacing-bar" style="width: 40px;"></div>
-        <span class="spacing-value">40px</span>
-      </div>
-      <div class="spacing-item">
-        <span class="spacing-label">xxxxl</span>
-        <div class="spacing-bar" style="width: 48px;"></div>
-        <span class="spacing-value">48px</span>
-      </div>
-    </div>
-
-    <!-- Typography -->
-    <h2>Typography</h2>
-    <div class="typography-grid">
-      <div class="type-item">
-        <div class="type-label">Title - 24px / Bold</div>
-        <div class="type-title">Mindfulness for any moment</div>
-      </div>
-      <div class="type-item">
-        <div class="type-label">Heading - 22px / Bold</div>
-        <div class="type-heading">What's on your mind?</div>
-      </div>
-      <div class="type-item">
-        <div class="type-label">Subheading - 18px / SemiBold</div>
-        <div class="type-subheading">Choose one option for now</div>
-      </div>
-      <div class="type-item">
-        <div class="type-label">Body - 16px / Regular</div>
-        <div class="type-body">Stress less. Move more. Sleep soundly. There's something for everyone.</div>
-      </div>
-      <div class="type-item">
-        <div class="type-label">Caption - 14px / Regular</div>
-        <div class="type-caption">You can explore others later.</div>
-      </div>
-      <div class="type-item">
-        <div class="type-label">Button - 17px / SemiBold</div>
-        <div class="type-button">Continue</div>
-      </div>
-      <div class="type-item">
-        <div class="type-label">Link - 14px / Medium</div>
-        <div class="type-link">Learn more</div>
-      </div>
-    </div>
-
-    <!-- Border Radius -->
-    <h2>Border Radius</h2>
-    <div class="radius-grid">
-      <div class="radius-item">
-        <div class="radius-preview" style="border-radius: var(--radius-xs);"></div>
-        <div class="radius-label">xs</div>
-        <div class="radius-value">4px</div>
-      </div>
-      <div class="radius-item">
-        <div class="radius-preview" style="border-radius: var(--radius-sm);"></div>
-        <div class="radius-label">sm</div>
-        <div class="radius-value">8px</div>
-      </div>
-      <div class="radius-item">
-        <div class="radius-preview" style="border-radius: var(--radius-md);"></div>
-        <div class="radius-label">md</div>
-        <div class="radius-value">12px</div>
-      </div>
-      <div class="radius-item">
-        <div class="radius-preview" style="border-radius: var(--radius-lg);"></div>
-        <div class="radius-label">lg</div>
-        <div class="radius-value">16px</div>
-      </div>
-      <div class="radius-item">
-        <div class="radius-preview" style="border-radius: var(--radius-xl);"></div>
-        <div class="radius-label">xl</div>
-        <div class="radius-value">20px</div>
-      </div>
-      <div class="radius-item">
-        <div class="radius-preview" style="border-radius: var(--radius-xxl);"></div>
-        <div class="radius-label">xxl</div>
-        <div class="radius-value">24px</div>
-      </div>
-      <div class="radius-item">
-        <div class="radius-preview" style="border-radius: var(--radius-pill);"></div>
-        <div class="radius-label">pill</div>
-        <div class="radius-value">9999px</div>
-      </div>
-      <div class="radius-item">
-        <div class="radius-preview" style="border-radius: var(--radius-button);"></div>
-        <div class="radius-label">button</div>
-        <div class="radius-value">28px</div>
-      </div>
-    </div>
-
-    <!-- Shadows -->
-    <h2>Shadows</h2>
-    <div class="shadow-grid">
-      <div class="shadow-item shadow-none">
-        <div class="shadow-label">None</div>
-        <div class="shadow-value">no shadow</div>
-      </div>
-      <div class="shadow-item shadow-sm">
-        <div class="shadow-label">Small</div>
-        <div class="shadow-value">0 1px 2px rgba(0,0,0,0.05)</div>
-      </div>
-      <div class="shadow-item shadow-md">
-        <div class="shadow-label">Medium</div>
-        <div class="shadow-value">0 2px 4px rgba(0,0,0,0.08)</div>
-      </div>
-      <div class="shadow-item shadow-lg">
-        <div class="shadow-label">Large</div>
-        <div class="shadow-value">0 4px 8px rgba(0,0,0,0.1)</div>
-      </div>
-    </div>
-
-    <!-- Component Previews -->
-    <h2>Component Previews</h2>
-
-    <h3>Button</h3>
-    <div class="component-preview">
-      <div class="preview-label">Light Theme</div>
-      <button class="btn btn-primary">Continue</button>
-      <button class="btn btn-secondary">Skip for now</button>
-      <button class="btn btn-outline">Learn more</button>
-    </div>
-
-    <h3>Pill Button</h3>
-    <div class="component-preview">
-      <div class="preview-label">Selection Options</div>
-      <button class="pill-btn">Managing anxiety & stress</button>
-      <button class="pill-btn">Sleeping soundly</button>
-      <button class="pill-btn selected">Being more active</button>
-      <button class="pill-btn">Trying something new</button>
-    </div>
-
-    <h3>Selectable List Item</h3>
-    <div class="component-preview dark">
-      <div class="preview-label">Goal Selection</div>
-      <div class="list-item">
-        <span>Sleep soundly</span>
-        <div class="checkbox checked"></div>
-      </div>
-      <div class="list-item">
-        <span>Feel calm and relaxed</span>
-        <div class="checkbox"></div>
-      </div>
-      <div class="list-item">
-        <span>Reduce stress</span>
-        <div class="checkbox"></div>
-      </div>
-      <div class="list-item">
-        <span>Be present and mindful</span>
-        <div class="checkbox"></div>
-      </div>
-    </div>
-
-    <h3>Feature Card</h3>
-    <div class="component-preview dark">
-      <div class="preview-label">Activity Cards</div>
-      <div class="feature-card">
-        <div class="feature-card-content">
-          <div class="feature-card-title"><strong>Learn the basics</strong> with a meditation or course.</div>
-        </div>
-        <div class="feature-card-icon">🧘</div>
-      </div>
-      <div class="feature-card">
-        <div class="feature-card-content">
-          <div class="feature-card-title"><strong>Sleep soundly</strong> with relaxing music and sleepcasts.</div>
-        </div>
-        <div class="feature-card-icon">🌙</div>
-      </div>
-      <div class="feature-card">
-        <div class="feature-card-content">
-          <div class="feature-card-title"><strong>Try a guided program</strong> on stress or anxious thoughts.</div>
-        </div>
-        <div class="feature-card-icon">✨</div>
-      </div>
-    </div>
-
-    <h3>Page Indicator</h3>
-    <div class="component-preview">
-      <div class="preview-label">Pagination Dots</div>
-      <div class="page-indicator">
-        <div class="dot active"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
-      </div>
-    </div>
-
-    <!-- Usage -->
-    <h2>Usage in React Native</h2>
-    <div class="code-block">
-<span class="code-comment">// Import tokens</span>
-<span class="code-keyword">import</span> { colors, spacing, typography } <span class="code-keyword">from</span> <span class="code-string">'../theme/tokens'</span>;
-
-<span class="code-comment">// Import components</span>
-<span class="code-keyword">import</span> {
-  Button,
-  PillButton,
-  SelectableListItem,
-  FeatureCard,
-  PageIndicator,
-} <span class="code-keyword">from</span> <span class="code-string">'../components'</span>;
-
-<span class="code-comment">// Use in your component</span>
-<span class="code-keyword">const</span> <span class="code-property">MyScreen</span> = () => (
-  &lt;View style={{ padding: spacing.screenPadding }}&gt;
-    &lt;Text style={typography.styles.title}&gt;Welcome&lt;/Text&gt;
-    &lt;Button title=<span class="code-string">"Get Started"</span> onPress={handlePress} /&gt;
-  &lt;/View&gt;
-);
-    </div>
-  </div>
-</body>
+  </body>
 </html>

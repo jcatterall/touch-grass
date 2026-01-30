@@ -1,0 +1,1 @@
+export { triggerHaptic } from './haptics';

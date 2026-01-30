@@ -15,13 +15,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button } from '../components/Button';
+import { Button } from '../../components/Button';
 import {
-  HSColors,
+  Colors,
   type ButtonSize,
   type ButtonVariant,
-  type HSColorMode,
-} from '../theme/theme';
+  type ColorMode,
+} from '../../theme/theme';
 
 // =============================================================================
 // CONSTANTS
@@ -64,7 +64,7 @@ const SampleIcon: React.FC<{ color: ColorValue; size: number }> = ({
 
 interface SectionProps {
   title: string;
-  mode: HSColorMode;
+  mode: ColorMode;
   children: React.ReactNode;
 }
 
@@ -80,7 +80,7 @@ const Section: React.FC<SectionProps> = ({ title, mode, children }) => (
 );
 
 interface ModeContainerProps {
-  mode: HSColorMode;
+  mode: ColorMode;
   children: React.ReactNode;
 }
 
@@ -103,7 +103,7 @@ const ModeContainer: React.FC<ModeContainerProps> = ({ mode, children }) => (
 // =============================================================================
 
 interface VariantShowcaseProps {
-  mode: HSColorMode;
+  mode: ColorMode;
 }
 
 const VariantShowcase: React.FC<VariantShowcaseProps> = ({ mode }) => (
@@ -240,8 +240,8 @@ const StateShowcase: React.FC<VariantShowcaseProps> = ({ mode }) => (
 
 const IconShowcase: React.FC<VariantShowcaseProps> = ({ mode }) => {
   const iconColor = mode === 'dark' ? '#FFFFFF' : '#FFFFFF';
-  const secondaryIconColor = mode === 'dark' ? '#8B9AFF' : HSColors.primaryBlue;
-  const tertiaryIconColor = mode === 'dark' ? '#8B9AFF' : HSColors.primaryBlue;
+  const secondaryIconColor = mode === 'dark' ? '#8B9AFF' : Colors.primaryBlue;
+  const tertiaryIconColor = mode === 'dark' ? '#8B9AFF' : Colors.primaryBlue;
 
   return (
     <Section title="With Icons" mode={mode}>
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 4,
   },
   pageSubtitle: {
@@ -389,12 +389,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   darkModeContainer: {
-    backgroundColor: HSColors.charcoal,
+    backgroundColor: Colors.charcoal,
   },
   modeTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 16,
   },
   sectionTitleDark: {

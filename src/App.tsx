@@ -8,7 +8,7 @@
 import { StatusBar, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import Why from './screens/onboarding/why';
+import { Why } from './screens';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';

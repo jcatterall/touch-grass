@@ -9,8 +9,8 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Select, SelectionRow } from '../components';
-import { HSColors, type HSColorMode, type SelectVariant } from '../theme/theme';
+import { Select, SelectionRow } from '../../components';
+import { Colors, type ColorMode, type SelectVariant } from '../../theme/theme';
 
 // =============================================================================
 // SAMPLE DATA
@@ -55,17 +55,29 @@ const EXPERIENCE_OPTIONS = [
 interface SectionProps {
   title: string;
   subtitle?: string;
-  mode: HSColorMode;
+  mode: ColorMode;
   children: React.ReactNode;
 }
 
-const Section: React.FC<SectionProps> = ({ title, subtitle, mode, children }) => (
+const Section: React.FC<SectionProps> = ({
+  title,
+  subtitle,
+  mode,
+  children,
+}) => (
   <View style={styles.section}>
-    <Text style={[styles.sectionTitle, mode === 'dark' && styles.sectionTitleDark]}>
+    <Text
+      style={[styles.sectionTitle, mode === 'dark' && styles.sectionTitleDark]}
+    >
       {title}
     </Text>
     {subtitle && (
-      <Text style={[styles.sectionSubtitle, mode === 'dark' && styles.sectionSubtitleDark]}>
+      <Text
+        style={[
+          styles.sectionSubtitle,
+          mode === 'dark' && styles.sectionSubtitleDark,
+        ]}
+      >
         {subtitle}
       </Text>
     )}
@@ -74,7 +86,7 @@ const Section: React.FC<SectionProps> = ({ title, subtitle, mode, children }) =>
 );
 
 interface ModeContainerProps {
-  mode: HSColorMode;
+  mode: ColorMode;
   children: React.ReactNode;
 }
 
@@ -97,7 +109,7 @@ const ModeContainer: React.FC<ModeContainerProps> = ({ mode, children }) => (
 // =============================================================================
 
 interface ShowcaseProps {
-  mode: HSColorMode;
+  mode: ColorMode;
 }
 
 const SingleSelectShowcase: React.FC<ShowcaseProps> = ({ mode }) => {
@@ -123,10 +135,9 @@ const SingleSelectShowcase: React.FC<ShowcaseProps> = ({ mode }) => {
 };
 
 const MultiSelectShowcase: React.FC<ShowcaseProps> = ({ mode }) => {
-  const [selectedInterests, setSelectedInterests] = useState<(string | number)[]>([
-    'meditation',
-    'breathing',
-  ]);
+  const [selectedInterests, setSelectedInterests] = useState<
+    (string | number)[]
+  >(['meditation', 'breathing']);
 
   return (
     <Section
@@ -153,10 +164,19 @@ const VariantsShowcase: React.FC<ShowcaseProps> = ({ mode }) => {
   const [orangeValue, setOrangeValue] = useState<string | number>(10);
 
   return (
-    <Section title="Color Variants" subtitle="Blue and Orange themes" mode={mode}>
+    <Section
+      title="Color Variants"
+      subtitle="Blue and Orange themes"
+      mode={mode}
+    >
       <View style={styles.variantsContainer}>
         <View style={styles.variantColumn}>
-          <Text style={[styles.variantLabel, mode === 'dark' && styles.variantLabelDark]}>
+          <Text
+            style={[
+              styles.variantLabel,
+              mode === 'dark' && styles.variantLabelDark,
+            ]}
+          >
             Blue Variant
           </Text>
           <Select
@@ -169,7 +189,12 @@ const VariantsShowcase: React.FC<ShowcaseProps> = ({ mode }) => {
           />
         </View>
         <View style={styles.variantColumn}>
-          <Text style={[styles.variantLabel, mode === 'dark' && styles.variantLabelDark]}>
+          <Text
+            style={[
+              styles.variantLabel,
+              mode === 'dark' && styles.variantLabelDark,
+            ]}
+          >
             Orange Variant
           </Text>
           <Select
@@ -187,7 +212,9 @@ const VariantsShowcase: React.FC<ShowcaseProps> = ({ mode }) => {
 };
 
 const DisabledStatesShowcase: React.FC<ShowcaseProps> = ({ mode }) => {
-  const [selectedExperience, setSelectedExperience] = useState<string | number>('beginner');
+  const [selectedExperience, setSelectedExperience] = useState<string | number>(
+    'beginner',
+  );
 
   return (
     <Section
@@ -294,7 +321,7 @@ const CustomRenderShowcase: React.FC<ShowcaseProps> = ({ mode }) => {
         variant="blue"
         mode={mode}
         renderItem={({ option, isSelected, onPress, defaultRowProps }) => {
-          const customOption = option as typeof customOptions[0];
+          const customOption = option as (typeof customOptions)[0];
           return (
             <SelectionRow
               {...defaultRowProps}
@@ -368,7 +395,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 4,
   },
   pageSubtitle: {
@@ -387,12 +414,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   darkModeContainer: {
-    backgroundColor: HSColors.charcoal,
+    backgroundColor: Colors.charcoal,
   },
   modeTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
@@ -410,7 +437,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 4,
   },
   sectionTitleDark: {

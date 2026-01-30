@@ -1,23 +1,10 @@
 /**
- * Chip - Headspace Design System Chip Component
- *
- * A production-ready, reusable chip/tag component for selection states.
- * Built with Pressable for granular state control (pressed).
- *
- * Features:
- * - Multiple variants: blue, orange, outline
- * - Two sizes: sm (32px), md (40px)
- * - Light/Dark mode support
- * - Haptic feedback on toggle (when react-native-haptic-feedback is installed)
- * - Full accessibility support with selected state announcement
- * - Optional left icon support
- * - Pill shape (borderRadius: 999)
+ * Chip - Reusable chip/tag component for selection states
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React from 'react';
 import {
   Animated,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -29,94 +16,34 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { usePressAnimation } from '../hooks/usePressAnimation';
+import { triggerHaptic } from '../utils/haptics';
 import {
   ChipColorSchemes,
   ChipSizes,
-  HSAnimation,
+  Borders,
+  DisabledColors,
   type ChipSize,
   type ChipVariant,
-  type HSColorMode,
+  type ColorMode,
 } from '../theme/theme';
 
-// =============================================================================
-// HAPTIC FEEDBACK (Optional - gracefully degrades if not installed)
-// =============================================================================
-
-let HapticFeedback: {
-  trigger: (type: string, options?: object) => void;
-} | null = null;
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  HapticFeedback = require('react-native-haptic-feedback').default;
-} catch {
-  HapticFeedback = null;
-}
-
-const triggerHaptic = (enabled: boolean = true): void => {
-  if (!enabled || !HapticFeedback) return;
-
-  try {
-    HapticFeedback.trigger('impactLight', {
-      enableVibrateFallback: true,
-      ignoreAndroidSystemSettings: false,
-    });
-  } catch {
-    // Silently fail if haptics unavailable
-  }
-};
-
-// =============================================================================
-// COMPONENT PROPS
-// =============================================================================
-
 export interface ChipProps {
-  /** Chip text label */
   label: string;
-
-  /** Whether the chip is currently selected */
   isSelected?: boolean;
-
-  /** Chip variant - controls color scheme */
   variant?: ChipVariant;
-
-  /** Chip size - controls height, padding, font size */
   size?: ChipSize;
-
-  /** Color mode - light or dark theme */
-  mode?: HSColorMode;
-
-  /** Optional icon to display on the left side */
+  mode?: ColorMode;
   leftIcon?: React.ReactNode;
-
-  /** Whether the chip is disabled */
   disabled?: boolean;
-
-  /** Whether to enable haptic feedback on press */
   hapticEnabled?: boolean;
-
-  /** Press handler */
   onPress?: (event: GestureResponderEvent) => void;
-
-  /** Accessibility label (defaults to label if not provided) */
   accessibilityLabel?: string;
-
-  /** Accessibility hint for screen readers */
   accessibilityHint?: string;
-
-  /** Custom container style */
   style?: StyleProp<ViewStyle>;
-
-  /** Custom text style */
   textStyle?: StyleProp<TextStyle>;
-
-  /** Test ID for testing */
   testID?: string;
 }
-
-// =============================================================================
-// CHIP COMPONENT
-// =============================================================================
 
 export const Chip: React.FC<ChipProps> = ({
   label,
@@ -134,136 +61,59 @@ export const Chip: React.FC<ChipProps> = ({
   textStyle,
   testID,
 }) => {
-  // Animation value for press scale effect
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const { scaleAnim, handlePressIn, handlePressOut } = usePressAnimation();
 
-  // Get color scheme based on mode, variant, and selection state
   const variantScheme = ChipColorSchemes[mode][variant];
   const colorScheme = isSelected ? variantScheme.selected : variantScheme.unselected;
   const sizeConfig = ChipSizes[size];
-
-  // Check if variant has border (outline variant)
   const hasBorder = variant === 'outline';
 
-  // ==========================================================================
-  // STYLE COMPUTATIONS (Array Style Pattern)
-  // ==========================================================================
+  const getBackgroundColor = (pressed: boolean): string => {
+    if (disabled) return DisabledColors[mode].background;
+    return pressed ? colorScheme.backgroundPressed : colorScheme.background;
+  };
 
-  const getBackgroundColor = useCallback(
-    (pressed: boolean): string => {
-      if (disabled) {
-        return mode === 'dark' ? '#2A2A32' : '#F0F0F0';
-      }
-      return pressed ? colorScheme.backgroundPressed : colorScheme.background;
-    },
-    [colorScheme, disabled, mode],
-  );
+  const textColor = disabled ? DisabledColors[mode].text : colorScheme.text;
 
-  const getTextColor = useCallback((): string => {
-    if (disabled) {
-      return mode === 'dark' ? '#5A5A62' : '#A0A0A0';
-    }
-    return colorScheme.text;
-  }, [colorScheme, disabled, mode]);
-
-  const getBorderStyle = useMemo((): ViewStyle | null => {
+  const getBorderStyle = (): ViewStyle | null => {
     if (!hasBorder) return null;
-
     const borderColor = disabled
-      ? mode === 'dark'
-        ? '#3D3D47'
-        : '#D1D1D1'
+      ? DisabledColors[mode].border
       : (colorScheme as { borderColor?: string }).borderColor ?? 'transparent';
+    return { borderWidth: Borders.width.normal, borderColor };
+  };
 
-    return {
-      borderWidth: 1.5,
-      borderColor,
-    };
-  }, [hasBorder, colorScheme, disabled, mode]);
-
-  // Compute container styles using Array Style Pattern
-  const computeContainerStyle = useCallback(
-    (state: PressableStateCallbackType): StyleProp<ViewStyle> => {
-      const { pressed } = state;
-
-      const baseStyles: ViewStyle = {
-        height: sizeConfig.height,
-        paddingHorizontal: sizeConfig.paddingHorizontal,
-        backgroundColor: getBackgroundColor(pressed),
-      };
-
-      // Array Style Pattern: [base, variant-specific, border, custom]
-      return [styles.container, baseStyles, getBorderStyle, style];
+  const getContainerStyle = (state: PressableStateCallbackType): StyleProp<ViewStyle> => [
+    styles.container,
+    {
+      height: sizeConfig.height,
+      paddingHorizontal: sizeConfig.paddingHorizontal,
+      backgroundColor: getBackgroundColor(state.pressed),
     },
-    [sizeConfig, getBackgroundColor, getBorderStyle, style],
-  );
+    getBorderStyle(),
+    style,
+  ];
 
-  // Compute text styles using Array Style Pattern
-  const computedTextStyle = useMemo((): StyleProp<TextStyle> => {
-    return [
-      styles.text,
-      {
-        fontSize: sizeConfig.fontSize,
-        fontWeight: sizeConfig.fontWeight,
-        color: getTextColor(),
-      },
-      textStyle,
-    ];
-  }, [sizeConfig, getTextColor, textStyle]);
-
-  // ==========================================================================
-  // ANIMATION HANDLERS
-  // ==========================================================================
-
-  const handlePressIn = useCallback(() => {
-    Animated.timing(scaleAnim, {
-      toValue: HSAnimation.pressedScale,
-      duration: HSAnimation.duration.press,
-      useNativeDriver: true,
-    }).start();
-  }, [scaleAnim]);
-
-  const handlePressOut = useCallback(() => {
-    Animated.timing(scaleAnim, {
-      toValue: 1,
-      duration: HSAnimation.duration.release,
-      useNativeDriver: true,
-    }).start();
-  }, [scaleAnim]);
-
-  // ==========================================================================
-  // PRESS HANDLER
-  // ==========================================================================
-
-  const handlePress = useCallback(
-    (event: GestureResponderEvent) => {
-      if (disabled) return;
-
-      // Trigger haptic feedback on successful toggle
-      triggerHaptic(hapticEnabled);
-
-      onPress?.(event);
+  const computedTextStyle: StyleProp<TextStyle> = [
+    styles.text,
+    {
+      fontSize: sizeConfig.fontSize,
+      fontWeight: sizeConfig.fontWeight,
+      color: textColor,
     },
-    [disabled, hapticEnabled, onPress],
-  );
+    textStyle,
+  ];
 
-  // ==========================================================================
-  // RENDER
-  // ==========================================================================
-
-  const renderContent = () => (
-    <View style={[styles.contentContainer, { gap: sizeConfig.gap }]}>
-      {leftIcon && <View style={styles.iconContainer}>{leftIcon}</View>}
-      <Text style={computedTextStyle} numberOfLines={1} allowFontScaling={false}>
-        {label}
-      </Text>
-    </View>
-  );
+  const handlePress = (event: GestureResponderEvent) => {
+    if (disabled) return;
+    if (hapticEnabled) triggerHaptic('impactLight');
+    onPress?.(event);
+  };
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <Pressable
-        style={computeContainerStyle}
+        style={getContainerStyle}
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -271,35 +121,28 @@ export const Chip: React.FC<ChipProps> = ({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityHint={accessibilityHint}
-        accessibilityState={{
-          selected: isSelected,
-          disabled,
-        }}
+        accessibilityState={{ selected: isSelected, disabled }}
         testID={testID}
         android_ripple={null}
       >
-        {renderContent}
+        <View style={[styles.contentContainer, { gap: sizeConfig.gap }]}>
+          {leftIcon && <View style={styles.iconContainer}>{leftIcon}</View>}
+          <Text style={computedTextStyle} numberOfLines={1} allowFontScaling={false}>
+            {label}
+          </Text>
+        </View>
       </Pressable>
     </Animated.View>
   );
 };
-
-// =============================================================================
-// STYLES
-// =============================================================================
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 999, // Pill shape
+    borderRadius: Borders.radius.pill,
     overflow: 'hidden',
-    ...Platform.select({
-      android: {
-        elevation: 0,
-      },
-    }),
   },
   contentContainer: {
     flexDirection: 'row',

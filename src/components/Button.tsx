@@ -1,25 +1,11 @@
 /**
- * Button - Headspace Design System Button Component
- *
- * A production-ready, reusable button component following Headspace design patterns.
- * Built with Pressable for granular state control (hover, pressed, focus).
- *
- * Features:
- * - Multiple variants: primary, secondary, tertiary, danger
- * - Multiple sizes: sm, md, lg, xl
- * - Light/Dark mode support
- * - Haptic feedback (when react-native-haptic-feedback is installed)
- * - Full accessibility support
- * - Loading state with ActivityIndicator
- * - Icon support (left position)
- * - Shape variants: pill, rounded
+ * Button - Reusable button component with multiple variants, sizes, and states
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -31,105 +17,38 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { usePressAnimation } from '../hooks/usePressAnimation';
+import { triggerHaptic } from '../utils/haptics';
 import {
-  HSAnimation,
+  Spacing,
   ButtonShapes,
   ButtonSizes,
   ButtonTypography,
-  HSColorSchemes,
+  ColorSchemes,
   type ButtonShape,
   type ButtonSize,
   type ButtonVariant,
-  type HSColorMode,
+  type ColorMode,
 } from '../theme/theme';
 
-// =============================================================================
-// HAPTIC FEEDBACK (Optional - gracefully degrades if not installed)
-// =============================================================================
-
-let HapticFeedback: {
-  trigger: (type: string, options?: object) => void;
-} | null = null;
-
-try {
-  // Attempt to import react-native-haptic-feedback
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  HapticFeedback = require('react-native-haptic-feedback').default;
-} catch {
-  // Package not installed - haptics will be disabled
-  HapticFeedback = null;
-}
-
-const triggerHaptic = (enabled: boolean = true): void => {
-  if (!enabled || !HapticFeedback) return;
-
-  try {
-    HapticFeedback.trigger('impactLight', {
-      enableVibrateFallback: true,
-      ignoreAndroidSystemSettings: false,
-    });
-  } catch {
-    // Silently fail if haptics unavailable
-  }
-};
-
-// =============================================================================
-// COMPONENT PROPS
-// =============================================================================
-
 export interface ButtonProps {
-  /** Button text content */
   children: string;
-
-  /** Button variant - controls color scheme */
   variant?: ButtonVariant;
-
-  /** Button size - controls height, padding, font size */
   size?: ButtonSize;
-
-  /** Color mode - light or dark theme */
-  mode?: HSColorMode;
-
-  /** Button shape - pill (fully rounded) or rounded (12px radius) */
+  mode?: ColorMode;
   shape?: ButtonShape;
-
-  /** Optional icon to display on the left side */
   iconLeft?: React.ReactNode;
-
-  /** Whether the button is in a loading state */
   isLoading?: boolean;
-
-  /** Whether the button is disabled */
   disabled?: boolean;
-
-  /** Whether to enable haptic feedback on press */
   hapticEnabled?: boolean;
-
-  /** Press handler */
   onPress?: (event: GestureResponderEvent) => void;
-
-  /** Long press handler */
   onLongPress?: (event: GestureResponderEvent) => void;
-
-  /** Accessibility label (defaults to children if not provided) */
   accessibilityLabel?: string;
-
-  /** Accessibility hint for screen readers */
   accessibilityHint?: string;
-
-  /** Custom container style */
   style?: StyleProp<ViewStyle>;
-
-  /** Custom text style */
   textStyle?: StyleProp<TextStyle>;
-
-  /** Test ID for testing */
   testID?: string;
 }
-
-// =============================================================================
-// Button COMPONENT
-// =============================================================================
 
 export const Button: React.FC<ButtonProps> = ({
   children,
@@ -149,147 +68,72 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   testID,
 }) => {
-  // Animation value for press scale effect
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const { scaleAnim, handlePressIn, handlePressOut } = usePressAnimation();
 
-  // Get color scheme based on mode and variant
-  const colorScheme = HSColorSchemes[mode][variant];
+  const colorScheme = ColorSchemes[mode][variant];
   const sizeConfig = ButtonSizes[size];
   const borderRadius = ButtonShapes[shape];
-
-  // Determine if button is effectively disabled
   const isDisabled = disabled || isLoading;
 
-  // ==========================================================================
-  // STYLE COMPUTATIONS (Array Style Pattern)
-  // ==========================================================================
+  const getBackgroundColor = (pressed: boolean): string => {
+    if (isDisabled) return colorScheme.backgroundDisabled;
+    return pressed ? colorScheme.backgroundPressed : colorScheme.background;
+  };
 
-  const getBackgroundColor = useCallback(
-    (pressed: boolean): string => {
-      if (isDisabled) {
-        return colorScheme.backgroundDisabled;
-      }
-      return pressed ? colorScheme.backgroundPressed : colorScheme.background;
-    },
-    [colorScheme, isDisabled],
-  );
+  const textColor = isDisabled ? colorScheme.textDisabled : colorScheme.text;
 
-  const getBorderStyle = useMemo((): ViewStyle | null => {
+  const getBorderStyle = (): ViewStyle | null => {
     if (variant !== 'tertiary') return null;
-
-    const tertiaryScheme = HSColorSchemes[mode].tertiary;
+    const tertiaryScheme = ColorSchemes[mode].tertiary;
     return {
       borderWidth: sizeConfig.borderWidth,
       borderColor: isDisabled
         ? tertiaryScheme.borderColorDisabled
         : tertiaryScheme.borderColor,
     };
-  }, [variant, mode, sizeConfig.borderWidth, isDisabled]);
+  };
 
-  const getTextColor = useCallback((): string => {
-    return isDisabled ? colorScheme.textDisabled : colorScheme.text;
-  }, [colorScheme, isDisabled]);
-
-  // Compute container styles using Array Style Pattern
-  const computeContainerStyle = useCallback(
-    (state: PressableStateCallbackType): StyleProp<ViewStyle> => {
-      const { pressed } = state;
-
-      const baseStyles: ViewStyle = {
-        height: sizeConfig.height,
-        paddingHorizontal: sizeConfig.paddingHorizontal,
-        borderRadius,
-        backgroundColor: getBackgroundColor(pressed),
-      };
-
-      // Array Style Pattern: combine base + variant-specific + custom styles
-      return [styles.container, baseStyles, getBorderStyle, style];
+  const getContainerStyle = (state: PressableStateCallbackType): StyleProp<ViewStyle> => [
+    styles.container,
+    {
+      height: sizeConfig.height,
+      paddingHorizontal: sizeConfig.paddingHorizontal,
+      borderRadius,
+      backgroundColor: getBackgroundColor(state.pressed),
     },
-    [sizeConfig, borderRadius, getBackgroundColor, getBorderStyle, style],
-  );
+    getBorderStyle(),
+    style,
+  ];
 
-  // Compute text styles using Array Style Pattern
-  const computedTextStyle = useMemo((): StyleProp<TextStyle> => {
-    return [
-      styles.text,
-      {
-        fontSize: sizeConfig.fontSize,
-        fontWeight: sizeConfig.fontWeight,
-        color: getTextColor(),
-        letterSpacing: ButtonTypography.letterSpacing,
-      },
-      textStyle,
-    ];
-  }, [sizeConfig, getTextColor, textStyle]);
-
-  // ==========================================================================
-  // ANIMATION HANDLERS
-  // ==========================================================================
-
-  const handlePressIn = useCallback(() => {
-    Animated.timing(scaleAnim, {
-      toValue: HSAnimation.pressedScale,
-      duration: HSAnimation.duration.press,
-      useNativeDriver: true,
-    }).start();
-  }, [scaleAnim]);
-
-  const handlePressOut = useCallback(() => {
-    Animated.timing(scaleAnim, {
-      toValue: 1,
-      duration: HSAnimation.duration.release,
-      useNativeDriver: true,
-    }).start();
-  }, [scaleAnim]);
-
-  // ==========================================================================
-  // PRESS HANDLERS
-  // ==========================================================================
-
-  const handlePress = useCallback(
-    (event: GestureResponderEvent) => {
-      if (isDisabled) return;
-
-      // Trigger haptic feedback
-      triggerHaptic(hapticEnabled);
-
-      // Call provided onPress handler
-      onPress?.(event);
+  const computedTextStyle: StyleProp<TextStyle> = [
+    styles.text,
+    {
+      fontSize: sizeConfig.fontSize,
+      fontWeight: sizeConfig.fontWeight,
+      color: textColor,
+      letterSpacing: ButtonTypography.letterSpacing,
     },
-    [isDisabled, hapticEnabled, onPress],
-  );
+    textStyle,
+  ];
 
-  const handleLongPress = useCallback(
-    (event: GestureResponderEvent) => {
-      if (isDisabled) return;
+  const handlePress = (event: GestureResponderEvent) => {
+    if (isDisabled) return;
+    if (hapticEnabled) triggerHaptic('impactLight');
+    onPress?.(event);
+  };
 
-      // Trigger stronger haptic for long press
-      if (hapticEnabled && HapticFeedback) {
-        try {
-          HapticFeedback.trigger('impactMedium', {
-            enableVibrateFallback: true,
-            ignoreAndroidSystemSettings: false,
-          });
-        } catch {
-          // Silently fail
-        }
-      }
-
-      onLongPress?.(event);
-    },
-    [isDisabled, hapticEnabled, onLongPress],
-  );
-
-  // ==========================================================================
-  // RENDER
-  // ==========================================================================
+  const handleLongPress = (event: GestureResponderEvent) => {
+    if (isDisabled) return;
+    if (hapticEnabled) triggerHaptic('impactMedium');
+    onLongPress?.(event);
+  };
 
   const renderContent = () => {
     if (isLoading) {
       return (
         <ActivityIndicator
           size="small"
-          color={getTextColor()}
+          color={textColor}
           testID={testID ? `${testID}-loading` : undefined}
         />
       );
@@ -298,11 +142,7 @@ export const Button: React.FC<ButtonProps> = ({
     return (
       <View style={styles.contentContainer}>
         {iconLeft && <View style={styles.iconContainer}>{iconLeft}</View>}
-        <Text
-          style={computedTextStyle}
-          numberOfLines={1}
-          allowFontScaling={false}
-        >
+        <Text style={computedTextStyle} numberOfLines={1} allowFontScaling={false}>
           {children}
         </Text>
       </View>
@@ -312,7 +152,7 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <Pressable
-        style={computeContainerStyle}
+        style={getContainerStyle}
         onPress={handlePress}
         onLongPress={onLongPress ? handleLongPress : undefined}
         onPressIn={handlePressIn}
@@ -321,12 +161,8 @@ export const Button: React.FC<ButtonProps> = ({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? children}
         accessibilityHint={accessibilityHint}
-        accessibilityState={{
-          disabled: isDisabled,
-          busy: isLoading,
-        }}
+        accessibilityState={{ disabled: isDisabled, busy: isLoading }}
         testID={testID}
-        // Android ripple effect (disabled for consistent cross-platform feel)
         android_ripple={null}
       >
         {renderContent}
@@ -335,24 +171,12 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-// =============================================================================
-// STYLES
-// =============================================================================
-
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        // iOS-specific shadows for subtle depth
-      },
-      android: {
-        elevation: 0,
-      },
-    }),
   },
   contentContainer: {
     flexDirection: 'row',
@@ -360,11 +184,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconContainer: {
-    marginRight: 8,
+    marginRight: Spacing.xs,
   },
   text: {
     textAlign: 'center',
-    includeFontPadding: false, // Android: removes extra padding
+    includeFontPadding: false,
     textAlignVertical: 'center',
   },
 });

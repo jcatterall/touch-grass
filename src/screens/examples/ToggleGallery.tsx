@@ -9,8 +9,8 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Toggle } from '../components/Toggle';
-import { HSColors, type HSColorMode } from '../theme/theme';
+import { Toggle } from '../../components/Toggle';
+import { Colors, type ColorMode } from '../../theme/theme';
 
 // =============================================================================
 // SETTINGS STATE TYPE
@@ -31,17 +31,19 @@ interface SettingsState {
 
 interface SectionHeaderProps {
   title: string;
-  mode: HSColorMode;
+  mode: ColorMode;
 }
 
 const SectionHeader: React.FC<SectionHeaderProps> = ({ title, mode }) => (
-  <Text style={[styles.sectionHeader, mode === 'dark' && styles.sectionHeaderDark]}>
+  <Text
+    style={[styles.sectionHeader, mode === 'dark' && styles.sectionHeaderDark]}
+  >
     {title}
   </Text>
 );
 
 interface SettingsGroupProps {
-  mode: HSColorMode;
+  mode: ColorMode;
   children: React.ReactNode;
 }
 
@@ -57,7 +59,7 @@ const SettingsGroup: React.FC<SettingsGroupProps> = ({ mode, children }) => (
 );
 
 interface DividerProps {
-  mode: HSColorMode;
+  mode: ColorMode;
 }
 
 const Divider: React.FC<DividerProps> = ({ mode }) => (
@@ -70,7 +72,7 @@ const Divider: React.FC<DividerProps> = ({ mode }) => (
 );
 
 interface ModeContainerProps {
-  mode: HSColorMode;
+  mode: ColorMode;
   children: React.ReactNode;
 }
 
@@ -93,7 +95,7 @@ const ModeContainer: React.FC<ModeContainerProps> = ({ mode, children }) => (
 // =============================================================================
 
 interface SettingsSectionProps {
-  mode: HSColorMode;
+  mode: ColorMode;
 }
 
 const SettingsSection: React.FC<SettingsSectionProps> = ({ mode }) => {
@@ -184,7 +186,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ mode }) => {
 // =============================================================================
 
 interface StatesShowcaseProps {
-  mode: HSColorMode;
+  mode: ColorMode;
 }
 
 const StatesShowcase: React.FC<StatesShowcaseProps> = ({ mode }) => {
@@ -197,68 +199,90 @@ const StatesShowcase: React.FC<StatesShowcaseProps> = ({ mode }) => {
       <SettingsGroup mode={mode}>
         <View style={styles.stateRow}>
           <View style={styles.stateInfo}>
-            <Text style={[styles.stateLabel, mode === 'dark' && styles.stateLabelDark]}>
+            <Text
+              style={[
+                styles.stateLabel,
+                mode === 'dark' && styles.stateLabelDark,
+              ]}
+            >
               On State
             </Text>
-            <Text style={[styles.stateValue, mode === 'dark' && styles.stateValueDark]}>
+            <Text
+              style={[
+                styles.stateValue,
+                mode === 'dark' && styles.stateValueDark,
+              ]}
+            >
               Green track, white thumb
             </Text>
           </View>
-          <Toggle
-            isOn={toggleOn}
-            onToggle={setToggleOn}
-            mode={mode}
-          />
+          <Toggle isOn={toggleOn} onToggle={setToggleOn} mode={mode} />
         </View>
         <Divider mode={mode} />
         <View style={styles.stateRow}>
           <View style={styles.stateInfo}>
-            <Text style={[styles.stateLabel, mode === 'dark' && styles.stateLabelDark]}>
+            <Text
+              style={[
+                styles.stateLabel,
+                mode === 'dark' && styles.stateLabelDark,
+              ]}
+            >
               Off State
             </Text>
-            <Text style={[styles.stateValue, mode === 'dark' && styles.stateValueDark]}>
+            <Text
+              style={[
+                styles.stateValue,
+                mode === 'dark' && styles.stateValueDark,
+              ]}
+            >
               Gray track, white thumb
             </Text>
           </View>
-          <Toggle
-            isOn={toggleOff}
-            onToggle={setToggleOff}
-            mode={mode}
-          />
+          <Toggle isOn={toggleOff} onToggle={setToggleOff} mode={mode} />
         </View>
         <Divider mode={mode} />
         <View style={styles.stateRow}>
           <View style={styles.stateInfo}>
-            <Text style={[styles.stateLabel, mode === 'dark' && styles.stateLabelDark]}>
+            <Text
+              style={[
+                styles.stateLabel,
+                mode === 'dark' && styles.stateLabelDark,
+              ]}
+            >
               Disabled (On)
             </Text>
-            <Text style={[styles.stateValue, mode === 'dark' && styles.stateValueDark]}>
+            <Text
+              style={[
+                styles.stateValue,
+                mode === 'dark' && styles.stateValueDark,
+              ]}
+            >
               Non-interactive state
             </Text>
           </View>
-          <Toggle
-            isOn={true}
-            onToggle={() => {}}
-            mode={mode}
-            disabled
-          />
+          <Toggle isOn={true} onToggle={() => {}} mode={mode} disabled />
         </View>
         <Divider mode={mode} />
         <View style={styles.stateRow}>
           <View style={styles.stateInfo}>
-            <Text style={[styles.stateLabel, mode === 'dark' && styles.stateLabelDark]}>
+            <Text
+              style={[
+                styles.stateLabel,
+                mode === 'dark' && styles.stateLabelDark,
+              ]}
+            >
               Disabled (Off)
             </Text>
-            <Text style={[styles.stateValue, mode === 'dark' && styles.stateValueDark]}>
+            <Text
+              style={[
+                styles.stateValue,
+                mode === 'dark' && styles.stateValueDark,
+              ]}
+            >
               Non-interactive state
             </Text>
           </View>
-          <Toggle
-            isOn={false}
-            onToggle={() => {}}
-            mode={mode}
-            disabled
-          />
+          <Toggle isOn={false} onToggle={() => {}} mode={mode} disabled />
         </View>
       </SettingsGroup>
     </View>
@@ -270,7 +294,7 @@ const StatesShowcase: React.FC<StatesShowcaseProps> = ({ mode }) => {
 // =============================================================================
 
 interface StandaloneShowcaseProps {
-  mode: HSColorMode;
+  mode: ColorMode;
 }
 
 const StandaloneShowcase: React.FC<StandaloneShowcaseProps> = ({ mode }) => {
@@ -281,7 +305,12 @@ const StandaloneShowcase: React.FC<StandaloneShowcaseProps> = ({ mode }) => {
       <SectionHeader title="STANDALONE (NO LABEL)" mode={mode} />
       <SettingsGroup mode={mode}>
         <View style={styles.standaloneRow}>
-          <Text style={[styles.standaloneLabel, mode === 'dark' && styles.standaloneLabelDark]}>
+          <Text
+            style={[
+              styles.standaloneLabel,
+              mode === 'dark' && styles.standaloneLabelDark,
+            ]}
+          >
             Toggle without built-in label (for custom layouts):
           </Text>
           <Toggle
@@ -354,7 +383,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 4,
   },
   pageSubtitle: {
@@ -373,12 +402,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   darkModeContainer: {
-    backgroundColor: HSColors.charcoal,
+    backgroundColor: Colors.charcoal,
   },
   modeTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
@@ -444,7 +473,7 @@ const styles = StyleSheet.create({
   stateLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 2,
   },
   stateLabelDark: {

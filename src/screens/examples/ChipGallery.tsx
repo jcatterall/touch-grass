@@ -15,13 +15,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Chip } from '../components/Chip';
+import { Chip } from '../../components/Chip';
 import {
-  HSColors,
+  Colors,
   type ChipSize,
   type ChipVariant,
-  type HSColorMode,
-} from '../theme/theme';
+  type ColorMode,
+} from '../../theme/theme';
 
 // =============================================================================
 // SAMPLE DATA
@@ -74,7 +74,7 @@ const CheckIcon: React.FC<{ color: ColorValue; size: number }> = ({
 
 interface SectionProps {
   title: string;
-  mode: HSColorMode;
+  mode: ColorMode;
   children: React.ReactNode;
 }
 
@@ -90,7 +90,7 @@ const Section: React.FC<SectionProps> = ({ title, mode, children }) => (
 );
 
 interface ModeContainerProps {
-  mode: HSColorMode;
+  mode: ColorMode;
   children: React.ReactNode;
 }
 
@@ -116,7 +116,7 @@ interface ChipGroupProps {
   items: string[];
   variant: ChipVariant;
   size: ChipSize;
-  mode: HSColorMode;
+  mode: ColorMode;
   multiSelect?: boolean;
 }
 
@@ -172,7 +172,7 @@ const ChipGroup: React.FC<ChipGroupProps> = ({
 // =============================================================================
 
 interface VariantShowcaseProps {
-  mode: HSColorMode;
+  mode: ColorMode;
 }
 
 const VariantsShowcase: React.FC<VariantShowcaseProps> = ({ mode }) => {
@@ -299,7 +299,7 @@ const StatesShowcase: React.FC<VariantShowcaseProps> = ({ mode }) => (
 
 const IconShowcase: React.FC<VariantShowcaseProps> = ({ mode }) => {
   const iconColor = mode === 'dark' ? '#FFFFFF' : '#FFFFFF';
-  const unselectedIconColor = mode === 'dark' ? '#E0E0E0' : HSColors.charcoal;
+  const unselectedIconColor = mode === 'dark' ? '#E0E0E0' : Colors.charcoal;
 
   return (
     <Section title="With Icons" mode={mode}>
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 4,
   },
   pageSubtitle: {
@@ -463,12 +463,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   darkModeContainer: {
-    backgroundColor: HSColors.charcoal,
+    backgroundColor: Colors.charcoal,
   },
   modeTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: HSColors.charcoal,
+    color: Colors.charcoal,
     marginBottom: 16,
   },
   sectionTitleDark: {

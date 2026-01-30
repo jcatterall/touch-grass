@@ -7,20 +7,27 @@ interface MainProps {
   style?: ViewStyle;
 }
 
-export default function Default({ children, style }: MainProps) {
+function Main({ children, style }: MainProps) {
   const insets = useSafeAreaInsets();
 
+  const mainStyle = {
+    flex: 1,
+    paddingTop: insets.top,
+    paddingBottom: insets.bottom,
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
+
+  const containerStyle = {
+    flex: 1,
+    ...style,
+  };
+
   return (
-    <View
-      style={{
-        flex: 1,
-        paddingTop: insets.top,
-        paddingBottom: insets.bottom,
-        paddingLeft: insets.left,
-        paddingRight: insets.right,
-      }}
-    >
-      <View style={{ flex: 1, ...style }}>{children}</View>
+    <View style={mainStyle}>
+      <View style={containerStyle}>{children}</View>
     </View>
   );
 }
+
+export default Main;
