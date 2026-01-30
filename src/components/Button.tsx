@@ -165,7 +165,7 @@ export const Button: React.FC<ButtonProps> = ({
         testID={testID}
         android_ripple={null}
       >
-        {renderContent}
+        {renderContent()}
       </Pressable>
     </Animated.View>
   );

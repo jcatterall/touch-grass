@@ -7,7 +7,7 @@ interface MainProps {
   style?: ViewStyle;
 }
 
-function Main({ children, style }: MainProps) {
+export const Main = ({ children, style }: MainProps) => {
   const insets = useSafeAreaInsets();
 
   const mainStyle = {
@@ -28,6 +28,4 @@ function Main({ children, style }: MainProps) {
       <View style={containerStyle}>{children}</View>
     </View>
   );
-}
-
-export default Main;
+};

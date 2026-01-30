@@ -1,15 +1,18 @@
 import {
   ListRenderItemInfo,
-  StyleProp,
   Text,
   View,
-  ViewStyle,
   Dimensions,
+  StyleSheet,
 } from 'react-native';
-import Main from '../../layout/main';
 import { spacing, typography } from '../../theme';
 import { useCallback, useRef, useState } from 'react';
 import { Button, Carousel, CarouselRef } from '../../components';
+import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
+
+export interface WhyProps {
+  onComplete: () => void;
+}
 
 interface CarouselItem {
   id: string;
@@ -38,41 +41,25 @@ const onboardingSlides: CarouselItem[] = [
   },
 ];
 
-const containerStyle: StyleProp<ViewStyle> = {
-  flex: 1,
-  flexDirection: 'column',
-  justifyContent: 'space-between',
-};
-
-const paginationStyle: StyleProp<ViewStyle> = {
-  marginBottom: spacing.xxxxl,
-};
-
-function Why() {
+export const Why = ({ onComplete }: WhyProps) => {
   const carouselRef = useRef<CarouselRef>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [containerWidth, setContainerWidth] = useState<number>(
     Dimensions.get('window').width - spacing.xl * 2,
   );
-  const isLastSlide = currentPage === onboardingSlides.length - 1;
 
   const continueClicked = useCallback(() => {
-    if (isLastSlide) {
-      console.log('Onboarding complete!');
-    } else {
-      carouselRef.current?.scrollToPage(currentPage + 1);
-    }
-  }, [currentPage, isLastSlide]);
+    const isLastPage = currentPage === onboardingSlides.length - 1;
+
+    isLastPage
+      ? onComplete()
+      : carouselRef.current?.scrollToPage(currentPage + 1);
+  }, [currentPage, onComplete]);
 
   const renderOnboardingItem = useCallback(
     ({ item }: ListRenderItemInfo<CarouselItem>) => {
-      const onboardingItemStyle: StyleProp<ViewStyle> = {
-        flex: 1,
-        flexDirection: 'column',
-        gap: spacing.md,
-      };
       return (
-        <View style={onboardingItemStyle}>
+        <View style={styles.onboardingItem}>
           <Text style={{ ...typography.styles.light.title }}>{item.title}</Text>
           <Text style={{ ...typography.styles.light.body }}>
             {item.subTitle}
@@ -84,34 +71,44 @@ function Why() {
   );
 
   return (
-    <Main style={{ padding: spacing.xl }}>
-      <View style={containerStyle}>
-        <View
-          style={{ flex: 1 }}
-          onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}
-        >
-          <Carousel
-            itemWidth={containerWidth || Dimensions.get('window').width}
-            ref={carouselRef}
-            style={{ flex: 1 }}
-            data={onboardingSlides}
-            renderItem={renderOnboardingItem}
-            keyExtractor={item => item.id}
-            showPagination={true}
-            paginationVariant="dots"
-            paginationActiveColor="blue"
-            onPageChange={setCurrentPage}
-            paginationContainerStyle={paginationStyle}
-          />
-        </View>
-        <View>
-          <Button size="lg" onPress={continueClicked}>
-            Continue
-          </Button>
-        </View>
+    <OnboardingContainer>
+      <View
+        style={styles.flex}
+        onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}
+      >
+        <Carousel
+          itemWidth={containerWidth || Dimensions.get('window').width}
+          ref={carouselRef}
+          style={styles.flex}
+          data={onboardingSlides}
+          renderItem={renderOnboardingItem}
+          keyExtractor={item => item.id}
+          showPagination={true}
+          paginationVariant="dots"
+          paginationActiveColor="blue"
+          onPageChange={setCurrentPage}
+          paginationContainerStyle={styles.pagination}
+        />
       </View>
-    </Main>
+      <View>
+        <Button size="lg" onPress={continueClicked}>
+          Continue
+        </Button>
+      </View>
+    </OnboardingContainer>
   );
-}
+};
 
-export default Why;
+const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  pagination: {
+    marginBottom: spacing.xxxxl,
+  },
+  onboardingItem: {
+    flex: 1,
+    flexDirection: 'column',
+    gap: spacing.md,
+  },
+});

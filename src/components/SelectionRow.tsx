@@ -32,7 +32,14 @@ interface CheckIconProps {
 }
 
 const CheckIcon: React.FC<CheckIconProps> = ({ size, color }) => (
-  <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+  <View
+    style={{
+      width: size,
+      height: size,
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}
+  >
     <View
       style={{
         width: size * 0.6,
@@ -80,7 +87,9 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
   const { scaleAnim, handlePressIn, handlePressOut } = usePressAnimation();
 
   const variantScheme = SelectColorSchemes[mode][variant];
-  const colorScheme = isSelected ? variantScheme.selected : variantScheme.unselected;
+  const colorScheme = isSelected
+    ? variantScheme.selected
+    : variantScheme.unselected;
 
   const getBackgroundColor = (pressed: boolean): string => {
     if (disabled) return DisabledColors[mode].background;
@@ -88,9 +97,15 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
   };
 
   const textColor = disabled ? DisabledColors[mode].text : colorScheme.text;
-  const borderColor = disabled ? 'transparent' : (isSelected ? colorScheme.borderColor : 'transparent');
+  const borderColor = disabled
+    ? 'transparent'
+    : isSelected
+    ? colorScheme.borderColor
+    : 'transparent';
 
-  const getContainerStyle = (state: PressableStateCallbackType): StyleProp<ViewStyle> => [
+  const getContainerStyle = (
+    state: PressableStateCallbackType,
+  ): StyleProp<ViewStyle> => [
     styles.container,
     {
       height: SelectSizes.rowHeight,
@@ -119,7 +134,9 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
       height: SelectSizes.indicatorSize,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: multiSelect ? Borders.radius.xs : SelectSizes.indicatorSize / 2,
+      borderRadius: multiSelect
+        ? Borders.radius.xs
+        : SelectSizes.indicatorSize / 2,
     };
 
     if (disabled) {
@@ -150,26 +167,17 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
   };
 
   const renderIndicator = () => {
-    const indicatorStyle = getIndicatorStyle();
+    // Do not render any indicator for single-selection (radio) style
+    if (!multiSelect) return null;
 
-    if (isSelected && multiSelect) {
-      return (
-        <View style={indicatorStyle}>
-          <CheckIcon size={SelectSizes.checkIconSize} color={colorScheme.checkIcon} />
-        </View>
-      );
-    }
+    const indicatorStyle = getIndicatorStyle();
 
     if (isSelected) {
       return (
         <View style={indicatorStyle}>
-          <View
-            style={{
-              width: SelectSizes.indicatorSize * 0.4,
-              height: SelectSizes.indicatorSize * 0.4,
-              borderRadius: SelectSizes.indicatorSize * 0.2,
-              backgroundColor: colorScheme.checkIcon,
-            }}
+          <CheckIcon
+            size={SelectSizes.checkIconSize}
+            color={colorScheme.checkIcon}
           />
         </View>
       );
@@ -198,7 +206,11 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
         android_ripple={null}
       >
         <View style={styles.content}>
-          <Text style={computedTextStyle} numberOfLines={1} allowFontScaling={false}>
+          <Text
+            style={computedTextStyle}
+            numberOfLines={1}
+            allowFontScaling={false}
+          >
             {label}
           </Text>
           {renderIndicator()}
