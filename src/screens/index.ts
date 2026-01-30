@@ -9,4 +9,4 @@ export { SelectGallery } from './examples/SelectGallery';
 export { ToggleGallery } from './examples/ToggleGallery';
 export { TooltipGallery } from './examples/TooltipGallery';
 
-export { default as Why } from './onboarding/why';
+export { default as Onboarding } from './onboarding/onboarding';

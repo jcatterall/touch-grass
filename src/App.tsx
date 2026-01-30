@@ -5,19 +5,29 @@
  * @format
  */
 
-import { StatusBar, useColorScheme } from 'react-native';
+import {
+  StatusBar,
+  StyleProp,
+  useColorScheme,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
-import { Why } from './screens';
+import { Onboarding } from './screens';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
-  // Switch between ButtonGallery and ChipGallery to view components
+  const style: StyleProp<ViewStyle> = {
+    flex: 1,
+  };
+
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <Why />
+      <View style={style}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <Onboarding />
+      </View>
     </SafeAreaProvider>
   );
 }

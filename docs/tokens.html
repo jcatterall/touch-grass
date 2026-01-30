@@ -63,6 +63,37 @@
         --spacing-xxxl: 40px;
         --spacing-xxxxl: 48px;
 
+        /* Typography Scales - Large Screens */
+        --type-display-1-large: 92px;
+        --type-display-2-large: 64px;
+        --type-display-3-large: 40px;
+        --type-title-1-large: 28px;
+        --type-title-2-large: 24px;
+        --type-title-3-large: 18px;
+        --type-paragraph-1-large: 18px;
+        --type-paragraph-2-large: 16px;
+        --type-paragraph-3-large: 14px;
+        --type-label-1-large: 12px;
+        --type-label-2-large: 10px;
+
+        /* Typography Scales - Small Screens */
+        --type-display-1-small: 56px;
+        --type-display-2-small: 36px;
+        --type-display-3-small: 32px;
+        --type-title-1-small: 28px;
+        --type-title-2-small: 24px;
+        --type-title-3-small: 20px;
+        --type-paragraph-1-small: 18px;
+        --type-paragraph-2-small: 16px;
+        --type-paragraph-3-small: 14px;
+        --type-headline-small: 16px;
+        --type-headline-caps-small: 14px;
+        --type-input-field-small: 16px;
+        --type-label-1-small: 14px;
+        --type-label-2-small: 12px;
+        --type-label-3-small: 10px;
+        --type-label-4-small: 10px;
+
         /* Border Radius */
         --radius-xs: 4px;
         --radius-sm: 8px;
@@ -260,6 +291,113 @@
         font-weight: 500;
         line-height: 20px;
         color: #f47d31;
+      }
+
+      /* Typography Scales - Display */
+      .type-display-1 {
+        font-size: 92px;
+        font-weight: 700;
+        line-height: 1.1;
+        color: #1a1a1a;
+      }
+      .type-display-2 {
+        font-size: 64px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #1a1a1a;
+      }
+      .type-display-3 {
+        font-size: 40px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #1a1a1a;
+      }
+
+      /* Typography Scales - Title */
+      .type-scale-title-1 {
+        font-size: 28px;
+        font-weight: 400;
+        line-height: 1.3;
+        color: #1a1a1a;
+      }
+      .type-scale-title-2 {
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1.3;
+        color: #1a1a1a;
+      }
+      .type-scale-title-3 {
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.3;
+        color: #1a1a1a;
+      }
+
+      /* Typography Scales - Body */
+      .type-scale-paragraph-1 {
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #666666;
+      }
+      .type-scale-paragraph-2 {
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #666666;
+      }
+      .type-scale-paragraph-3 {
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #666666;
+      }
+
+      /* Typography Scales - Labels */
+      .type-scale-label-1 {
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.4;
+        color: #1a1a1a;
+      }
+      .type-scale-label-2 {
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.4;
+        color: #1a1a1a;
+      }
+      .type-scale-label-3 {
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.4;
+        color: #1a1a1a;
+      }
+      .type-scale-label-4 {
+        font-size: 10px;
+        font-weight: 400;
+        line-height: 1.4;
+        color: #666666;
+      }
+
+      /* Typography Scales - Additional */
+      .type-scale-headline {
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.375;
+        color: #1a1a1a;
+      }
+      .type-scale-headline-caps {
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.4;
+        text-transform: uppercase;
+        color: #1a1a1a;
+      }
+      .type-scale-input-field {
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #666666;
       }
 
       /* Border Radius */
@@ -864,37 +1002,96 @@
 
       <!-- Typography -->
       <h2>Typography</h2>
+
+      <h3>Display Scales</h3>
       <div class="typography-grid">
         <div class="type-item">
-          <div class="type-label">Title - 24px / Bold</div>
-          <div class="type-title">Mindfulness for any moment</div>
+          <div class="type-label">Display 1 - 92px / Bold</div>
+          <div class="type-display-1">Welcome</div>
         </div>
         <div class="type-item">
-          <div class="type-label">Heading - 22px / Bold</div>
-          <div class="type-heading">What's on your mind?</div>
+          <div class="type-label">Display 2 - 64px / Bold</div>
+          <div class="type-display-2">Get Started</div>
         </div>
         <div class="type-item">
-          <div class="type-label">Subheading - 18px / SemiBold</div>
-          <div class="type-subheading">Choose one option for now</div>
+          <div class="type-label">Display 3 - 40px / Bold</div>
+          <div class="type-display-3">Main Title</div>
+        </div>
+      </div>
+
+      <h3>Title Scales</h3>
+      <div class="typography-grid">
+        <div class="type-item">
+          <div class="type-label">Title 1 - 28px / Regular</div>
+          <div class="type-scale-title-1">Section Heading</div>
         </div>
         <div class="type-item">
-          <div class="type-label">Body - 16px / Regular</div>
-          <div class="type-body">
-            Stress less. Move more. Sleep soundly. There's something for
-            everyone.
+          <div class="type-label">Title 2 - 24px / Bold</div>
+          <div class="type-scale-title-2">Important Title</div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Title 3 - 18px / Bold</div>
+          <div class="type-scale-title-3">Subsection</div>
+        </div>
+      </div>
+
+      <h3>Body/Paragraph Scales</h3>
+      <div class="typography-grid">
+        <div class="type-item">
+          <div class="type-label">Paragraph 1 - 18px / Regular</div>
+          <div class="type-scale-paragraph-1">
+            Large body text for important content. This is used for
+            introductions and feature descriptions.
           </div>
         </div>
         <div class="type-item">
-          <div class="type-label">Caption - 14px / Regular</div>
-          <div class="type-caption">You can explore others later.</div>
+          <div class="type-label">Paragraph 2 - 16px / Regular</div>
+          <div class="type-scale-paragraph-2">
+            Standard body text used throughout the app. Comfortable to read at
+            any size.
+          </div>
         </div>
         <div class="type-item">
-          <div class="type-label">Button - 17px / SemiBold</div>
-          <div class="type-button">Continue</div>
+          <div class="type-label">Paragraph 3 - 14px / Regular</div>
+          <div class="type-scale-paragraph-3">
+            Smaller body text for supplementary information and details.
+          </div>
+        </div>
+      </div>
+
+      <h3>Label Scales</h3>
+      <div class="typography-grid">
+        <div class="type-item">
+          <div class="type-label">Label 1 - 12px / Bold</div>
+          <div class="type-scale-label-1">IMPORTANT LABEL</div>
         </div>
         <div class="type-item">
-          <div class="type-label">Link - 14px / Medium</div>
-          <div class="type-link">Learn more</div>
+          <div class="type-label">Label 2 - 12px / Bold</div>
+          <div class="type-scale-label-2">Secondary Label</div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Label 3 - 10px / Bold</div>
+          <div class="type-scale-label-3">SMALL LABEL</div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Label 4 - 10px / Regular</div>
+          <div class="type-scale-label-4">Tiny regular label</div>
+        </div>
+      </div>
+
+      <h3>Additional Scales</h3>
+      <div class="typography-grid">
+        <div class="type-item">
+          <div class="type-label">Headline - 16px / Bold</div>
+          <div class="type-scale-headline">Item Headline</div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Headline Caps - 14px / Bold / Uppercase</div>
+          <div class="type-scale-headline-caps">Highlighted text</div>
+        </div>
+        <div class="type-item">
+          <div class="type-label">Input Field - 16px / Regular</div>
+          <div class="type-scale-input-field">Enter your text here</div>
         </div>
       </div>
 

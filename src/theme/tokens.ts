@@ -6,75 +6,75 @@
 export const colors = {
   // Primary Brand Colors
   primary: {
-    orange: '#F47D31',        // Primary orange (checkmarks, selected cards)
-    orangeLight: '#FF9F4A',   // Lighter orange gradient
-    blue: '#3478F6',          // CTA buttons
-    blueDark: '#2E6BD6',      // Blue pressed state (estimated)
+    orange: '#F47D31', // Primary orange (checkmarks, selected cards)
+    orangeLight: '#FF9F4A', // Lighter orange gradient
+    blue: '#3478F6', // CTA buttons
+    blueDark: '#2E6BD6', // Blue pressed state (estimated)
   },
 
   // Gradient Colors (Sun illustration)
   gradient: {
-    yellow: '#FFE566',        // Top of sun rays
-    yellowMid: '#FFD54F',     // Mid sun
-    orangeLight: '#FFAB40',   // Lower sun
-    orangeDark: '#F47D31',    // Base orange
-    skyBlue: '#87CEEB',       // Sky background
-    skyBlueLight: '#B0E0E6',  // Lighter sky
+    yellow: '#FFE566', // Top of sun rays
+    yellowMid: '#FFD54F', // Mid sun
+    orangeLight: '#FFAB40', // Lower sun
+    orangeDark: '#F47D31', // Base orange
+    skyBlue: '#87CEEB', // Sky background
+    skyBlueLight: '#B0E0E6', // Lighter sky
   },
 
   // Neutral Colors
   neutral: {
     white: '#FFFFFF',
-    background: '#FAFAFA',    // Slight off-white background
+    background: '#FAFAFA', // Slight off-white background
     cardBackground: '#F5F3EF', // Beige/cream card background
-    gray100: '#F5F5F5',       // Light gray backgrounds
-    gray200: '#E8E8E8',       // Borders, dividers
-    gray300: '#D1D1D1',       // Toggle off state
-    gray400: '#9E9E9E',       // Secondary text
-    gray600: '#666666',       // Body text
-    gray800: '#333333',       // Primary text
-    black: '#1A1A1A',         // Headings
+    gray100: '#F5F5F5', // Light gray backgrounds
+    gray200: '#E8E8E8', // Borders, dividers
+    gray300: '#D1D1D1', // Toggle off state
+    gray400: '#9E9E9E', // Secondary text
+    gray600: '#666666', // Body text
+    gray800: '#333333', // Primary text
+    black: '#1A1A1A', // Headings
   },
 
   // Dark Theme Colors
   dark: {
-    background: '#0F1535',    // Dark navy background
-    surface: '#1A1F3D',       // Slightly lighter surface
+    background: '#0F1535', // Dark navy background
+    surface: '#1A1F3D', // Slightly lighter surface
     cardBackground: '#252A4A', // Card/list item background
     cardBackgroundHover: '#2D3250', // Hover state
-    border: '#3D4470',        // Subtle borders
-    textPrimary: '#FFFFFF',   // White headings
+    border: '#3D4470', // Subtle borders
+    textPrimary: '#FFFFFF', // White headings
     textSecondary: '#B8BDD4', // Muted text
-    textTertiary: '#6B7194',  // Very muted text
+    textTertiary: '#6B7194', // Very muted text
   },
 
   // Accent Colors (from illustrations)
   accent: {
-    purple: '#9B59B6',        // Illustration element
-    pink: '#FFB6C1',          // Cloud pink
-    pinkLight: '#FFC0CB',     // Light pink clouds
-    teal: '#4ECDC4',          // Illustration ring
-    mint: '#7ED9A6',          // Illustration element
-    yellow: '#FFD93D',        // Star illustration
-    peach: '#FFAB91',         // Peach illustration element
+    purple: '#9B59B6', // Illustration element
+    pink: '#FFB6C1', // Cloud pink
+    pinkLight: '#FFC0CB', // Light pink clouds
+    teal: '#4ECDC4', // Illustration ring
+    mint: '#7ED9A6', // Illustration element
+    yellow: '#FFD93D', // Star illustration
+    peach: '#FFAB91', // Peach illustration element
   },
 
   // Semantic Colors
   semantic: {
-    success: '#F47D31',       // Orange checkmarks
-    link: '#F47D31',          // Orange link text
+    success: '#F47D31', // Orange checkmarks
+    link: '#F47D31', // Orange link text
     disabled: '#D1D1D1',
-    disabledDark: '#4A4F6A',  // Disabled state in dark mode
+    disabledDark: '#4A4F6A', // Disabled state in dark mode
   },
 
   // Text Colors
   text: {
-    primary: '#1A1A1A',       // Main headings
-    secondary: '#666666',     // Body text, descriptions
-    tertiary: '#9E9E9E',      // Subtle text
-    inverse: '#FFFFFF',       // Text on dark/colored backgrounds
-    link: '#F47D31',          // Link text (orange)
-    linkBlue: '#3478F6',      // Alternative link color
+    primary: '#1A1A1A', // Main headings
+    secondary: '#666666', // Body text, descriptions
+    tertiary: '#9E9E9E', // Subtle text
+    inverse: '#FFFFFF', // Text on dark/colored backgrounds
+    link: '#F47D31', // Link text (orange)
+    linkBlue: '#3478F6', // Alternative link color
   },
 };
 
@@ -92,43 +92,19 @@ export const spacing = {
   xxxxl: 48,
 
   // Specific use cases
-  screenPadding: 24,          // Horizontal screen padding
-  cardPadding: 16,            // Internal card padding
-  sectionGap: 24,             // Gap between sections
-  listItemGap: 16,            // Gap between list items
-  buttonMargin: 16,           // Margin around buttons
-  iconTextGap: 12,            // Gap between icon and text
+  screenPadding: 24, // Horizontal screen padding
+  cardPadding: 16, // Internal card padding
+  sectionGap: 24, // Gap between sections
+  listItemGap: 16, // Gap between list items
+  buttonMargin: 16, // Margin around buttons
+  iconTextGap: 12, // Gap between icon and text
 };
 
 export const typography = {
-  // Font Family
-  fontFamily: {
-    regular: 'System',        // SF Pro on iOS, Roboto on Android
-    medium: 'System',
-    semiBold: 'System',
-    bold: 'System',
-  },
+  // Primary font family (site design)
+  fontFamily: 'Apercu',
 
-  // Font Sizes
-  fontSize: {
-    xs: 12,
-    sm: 14,
-    md: 16,
-    lg: 18,
-    xl: 20,
-    xxl: 24,
-    xxxl: 28,
-    display: 32,
-  },
-
-  // Line Heights
-  lineHeight: {
-    tight: 1.2,
-    normal: 1.4,
-    relaxed: 1.6,
-  },
-
-  // Font Weights
+  // Font weight tokens (kept for compatibility)
   fontWeight: {
     regular: '400' as const,
     medium: '500' as const,
@@ -136,62 +112,161 @@ export const typography = {
     bold: '700' as const,
   },
 
-  // Pre-defined text styles
+  // Responsive typography scales provided by design
+  scales: {
+    large_screens: {
+      display: {
+        display_1: { fontSize: 92, fontWeight: '700' },
+        display_2: { fontSize: 64, fontWeight: '700' },
+        display_3: { fontSize: 40, fontWeight: '700' },
+      },
+      title: {
+        title_1: { fontSize: 28, fontWeight: '400' },
+        title_2: { fontSize: 24, fontWeight: '700' },
+        title_3: { fontSize: 18, fontWeight: '700' },
+      },
+      body: {
+        paragraph_1: { fontSize: 18, fontWeight: '400' },
+        paragraph_2: { fontSize: 16, fontWeight: '400' },
+        paragraph_3: { fontSize: 14, fontWeight: '400' },
+      },
+      labels: {
+        label_1: { fontSize: 12, fontWeight: '400' },
+        label_2: { fontSize: 10, fontWeight: '400' },
+      },
+    },
+
+    small_screens: {
+      display: {
+        display_1: { fontSize: 56, fontWeight: '700' },
+        display_2: { fontSize: 36, fontWeight: '700' },
+        display_3: { fontSize: 32, fontWeight: '700' },
+      },
+      title: {
+        title_1: { fontSize: 28, fontWeight: '700' },
+        title_2: { fontSize: 24, fontWeight: '700' },
+        title_3: { fontSize: 20, fontWeight: '700' },
+      },
+      body: {
+        paragraph_1: { fontSize: 18, fontWeight: '400' },
+        paragraph_2: { fontSize: 16, fontWeight: '400' },
+        paragraph_3: { fontSize: 14, fontWeight: '400' },
+        headline: { fontSize: 16, fontWeight: '700' },
+        headline_caps: {
+          fontSize: 14,
+          fontWeight: '700',
+          textTransform: 'uppercase' as const,
+        },
+        input_field: { fontSize: 16, fontWeight: '400' },
+      },
+      labels: {
+        label_1: { fontSize: 14, fontWeight: '700' },
+        label_2: { fontSize: 12, fontWeight: '700' },
+        label_3: { fontSize: 10, fontWeight: '700' },
+        label_4: { fontSize: 10, fontWeight: '400' },
+      },
+    },
+  },
+
+  // Legacy pre-defined text styles kept for backward compatibility with existing components
   styles: {
-    // Large title (e.g., "Try Headspace Plus for free")
-    title: {
-      fontSize: 24,
-      fontWeight: '700' as const,
-      lineHeight: 32,
-      color: '#1A1A1A',
+    light: {
+      title: {
+        fontSize: 36,
+        fontWeight: '700' as const,
+        lineHeight: 42,
+        color: colors.text.primary,
+      },
+      heading: {
+        fontSize: 22,
+        fontWeight: '700' as const,
+        lineHeight: 28,
+        color: colors.text.primary,
+      },
+      subheading: {
+        fontSize: 18,
+        fontWeight: '600' as const,
+        lineHeight: 24,
+        color: colors.text.primary,
+      },
+      body: {
+        fontSize: 16,
+        fontWeight: '400' as const,
+        lineHeight: 24,
+        color: colors.text.secondary,
+      },
+      caption: {
+        fontSize: 14,
+        fontWeight: '400' as const,
+        lineHeight: 20,
+        color: colors.text.tertiary,
+      },
+      price: {
+        fontSize: 18,
+        fontWeight: '600' as const,
+        lineHeight: 24,
+        color: colors.text.inverse,
+      },
+      button: {
+        fontSize: 17,
+        fontWeight: '600' as const,
+        lineHeight: 22,
+      },
+      link: {
+        fontSize: 14,
+        fontWeight: '500' as const,
+        lineHeight: 20,
+        color: colors.text.link,
+      },
     },
-    // Section heading (e.g., "Turn on notifications...")
-    heading: {
-      fontSize: 22,
-      fontWeight: '700' as const,
-      lineHeight: 28,
-      color: '#1A1A1A',
-    },
-    // Subheading (e.g., "Stay motivated")
-    subheading: {
-      fontSize: 18,
-      fontWeight: '600' as const,
-      lineHeight: 24,
-      color: '#1A1A1A',
-    },
-    // Body text
-    body: {
-      fontSize: 16,
-      fontWeight: '400' as const,
-      lineHeight: 24,
-      color: '#666666',
-    },
-    // Small body/caption
-    caption: {
-      fontSize: 14,
-      fontWeight: '400' as const,
-      lineHeight: 20,
-      color: '#9E9E9E',
-    },
-    // Price/emphasis text
-    price: {
-      fontSize: 18,
-      fontWeight: '600' as const,
-      lineHeight: 24,
-      color: '#FFFFFF',
-    },
-    // Button text
-    button: {
-      fontSize: 17,
-      fontWeight: '600' as const,
-      lineHeight: 22,
-    },
-    // Link text
-    link: {
-      fontSize: 14,
-      fontWeight: '500' as const,
-      lineHeight: 20,
-      color: '#F47D31',
+    dark: {
+      title: {
+        fontSize: 36,
+        fontWeight: '700' as const,
+        lineHeight: 42,
+        color: colors.dark.textPrimary,
+      },
+      heading: {
+        fontSize: 22,
+        fontWeight: '700' as const,
+        lineHeight: 28,
+        color: colors.dark.textPrimary,
+      },
+      subheading: {
+        fontSize: 18,
+        fontWeight: '600' as const,
+        lineHeight: 24,
+        color: colors.dark.textPrimary,
+      },
+      body: {
+        fontSize: 16,
+        fontWeight: '400' as const,
+        lineHeight: 24,
+        color: colors.dark.textSecondary,
+      },
+      caption: {
+        fontSize: 14,
+        fontWeight: '400' as const,
+        lineHeight: 20,
+        color: colors.dark.textTertiary,
+      },
+      price: {
+        fontSize: 18,
+        fontWeight: '600' as const,
+        lineHeight: 24,
+        color: colors.dark.textPrimary,
+      },
+      button: {
+        fontSize: 17,
+        fontWeight: '600' as const,
+        lineHeight: 22,
+      },
+      link: {
+        fontSize: 14,
+        fontWeight: '500' as const,
+        lineHeight: 20,
+        color: colors.text.link,
+      },
     },
   },
 };
@@ -204,13 +279,13 @@ export const borderRadius = {
   lg: 16,
   xl: 20,
   xxl: 24,
-  pill: 9999,               // Fully rounded (buttons)
+  pill: 9999, // Fully rounded (buttons)
 
   // Specific components
-  button: 28,               // Primary buttons are very rounded
-  card: 12,                 // Card corners
-  toggle: 16,               // Toggle switch
-  badge: 8,                 // Small badges like "Best value"
+  button: 28, // Primary buttons are very rounded
+  card: 12, // Card corners
+  toggle: 16, // Toggle switch
+  badge: 8, // Small badges like "Best value"
 };
 
 export const shadows = {

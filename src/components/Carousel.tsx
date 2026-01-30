@@ -2,7 +2,13 @@
  * Carousel - Horizontal carousel with pagination integration
  */
 
-import React, { useCallback, useRef, useImperativeHandle, forwardRef, useEffect } from 'react';
+import React, {
+  useCallback,
+  useRef,
+  useImperativeHandle,
+  forwardRef,
+  useEffect,
+} from 'react';
 import {
   Dimensions,
   FlatList,
@@ -22,23 +28,32 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Pagination, type PaginationProps } from './Pagination';
-import { CarouselSizes, type ColorMode, type PaginationVariant } from '../theme/theme';
+import {
+  CarouselSizes,
+  type ColorMode,
+  type PaginationVariant,
+} from '../theme/theme';
 
-const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as unknown as typeof FlatList;
+const AnimatedFlatList = Animated.createAnimatedComponent(
+  FlatList,
+) as unknown as typeof FlatList;
 
 export interface CarouselRef {
   scrollToPage: (index: number, animated?: boolean) => void;
   getCurrentPage: () => number;
 }
 
-export type PaginationPosition = 'top' | 'bottom' | 'overlay-top' | 'overlay-bottom';
+export type PaginationPosition =
+  | 'top'
+  | 'bottom'
+  | 'overlay-top'
+  | 'overlay-bottom';
 
 export interface CarouselProps<T> {
   data: T[];
   renderItem: (info: ListRenderItemInfo<T>) => React.ReactElement;
   keyExtractor?: (item: T, index: number) => string;
   itemWidth?: number;
-  height?: number;
   showPagination?: boolean;
   paginationPosition?: PaginationPosition;
   paginationVariant?: PaginationVariant;
@@ -62,7 +77,6 @@ function CarouselInner<T>(
     renderItem,
     keyExtractor,
     itemWidth = Dimensions.get('window').width,
-    height = CarouselSizes.defaultHeight,
     showPagination = true,
     paginationPosition = 'top',
     paginationVariant = 'dots',
@@ -79,7 +93,7 @@ function CarouselInner<T>(
     contentContainerStyle,
     testID,
   }: CarouselProps<T>,
-  ref: React.Ref<CarouselRef>
+  ref: React.Ref<CarouselRef>,
 ) {
   const flatListRef = useRef<FlatList<T>>(null);
   const currentPageRef = useRef(initialPage);
@@ -91,7 +105,7 @@ function CarouselInner<T>(
   }, [animValue, onAnimValueChange]);
 
   const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
+    onScroll: event => {
       scrollX.value = event.contentOffset.x;
       animValue.value = event.contentOffset.x / itemWidth;
     },
@@ -100,7 +114,10 @@ function CarouselInner<T>(
   useImperativeHandle(ref, () => ({
     scrollToPage: (index: number, animated = true) => {
       if (index >= 0 && index < data.length) {
-        flatListRef.current?.scrollToOffset({ offset: index * itemWidth, animated });
+        flatListRef.current?.scrollToOffset({
+          offset: index * itemWidth,
+          animated,
+        });
       }
     },
     getCurrentPage: () => currentPageRef.current,
@@ -119,7 +136,7 @@ function CarouselInner<T>(
       }
       onScrollEnd?.(newPage);
     },
-    [itemWidth, onPageChange, onScrollEnd]
+    [itemWidth, onPageChange, onScrollEnd],
   );
 
   const handleViewableItemsChanged = useCallback(
@@ -132,31 +149,46 @@ function CarouselInner<T>(
         }
       }
     },
-    [onPageChange]
+    [onPageChange],
   );
 
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const viewabilityConfig = useRef({
+    viewAreaCoveragePercentThreshold: 50,
+  }).current;
 
   const handlePaginationPageChange = useCallback(
     (index: number) => {
-      flatListRef.current?.scrollToOffset({ offset: index * itemWidth, animated: true });
+      flatListRef.current?.scrollToOffset({
+        offset: index * itemWidth,
+        animated: true,
+      });
     },
-    [itemWidth]
+    [itemWidth],
   );
 
   const renderItemWrapper = useCallback(
-    (info: ListRenderItemInfo<T>) => <View style={{ width: itemWidth }}>{renderItem(info)}</View>,
-    [itemWidth, renderItem]
+    (info: ListRenderItemInfo<T>) => (
+      <View style={{ width: itemWidth, flex: 1 }}>{renderItem(info)}</View>
+    ),
+    [itemWidth, renderItem],
   );
 
-  const isOverlay = paginationPosition === 'overlay-top' || paginationPosition === 'overlay-bottom';
-  const isTop = paginationPosition === 'top' || paginationPosition === 'overlay-top';
+  const isOverlay =
+    paginationPosition === 'overlay-top' ||
+    paginationPosition === 'overlay-bottom';
+  const isTop =
+    paginationPosition === 'top' || paginationPosition === 'overlay-top';
 
   const renderPagination = () => {
     if (!showPagination || data.length <= 1) return null;
 
     const overlayStyle = isOverlay
-      ? [styles.paginationOverlay, isTop ? { top: CarouselSizes.paginationBottomOffset } : { bottom: CarouselSizes.paginationBottomOffset }]
+      ? [
+          styles.paginationOverlay,
+          isTop
+            ? { top: CarouselSizes.paginationBottomOffset }
+            : { bottom: CarouselSizes.paginationBottomOffset },
+        ]
       : styles.paginationStatic;
 
     return (
@@ -177,7 +209,7 @@ function CarouselInner<T>(
   return (
     <View style={[styles.container, style]} testID={testID}>
       {isTop && renderPagination()}
-      <View style={{ height }}>
+      <View style={{ flex: 1 }}>
         <AnimatedFlatList
           ref={flatListRef}
           data={data}
@@ -194,7 +226,11 @@ function CarouselInner<T>(
           onViewableItemsChanged={handleViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           initialScrollIndex={initialPage}
-          getItemLayout={(_, index) => ({ length: itemWidth, offset: itemWidth * index, index })}
+          getItemLayout={(_, index) => ({
+            length: itemWidth,
+            offset: itemWidth * index,
+            index,
+          })}
           contentContainerStyle={contentContainerStyle}
           decelerationRate="fast"
           snapToInterval={itemWidth}
@@ -207,7 +243,7 @@ function CarouselInner<T>(
 }
 
 export const Carousel = forwardRef(CarouselInner) as <T>(
-  props: CarouselProps<T> & { ref?: React.Ref<CarouselRef> }
+  props: CarouselProps<T> & { ref?: React.Ref<CarouselRef> },
 ) => React.ReactElement;
 
 const styles = StyleSheet.create({
