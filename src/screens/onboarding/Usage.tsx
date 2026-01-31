@@ -1,7 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { Main } from '../../layout/Main';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
-import { spacing, typography } from '../../theme';
+import { spacing } from '../../theme';
 import { Button } from '../../components';
 
 export interface PlanProps {
@@ -16,11 +15,11 @@ export const Usage = ({ onComplete }: PlanProps) => {
   return (
     <OnboardingContainer>
       <View>
-        <View></View>
-        <Button size="lg" onPress={handleContinue}>
-          Continue
-        </Button>
+        <Text>Usage</Text>
       </View>
+      <Button size="lg" onPress={handleContinue}>
+        Continue
+      </Button>
     </OnboardingContainer>
   );
 };

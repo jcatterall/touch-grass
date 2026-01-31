@@ -4,17 +4,44 @@ import { Goals } from './Goals';
 import { Plan } from './Plan';
 import { Usage } from './Usage';
 import { Home } from './Home';
+import { GoalsSplash } from './GoalsSplash';
+import { PlanSplash } from './PlanSplash';
+import { Streak } from './Streak';
+import { Paywall } from './Paywall';
+import { Notification } from '../Notification';
 
-const Steps: OnboardingStep[] = ['home', 'why', 'usage', 'goals', 'plan'];
-type OnboardingStep = 'home' | 'why' | 'goals' | 'plan' | 'usage';
+const Steps: OnboardingStep[] = [
+  'home',
+  'why',
+  'usage',
+  'goalsSplash',
+  'goals',
+  'planSplash',
+  'plan',
+  'streak',
+  'paywall',
+  'notification',
+]; //ordered
+type OnboardingStep =
+  | 'home'
+  | 'why'
+  | 'goalsSplash'
+  | 'goals'
+  | 'planSplash'
+  | 'plan'
+  | 'usage'
+  | 'streak'
+  | 'paywall'
+  | 'notification';
 
 export const Onboarding = () => {
-  //TODO: default to why
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>('home');
+  //TODO: default to home
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>('usage');
 
-  const handleNext = () => {
+  const handleNext = (skip: boolean = false) => {
     const currentIndex = Steps.indexOf(currentStep);
-    const nextStep = Steps[currentIndex + 1];
+    const nextIndex = skip ? 2 : 1; //skip next
+    const nextStep = Steps[currentIndex + nextIndex];
 
     if (nextStep) {
       setCurrentStep(nextStep);
@@ -26,9 +53,16 @@ export const Onboarding = () => {
   const StepComponent = {
     home: <Home onComplete={handleNext} />,
     why: <Why onComplete={handleNext} />,
+    goalsSplash: <GoalsSplash onComplete={handleNext} />,
     goals: <Goals onComplete={handleNext} />,
+    planSplash: (
+      <PlanSplash onSkip={() => handleNext(true)} onComplete={handleNext} />
+    ),
     plan: <Plan onComplete={handleNext} />,
     usage: <Usage onComplete={handleNext} />,
+    streak: <Streak onComplete={handleNext} />,
+    paywall: <Paywall onComplete={handleNext} />,
+    notification: <Notification onComplete={handleNext} />,
   }[currentStep];
 
   return <>{StepComponent}</>;

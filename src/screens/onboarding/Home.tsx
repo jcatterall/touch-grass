@@ -15,24 +15,39 @@ export const Home = ({ onComplete }: PlanProps) => {
   return (
     <OnboardingContainer>
       <View style={styles.top}>
-        <Text style={{ ...typography.styles.light.title, ...styles.fontAlign }}>
-          Regain control over your screen time.
-        </Text>
-      </View>
-      <View style={styles.center}>
         <Text style={{ ...styles.fontAlign, ...typography.styles.light.title }}>
           🎉
         </Text>
       </View>
+      <View style={styles.center}>
+        <Text
+          style={{
+            ...typography.styles.light.largeHeading,
+            ...styles.fontAlign,
+          }}
+        >
+          Expand your mind by walking outside you little
+        </Text>
+        <Text
+          style={{
+            ...typography.styles.light.body,
+            ...styles.fontAlign,
+          }}
+        >
+          Learn to be a better person with more walking and such, it's just
+          better for you.
+        </Text>
+      </View>
+
       <View style={styles.bottom}>
-        <Button size="lg" onPress={handleContinue}>
-          Let's do it
-        </Button>
         <Text
           style={{ ...typography.styles.light.caption, ...styles.fontAlign }}
         >
-          By proceeding, you agree to our Privacy Policy and Conditions of Use
+          Some text would go here
         </Text>
+        <Button size="lg" onPress={handleContinue}>
+          Get started
+        </Button>
       </View>
     </OnboardingContainer>
   );
@@ -40,11 +55,13 @@ export const Home = ({ onComplete }: PlanProps) => {
 
 const styles = StyleSheet.create({
   top: {
-    marginTop: spacing.xxxl,
+    marginTop: spacing.xl,
   },
-  center: {},
+  center: {
+    gap: spacing.sm,
+  },
   bottom: {
-    gap: spacing.xxxl,
+    gap: spacing.xxl,
   },
   fontAlign: {
     textAlign: 'center',

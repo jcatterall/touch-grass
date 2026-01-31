@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Touch Grass - App Mockup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Custom Palette Implementation */
+      :root {
+        --meadow-green: #4f7942;
+        --terracotta: #e2725b;
+        --oatmeal: #f5f5dc;
+        --sky-blue: #87ceeb;
+        --charcoal: #2f2f2f;
+      }
+
+      body {
+        background-color: var(--oatmeal);
+        color: var(--charcoal);
+        font-family: 'Inter', sans-serif;
+      }
+
+      /* Isometric-style "Hard" Shadows */
+      .iso-card {
+        background: white;
+        border: 2px solid var(--charcoal);
+        box-shadow: 6px 6px 0px var(--charcoal);
+        transition: all 0.2s ease;
+      }
+
+      .iso-card:active {
+        transform: translate(3px, 3px);
+        box-shadow: 2px 2px 0px var(--charcoal);
+      }
+
+      .btn-primary {
+        background-color: var(--meadow-green);
+        color: white;
+        border: 2px solid var(--charcoal);
+        box-shadow: 4px 4px 0px var(--charcoal);
+      }
+
+      .blocked-app {
+        background-color: white;
+        border: 2px solid var(--charcoal);
+        opacity: 0.6;
+        filter: grayscale(0.5);
+      }
+
+      .status-badge {
+        background-color: var(--terracotta);
+        color: white;
+        padding: 2px 8px;
+        border: 2px solid var(--charcoal);
+        font-weight: bold;
+        font-size: 12px;
+        transform: rotate(-2deg);
+      }
+    </style>
+  </head>
+  <body class="flex items-center justify-center min-h-screen p-4">
+    <div
+      class="mt-8 grid grid-cols-2 md:grid-cols-5 gap-4 max-w-4xl mx-auto p-6"
+    >
+      <div class="iso-card p-4 flex flex-col items-center">
+        <div
+          class="w-12 h-12 rounded-full border-2 border-[#2F2F2F] mb-2"
+          style="background-color: #4f7942"
+        ></div>
+        <span class="text-[10px] font-black uppercase">Meadow Green</span>
+        <span class="text-xs font-mono">#4F7942</span>
+      </div>
+
+      <div class="iso-card p-4 flex flex-col items-center">
+        <div
+          class="w-12 h-12 rounded-full border-2 border-[#2F2F2F] mb-2"
+          style="background-color: #e2725b"
+        ></div>
+        <span class="text-[10px] font-black uppercase">Terracotta</span>
+        <span class="text-xs font-mono">#E2725B</span>
+      </div>
+
+      <div class="iso-card p-4 flex flex-col items-center">
+        <div
+          class="w-12 h-12 rounded-full border-2 border-[#2F2F2F] mb-2"
+          style="background-color: #f5f5dc"
+        ></div>
+        <span class="text-[10px] font-black uppercase">Oatmeal</span>
+        <span class="text-xs font-mono">#F5F5DC</span>
+      </div>
+
+      <div class="iso-card p-4 flex flex-col items-center">
+        <div
+          class="w-12 h-12 rounded-full border-2 border-[#2F2F2F] mb-2"
+          style="background-color: #87ceeb"
+        ></div>
+        <span class="text-[10px] font-black uppercase">Sky Blue</span>
+        <span class="text-xs font-mono">#87CEEB</span>
+      </div>
+
+      <div class="iso-card p-4 flex flex-col items-center">
+        <div
+          class="w-12 h-12 rounded-full border-2 border-[#2F2F2F] mb-2"
+          style="background-color: #2f2f2f"
+        ></div>
+        <span class="text-[10px] font-black uppercase">Charcoal</span>
+        <span class="text-xs font-mono">#2F2F2F</span>
+      </div>
+    </div>
+    <div
+      class="w-80 h-[600px] bg-[#F5F5DC] border-[4px] border-[#2F2F2F] rounded-[3rem] overflow-hidden relative shadow-2xl"
+    >
+      <div class="p-6 pt-10">
+        <div class="flex justify-between items-start">
+          <div>
+            <h1
+              class="text-3xl font-black italic uppercase tracking-tighter"
+              style="color: var(--charcoal)"
+            >
+              Touch<br />Grass
+            </h1>
+            <p class="text-xs font-bold opacity-70">STATUS: INDOORS</p>
+          </div>
+          <div class="status-badge">LOCKED</div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4">
+        <div
+          class="w-full h-32 bg-[#87CEEB] border-2 border-[#2F2F2F] rounded-xl flex items-center justify-center relative overflow-hidden"
+        >
+          <div
+            class="absolute inset-0 opacity-20"
+            style="
+              background-image: radial-gradient(
+                var(--charcoal) 1px,
+                transparent 1px
+              );
+              background-size: 8px 8px;
+            "
+          ></div>
+          <span class="font-bold text-[#2F2F2F] z-10"
+            >Illustration Placeholder</span
+          >
+        </div>
+      </div>
+
+      <div class="px-6 space-y-3">
+        <p
+          class="text-[10px] font-bold uppercase tracking-widest border-b-2 border-[#2F2F2F] pb-1"
+        >
+          Blocked Apps
+        </p>
+
+        <div class="blocked-app p-3 rounded-lg flex items-center gap-3">
+          <div
+            class="w-8 h-8 bg-[#E2725B] border-2 border-[#2F2F2F] rounded-md"
+          ></div>
+          <div>
+            <p class="text-sm font-bold">Instagram</p>
+            <p class="text-[10px]">Restricted until 200m walk</p>
+          </div>
+        </div>
+
+        <div class="blocked-app p-3 rounded-lg flex items-center gap-3">
+          <div
+            class="w-8 h-8 bg-[#2F2F2F] border-2 border-[#2F2F2F] rounded-md"
+          ></div>
+          <div>
+            <p class="text-sm font-bold">TikTok</p>
+            <p class="text-[10px]">Locked</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="absolute bottom-10 left-0 right-0 px-6">
+        <button
+          class="btn-primary w-full py-4 rounded-xl font-black text-lg uppercase tracking-tight"
+        >
+          Go Outside
+        </button>
+      </div>
+    </div>
+  </body>
+</html>

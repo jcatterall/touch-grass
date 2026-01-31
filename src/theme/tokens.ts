@@ -110,6 +110,7 @@ export const typography = {
     medium: '500' as const,
     semiBold: '600' as const,
     bold: '700' as const,
+    extraBold: '900' as const,
   },
 
   // Responsive typography scales provided by design
@@ -171,10 +172,22 @@ export const typography = {
   // Legacy pre-defined text styles kept for backward compatibility with existing components
   styles: {
     light: {
+      largeTitle: {
+        fontSize: 48,
+        fontWeight: '700' as const,
+        lineHeight: 54,
+        color: colors.text.primary,
+      },
       title: {
         fontSize: 36,
         fontWeight: '700' as const,
         lineHeight: 42,
+        color: colors.text.primary,
+      },
+      largeHeading: {
+        fontSize: 28,
+        fontWeight: '700' as const,
+        lineHeight: 36,
         color: colors.text.primary,
       },
       heading: {
@@ -185,7 +198,7 @@ export const typography = {
       },
       subheading: {
         fontSize: 18,
-        fontWeight: '600' as const,
+        fontWeight: '400' as const,
         lineHeight: 24,
         color: colors.text.primary,
       },
@@ -216,14 +229,26 @@ export const typography = {
         fontSize: 14,
         fontWeight: '500' as const,
         lineHeight: 20,
-        color: colors.text.link,
+        color: colors.text.secondary,
       },
     },
     dark: {
+      largeTitle: {
+        fontSize: 48,
+        fontWeight: '700' as const,
+        lineHeight: 54,
+        color: colors.dark.textPrimary,
+      },
       title: {
         fontSize: 36,
         fontWeight: '700' as const,
         lineHeight: 42,
+        color: colors.dark.textPrimary,
+      },
+      largeHeading: {
+        fontSize: 28,
+        fontWeight: '700' as const,
+        lineHeight: 36,
         color: colors.dark.textPrimary,
       },
       heading: {
@@ -234,7 +259,7 @@ export const typography = {
       },
       subheading: {
         fontSize: 18,
-        fontWeight: '600' as const,
+        fontWeight: '400' as const,
         lineHeight: 24,
         color: colors.dark.textPrimary,
       },
@@ -265,7 +290,7 @@ export const typography = {
         fontSize: 14,
         fontWeight: '500' as const,
         lineHeight: 20,
-        color: colors.text.link,
+        color: colors.text.secondary,
       },
     },
   },

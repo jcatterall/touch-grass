@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
 import { useState } from 'react';
 import { spacing, typography } from '../../theme';
@@ -28,8 +28,6 @@ export const Goals = ({ onComplete }: GoalsProps) => {
   const isLastPage = currentPage === Steps.length - 1;
 
   const handleContinue = () => {
-    if (!selectedValue) return;
-
     if (isLastPage) {
       onComplete();
     } else {
@@ -44,10 +42,21 @@ export const Goals = ({ onComplete }: GoalsProps) => {
 
   return (
     <OnboardingContainer>
-      <View style={styles.flex}>
+      <View style={{ ...styles.flex, gap: spacing.xxxxl }}>
+        <View style={styles.flexReverse}>
+          <Pressable onPress={handleContinue}>
+            <Text>Skip</Text>
+          </Pressable>
+        </View>
         <View style={styles.item}>
-          <Text style={typography.styles.light.title}>{currentStep.title}</Text>
-          <Text style={typography.styles.light.body}>
+          <Text
+            style={{ ...typography.styles.light.title, ...styles.textCentered }}
+          >
+            {currentStep.title}
+          </Text>
+          <Text
+            style={{ ...typography.styles.light.body, ...styles.textCentered }}
+          >
             {currentStep.subTitle}
           </Text>
 
@@ -75,10 +84,16 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  flexReverse: {
+    flexDirection: 'row-reverse',
+  },
   item: {
     flex: 1,
     flexDirection: 'column',
     gap: spacing.md,
+  },
+  textCentered: {
+    textAlign: 'center',
   },
   selectWrapper: {
     marginHorizontal: spacing.xxxxl,

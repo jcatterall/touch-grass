@@ -60,8 +60,14 @@ export const Why = ({ onComplete }: WhyProps) => {
     ({ item }: ListRenderItemInfo<CarouselItem>) => {
       return (
         <View style={styles.onboardingItem}>
-          <Text style={{ ...typography.styles.light.title }}>{item.title}</Text>
-          <Text style={{ ...typography.styles.light.body }}>
+          <Text
+            style={{ ...typography.styles.light.title, ...styles.textCentered }}
+          >
+            {item.title}
+          </Text>
+          <Text
+            style={{ ...typography.styles.light.body, ...styles.textCentered }}
+          >
             {item.subTitle}
           </Text>
         </View>
@@ -105,6 +111,9 @@ const styles = StyleSheet.create({
   },
   pagination: {
     marginBottom: spacing.xxxxl,
+  },
+  textCentered: {
+    textAlign: 'center',
   },
   onboardingItem: {
     flex: 1,
