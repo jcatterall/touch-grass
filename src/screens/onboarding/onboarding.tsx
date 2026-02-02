@@ -9,11 +9,15 @@ import { PlanSplash } from './PlanSplash';
 import { Streak } from './Streak';
 import { Paywall } from './Paywall';
 import { Notification } from '../Notification';
+import { UsageReport } from './UsageReport';
+import { UsagePermissions } from './UsagePermissions';
 
 const Steps: OnboardingStep[] = [
   'home',
   'why',
   'usage',
+  'usagePermissions',
+  'usageReport',
   'goalsSplash',
   'goals',
   'planSplash',
@@ -30,6 +34,8 @@ type OnboardingStep =
   | 'planSplash'
   | 'plan'
   | 'usage'
+  | 'usagePermissions'
+  | 'usageReport'
   | 'streak'
   | 'paywall'
   | 'notification';
@@ -37,6 +43,7 @@ type OnboardingStep =
 export const Onboarding = () => {
   //TODO: default to home
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('usage');
+  const [usage, setUsage] = useState(0);
 
   const handleNext = (skip: boolean = false) => {
     const currentIndex = Steps.indexOf(currentStep);
@@ -59,7 +66,16 @@ export const Onboarding = () => {
       <PlanSplash onSkip={() => handleNext(true)} onComplete={handleNext} />
     ),
     plan: <Plan onComplete={handleNext} />,
-    usage: <Usage onComplete={handleNext} />,
+    usage: (
+      <Usage onComplete={handleNext} setUsage={value => setUsage(value)} />
+    ),
+    usagePermissions: (
+      <UsagePermissions
+        onSkip={() => handleNext(true)}
+        onComplete={handleNext}
+      />
+    ),
+    usageReport: <UsageReport usage={usage} onComplete={handleNext} />,
     streak: <Streak onComplete={handleNext} />,
     paywall: <Paywall onComplete={handleNext} />,
     notification: <Notification onComplete={handleNext} />,

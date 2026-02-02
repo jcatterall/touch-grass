@@ -25,7 +25,7 @@ export const PlanSplash = ({ onComplete }: PlanSplashProps) => {
           <Text
             style={{
               ...typography.styles.light.heading,
-              ...styles.textAligned,
+              ...styles.textCentered,
             }}
           >
             Let's set up your plan
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   bottom: {
     gap: spacing.lg,
   },
-  textAligned: {
+  textCentered: {
     textAlign: 'center',
   },
 });

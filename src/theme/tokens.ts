@@ -214,6 +214,12 @@ export const typography = {
         lineHeight: 20,
         color: colors.text.tertiary,
       },
+      small: {
+        fontSize: 12,
+        fontWeight: '400' as const,
+        lineHeight: 20,
+        color: colors.text.tertiary,
+      },
       price: {
         fontSize: 18,
         fontWeight: '600' as const,
@@ -274,6 +280,12 @@ export const typography = {
         fontWeight: '400' as const,
         lineHeight: 20,
         color: colors.dark.textTertiary,
+      },
+      small: {
+        fontSize: 12,
+        fontWeight: '400' as const,
+        lineHeight: 20,
+        color: colors.dark.textPrimary,
       },
       price: {
         fontSize: 18,
