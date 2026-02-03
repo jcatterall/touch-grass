@@ -1,8 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
-import { spacing, typography } from '../../theme';
-import { Button } from '../../components';
-import Slider from '../../components/Slider';
+import { OnboardingContainer } from '../../../components/onboarding/OnboardingContainer';
+import { spacing, typography } from '../../../theme';
+import { Button } from '../../../components';
+import Slider from '../../../components/Slider';
 import { useEffect, useState } from 'react';
 import Animated, {
   useSharedValue,
@@ -11,12 +11,12 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 
-export interface PlanProps {
+export interface UsageProps {
   onComplete: () => void;
   setUsage: (value: number) => void;
 }
 
-export const Usage = ({ onComplete, setUsage }: PlanProps) => {
+export const Usage = ({ onComplete, setUsage }: UsageProps) => {
   const [currentUsage, setCurrentUsage] = useState(1);
   const animatedUsage = useSharedValue(1);
 

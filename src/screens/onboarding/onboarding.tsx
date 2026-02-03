@@ -2,15 +2,15 @@ import { useState } from 'react';
 import { Why } from './Why';
 import { Goals } from './Goals';
 import { Plan } from './Plan';
-import { Usage } from './Usage';
+import { Usage } from './usage/Usage';
 import { Home } from './Home';
 import { GoalsSplash } from './GoalsSplash';
 import { PlanSplash } from './PlanSplash';
 import { Streak } from './Streak';
 import { Paywall } from './Paywall';
 import { Notification } from '../Notification';
-import { UsageReport } from './UsageReport';
-import { UsagePermissions } from './UsagePermissions';
+import { UsageReport } from './usage/UsageReport';
+import { UsagePermissions } from './usage/UsagePermissions';
 
 const Steps: OnboardingStep[] = [
   'home',
@@ -26,6 +26,7 @@ const Steps: OnboardingStep[] = [
   'paywall',
   'notification',
 ]; //ordered
+
 type OnboardingStep =
   | 'home'
   | 'why'

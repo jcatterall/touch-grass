@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
-import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
-import { spacing, typography } from '../../theme';
-import { Button } from '../../components';
-import UsageStats from '../../native/UsageStats';
+import { OnboardingContainer } from '../../../components/onboarding/OnboardingContainer';
+import { spacing, typography } from '../../../theme';
+import { Button } from '../../../components';
+import UsageStats from '../../../native/UsageStats';
 
 export interface UsagePermissionsProps {
   onComplete: () => void;
