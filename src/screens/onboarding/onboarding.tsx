@@ -43,7 +43,7 @@ type OnboardingStep =
 
 export const Onboarding = () => {
   //TODO: default to home
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>('usage');
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>('plan');
   const [usage, setUsage] = useState(0);
 
   const handleNext = (skip: boolean = false) => {

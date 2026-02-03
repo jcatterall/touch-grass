@@ -3,13 +3,17 @@ import { colors, spacing, typography } from '../theme';
 
 export interface AppIconProps {
   name: string;
-  time: string;
+  /** Time to display (e.g., "2h 30m") */
+  time?: string;
+  /** Generic label to display below icon (used if time not provided) */
+  label?: string;
   /** Base64-encoded PNG app icon */
   icon?: string;
 }
 
-export const AppIcon = ({ name, time, icon }: AppIconProps) => {
+export const AppIcon = ({ name, time, label, icon }: AppIconProps) => {
   const bgColor = appIconColors[name] || colors.dark.surface;
+  const displayLabel = time ?? label ?? name;
 
   return (
     <View style={appStyles.appItem}>
@@ -28,7 +32,7 @@ export const AppIcon = ({ name, time, icon }: AppIconProps) => {
         )}
       </View>
       <Text style={typography.styles.light.small} numberOfLines={1}>
-        {time}
+        {displayLabel}
       </Text>
     </View>
   );

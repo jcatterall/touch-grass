@@ -30,10 +30,7 @@ export const UsageReportComparison = ({
   >
     <View style={usageStyles.slideHeader}>
       <Text
-        style={[
-          typography.styles.light.largeHeading,
-          usageStyles.textCentered,
-        ]}
+        style={[typography.styles.light.largeHeading, usageStyles.textCentered]}
       >
         No stress, we've got your back. Let's take a look at your potential.
       </Text>
@@ -69,7 +66,7 @@ export const UsageReportComparison = ({
           suffix={`${average.pickups}×`}
         />
         <UsageComparison
-          label="With AppBlock"
+          label="With TouchGrass"
           value={reduced.pickups}
           maxValue={average.pickups}
           suffix={`${reduced.pickups}×`}
