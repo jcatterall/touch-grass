@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { AppUsage } from '../../native/UsageStats';
-import { borderRadius, colors, spacing, typography } from '../../theme/tokens';
+import { borderRadius, colors, spacing } from '../../theme/tokens';
 import { AppIcon } from '../AppIcon';
+import { Typography } from '../Typography';
 
 export const UsageApps = ({ apps }: { apps: AppUsage[] }) => {
   const displayApps = apps.slice(0, 6);
@@ -9,15 +10,21 @@ export const UsageApps = ({ apps }: { apps: AppUsage[] }) => {
   if (displayApps.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={typography.styles.light.title}>Most used</Text>
-        <Text style={styles.emptyText}>No app usage data available</Text>
+        <Typography mode="light" variant="title">
+          Most used
+        </Typography>
+        <Typography variant="body" color="secondary">
+          No app usage data available
+        </Typography>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={typography.styles.dark.subheading}>Most used apps</Text>
+      <Typography mode="dark" variant="subtitle">
+        Most used apps
+      </Typography>
       <View style={styles.appsRow}>
         {displayApps.map((app, index) => (
           <AppIcon
@@ -37,10 +44,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dark.cardBackground,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-  },
-  emptyText: {
-    ...typography.styles.dark.caption,
-    color: colors.dark.textSecondary,
   },
   appsRow: {
     flexDirection: 'row',

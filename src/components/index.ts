@@ -3,6 +3,12 @@
  */
 
 export { Button, type ButtonProps } from './Button';
+export {
+  Typography,
+  type TypographyProps,
+  type TextVariant,
+  type TextColor,
+} from './Typography';
 export { DayChip, type DayChipProps } from './DayChip';
 export { RadioRow, type RadioRowProps } from './RadioRow';
 export { SegmentedControl, type SegmentedControlProps } from './SegmentedControl';

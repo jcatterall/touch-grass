@@ -1,5 +1,6 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
-import { spacing, typography } from '../theme';
+import { Image, StyleSheet, View } from 'react-native';
+import { spacing } from '../theme';
+import { Typography } from './Typography';
 
 export interface AppIconProps {
   name: string;
@@ -27,14 +28,19 @@ export const AppIcon = ({ name, time, label, icon }: AppIconProps) => {
             style={appStyles.iconImage}
           />
         ) : (
-          <Text style={typography.styles.light.body}>
+          <Typography variant="subtitle">
             {name.charAt(0).toUpperCase()}
-          </Text>
+          </Typography>
         )}
       </View>
-      <Text style={typography.styles.light.small} numberOfLines={1}>
+      <Typography
+        mode="dark"
+        variant="body"
+        color="secondary"
+        numberOfLines={1}
+      >
         {displayLabel}
-      </Text>
+      </Typography>
     </View>
   );
 };

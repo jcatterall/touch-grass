@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   StyleSheet,
-  Text,
   View,
   Pressable,
   ActivityIndicator,
@@ -12,9 +11,9 @@ import Purchases, {
   PurchasesOffering,
 } from 'react-native-purchases';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
-import { Button } from '../../components';
+import { Button, Typography } from '../../components';
 import { ListItem } from '../../components/ListItem';
-import { colors, spacing, typography, borderRadius } from '../../theme';
+import { colors, spacing, borderRadius } from '../../theme';
 import { X } from 'lucide-react-native';
 
 export interface PaywallProps {
@@ -118,7 +117,7 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
     return (
       <OnboardingContainer>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary.blue} />
+          <ActivityIndicator size="large" color={colors.secondary60} />
         </View>
       </OnboardingContainer>
     );
@@ -131,10 +130,12 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
     <OnboardingContainer>
       <View style={styles.header}>
         <Pressable onPress={skipClicked} hitSlop={8}>
-          <X size={24} color={colors.dark.textSecondary} />
+          <X size={24} color={colors.dark20} />
         </Pressable>
         <Pressable onPress={handleRestore} disabled={isPurchasing}>
-          <Text style={styles.restoreText}>Restore Purchase</Text>
+          <Typography variant="link" color="secondary">
+            Restore Purchase
+          </Typography>
         </Pressable>
       </View>
 
@@ -159,13 +160,17 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
               onPress={() => setSelectedPackage(annualPackage)}
             >
               <View style={styles.bestValueBadge}>
-                <Text style={styles.bestValueText}>Best Value</Text>
+                <Typography variant="body" style={styles.bestValueText}>
+                  Best Value
+                </Typography>
               </View>
-              <Text style={styles.packageTitle}>Annual</Text>
-              <Text style={styles.packagePrice}>
+              <Typography variant="subtitle" color="inverse">
+                Annual
+              </Typography>
+              <Typography variant="body" color="inverse">
                 {annualPackage.product.priceString} / year{' '}
                 {getTrialText(annualPackage)} {getMonthlyPrice(annualPackage)}
-              </Text>
+              </Typography>
             </Pressable>
           )}
 
@@ -179,11 +184,11 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
               ]}
               onPress={() => setSelectedPackage(monthlyPackage)}
             >
-              <Text style={styles.packageTitleMonthly}>Monthly</Text>
-              <Text style={styles.packagePriceMonthly}>
+              <Typography variant="subtitle">Monthly</Typography>
+              <Typography variant="body" color="secondary">
                 {monthlyPackage.product.priceString} / month{' '}
                 {getTrialText(monthlyPackage)}
-              </Text>
+              </Typography>
             </Pressable>
           )}
         </View>
@@ -197,7 +202,9 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
         >
           {isPurchasing ? 'Processing...' : 'Try free and subscribe'}
         </Button>
-        <Text style={styles.cancelText}>Cancel anytime in Settings</Text>
+        <Typography variant="body" color="tertiary">
+          Cancel anytime in Settings
+        </Typography>
       </View>
     </OnboardingContainer>
   );
@@ -208,10 +215,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  restoreText: {
-    ...typography.styles.light.link,
-    color: colors.dark.textSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -236,58 +239,32 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   packageCardAnnual: {
-    backgroundColor: colors.primary.orange,
+    backgroundColor: colors.primary60,
   },
   packageCardMonthly: {
-    backgroundColor: colors.neutral.white,
-    borderColor: colors.neutral.gray200,
+    backgroundColor: colors.white,
+    borderColor: colors.neutral20,
   },
   packageCardSelected: {
-    borderColor: colors.neutral.white,
+    borderColor: colors.white,
   },
   packageCardMonthlySelected: {
-    borderColor: colors.primary.blue,
+    borderColor: colors.secondary60,
   },
   bestValueBadge: {
     position: 'absolute',
     top: -10,
     right: spacing.sm,
-    backgroundColor: colors.neutral.white,
+    backgroundColor: colors.white,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
     borderRadius: borderRadius.sm,
   },
   bestValueText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.primary.orange,
-  },
-  packageTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.neutral.white,
-    marginBottom: spacing.xxs,
-  },
-  packagePrice: {
-    fontSize: 14,
-    color: colors.neutral.white,
-  },
-  packageTitleMonthly: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: spacing.xxs,
-  },
-  packagePriceMonthly: {
-    fontSize: 14,
-    color: colors.text.secondary,
+    color: colors.primary60,
   },
   bottom: {
     gap: spacing.sm,
     alignItems: 'center',
-  },
-  cancelText: {
-    ...typography.styles.light.caption,
-    color: colors.dark.textSecondary,
   },
 });

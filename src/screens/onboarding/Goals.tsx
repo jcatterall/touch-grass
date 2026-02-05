@@ -1,8 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
 import { useState } from 'react';
-import { spacing, typography } from '../../theme';
-import { Button, Select } from '../../components';
+import { spacing } from '../../theme';
+import { Button, Select, Typography } from '../../components';
 
 export interface GoalsProps {
   onComplete: () => void;
@@ -46,20 +46,18 @@ export const Goals = ({ onComplete }: GoalsProps) => {
       <View style={{ ...styles.flex, gap: spacing.xxxxl }}>
         <View style={styles.flexReverse}>
           <Pressable onPress={handleContinue}>
-            <Text>Skip</Text>
+            <Typography variant="link" color="link">
+              Skip
+            </Typography>
           </Pressable>
         </View>
         <View style={styles.item}>
-          <Text
-            style={{ ...typography.styles.light.title, ...styles.textCentered }}
-          >
+          <Typography variant="heading" center>
             {currentStep.title}
-          </Text>
-          <Text
-            style={{ ...typography.styles.light.body, ...styles.textCentered }}
-          >
+          </Typography>
+          <Typography variant="subtitle" color="secondary" center>
             {currentStep.subTitle}
-          </Text>
+          </Typography>
 
           <View style={styles.selectWrapper}>
             <Select
@@ -93,12 +91,9 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: spacing.md,
   },
-  textCentered: {
-    textAlign: 'center',
-  },
   selectWrapper: {
     marginHorizontal: spacing.xxxxl,
-    marginTop: spacing.lg, // Optional: adds a bit of breathing room below the subTitle
+    marginTop: spacing.lg,
   },
 });
 

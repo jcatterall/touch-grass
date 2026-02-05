@@ -1,13 +1,16 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { type DailyUsage } from '../../native/UsageStats';
-import { colors, spacing, typography } from '../../theme';
+import { colors, spacing } from '../../theme';
 import { calculateAverage, formatTime } from './Usage.utils';
+import { Typography } from '../Typography';
 
 export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
   if (data.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No usage data available</Text>
+        <Typography variant="body" color="secondary">
+          No usage data available
+        </Typography>
       </View>
     );
   }
@@ -41,10 +44,14 @@ export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
               <View style={styles.barArea}>
                 <View style={[styles.bar, isTodayStyle]} />
               </View>
-              <Text style={typography.styles.light.caption}>{day.day}</Text>
-              <Text style={typography.styles.light.small}>
-                {formatTime(day.hours, day.minutes)}
-              </Text>
+              <View style={styles.labelContainer}>
+                <Typography variant="body" color="secondary">
+                  {day.day}
+                </Typography>
+                <Typography variant="body" color="secondary">
+                  {formatTime(day.hours, day.minutes)}
+                </Typography>
+              </View>
             </View>
           );
         })}
@@ -53,19 +60,16 @@ export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
   );
 };
 
+const CHART_HEIGHT = 150;
+
 const styles = StyleSheet.create({
   container: {
-    height: 220,
     position: 'relative',
   },
   emptyContainer: {
-    height: 220,
+    height: 200,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptyText: {
-    ...typography.styles.dark.body,
-    color: colors.dark.textSecondary,
   },
   avgLine: {
     position: 'absolute',
@@ -80,8 +84,6 @@ const styles = StyleSheet.create({
   barsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 180,
     paddingHorizontal: spacing.xs,
   },
   barWrapper: {
@@ -89,7 +91,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   barArea: {
-    height: 180,
+    height: CHART_HEIGHT,
     justifyContent: 'flex-end',
     width: '100%',
     alignItems: 'center',
@@ -98,5 +100,9 @@ const styles = StyleSheet.create({
     width: 28,
     borderRadius: 6,
     minHeight: 4,
+  },
+  labelContainer: {
+    alignItems: 'center',
+    paddingTop: spacing.xs,
   },
 });

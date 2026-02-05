@@ -25,7 +25,12 @@ export const SegmentedControl = ({
   const isSmall = size === 'sm';
 
   return (
-    <View style={[styles.segmentedContainer, isSmall && styles.segmentedContainerSm]}>
+    <View
+      style={[
+        styles.segmentedContainer,
+        isSmall && styles.segmentedContainerSm,
+      ]}
+    >
       {options.map((option, index) => (
         <Pressable
           key={option}
@@ -57,15 +62,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: colors.neutral.gray200,
     borderRadius: borderRadius.pill,
-    padding: 1,
+    padding: 2,
+    alignSelf: 'flex-start',
   },
   segmentedContainerSm: {
     padding: 2,
   },
   segmentedOption: {
-    flex: 1,
     paddingVertical: spacing.xxs,
-    maxWidth: spacing.xl * 5,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: borderRadius.pill,
@@ -73,8 +78,6 @@ const styles = StyleSheet.create({
   segmentedOptionSm: {
     paddingVertical: spacing.xxxs,
     paddingHorizontal: spacing.sm,
-    maxWidth: undefined,
-    flex: 0,
   },
   segmentedOptionSelected: {
     backgroundColor: colors.primary.blue,

@@ -1,8 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 import DailyStreak from '../../components/DailyStreak';
-import { typography } from '../../theme';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
-import { Button } from '../../components';
+import { Button, Typography } from '../../components';
 import { onboardingStyles } from './onboarding.styles';
 
 export interface StreakProps {
@@ -13,12 +12,12 @@ export interface StreakProps {
 export const Streak = ({ onComplete }: StreakProps) => (
   <OnboardingContainer>
     <View style={[onboardingStyles.marginTopXxxl, onboardingStyles.gapXxl]}>
-      <Text style={[typography.styles.light.largeHeading, onboardingStyles.textCenter]}>
+      <Typography variant="heading" center>
         🔥
-      </Text>
-      <Text style={[typography.styles.light.largeHeading, onboardingStyles.textCenter]}>
+      </Typography>
+      <Typography variant="heading" center>
         Create a consistent daily routine
-      </Text>
+      </Typography>
       <DailyStreak currentStreak={1} isTodayComplete={true} />
     </View>
     <Button size="lg" onPress={onComplete}>

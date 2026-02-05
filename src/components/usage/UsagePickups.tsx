@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { borderRadius, colors, spacing, typography } from '../../theme';
+import { borderRadius, colors, spacing } from '../../theme';
 import Chip from '../Chip';
+import { Typography } from '../Typography';
 
 const getPickupStatus = (count: number): string => {
   if (count < 30) return 'Low';
@@ -15,7 +16,9 @@ export const UsagePickups = ({ count }: { count: number }) => {
   return (
     <View style={styles.container}>
       <View style={styles.leftContent}>
-        <Text style={styles.title}>Daily pickups</Text>
+        <Typography mode="dark" variant="subtitle">
+          Daily pickups
+        </Typography>
         <Chip label={status} variant="blue" size="sm" mode="dark" isSelected />
       </View>
       <Text style={styles.countText}>{count}x</Text>
@@ -34,11 +37,6 @@ const styles = StyleSheet.create({
   },
   leftContent: {
     gap: spacing.xs,
-  },
-  title: {
-    ...typography.styles.dark.body,
-    color: colors.dark.textPrimary,
-    fontWeight: '600',
   },
   countText: {
     fontSize: 32,

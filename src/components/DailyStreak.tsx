@@ -3,15 +3,10 @@
  */
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { BadgeCheck } from 'lucide-react-native';
-import {
-  colors,
-  spacing,
-  borderRadius,
-  shadows,
-  typography,
-} from '../theme/tokens';
+import { colors, spacing, borderRadius, shadows } from '../theme/tokens';
+import { Typography } from './Typography';
 
 // Types
 export interface DailyStreakProps {
@@ -78,15 +73,19 @@ const DayIndicator: React.FC<DayIndicatorProps> = ({
 
   return (
     <View style={styles.dayWrapper}>
-      <Text style={[styles.dayLabel, isCompleted && styles.dayLabelCompleted]}>
+      <Typography
+        variant="body"
+        color={isCompleted ? 'secondary' : 'tertiary'}
+        style={styles.dayLabel}
+      >
         {day}
-      </Text>
+      </Typography>
       <View style={containerStyle}>
         {isCompleted ? (
           <BadgeCheck
             size={32}
-            color={colors.neutral.white}
-            fill={colors.primary.orange}
+            color={colors.white}
+            fill={colors.primary60}
             strokeWidth={2}
           />
         ) : (
@@ -118,21 +117,22 @@ export const DailyStreak: React.FC<DailyStreakProps> = ({
           />
         ))}
       </View>
-      <Text style={styles.caption}>Build a streak, one day at a time</Text>
+      <Typography variant="body" color="secondary" center style={styles.caption}>
+        Build a streak, one day at a time
+      </Typography>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.neutral.cardBackground,
+    backgroundColor: colors.neutral10,
     borderRadius: borderRadius.lg,
     padding: spacing.sm,
     ...shadows.md,
   },
   caption: {
     marginTop: spacing.lg,
-    textAlign: 'center',
   },
   weekContainer: {
     flexDirection: 'row',
@@ -157,28 +157,14 @@ const styles = StyleSheet.create({
   dayContainerIncomplete: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: colors.neutral.gray300,
+    borderColor: colors.neutral30,
   },
   dayContainerToday: {
-    borderColor: colors.primary.orange,
+    borderColor: colors.primary60,
     borderWidth: 2,
   },
-  dayText: {
-    fontSize: 14,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.neutral.gray400,
-  },
-  dayTextToday: {
-    color: colors.primary.orange,
-    fontWeight: typography.fontWeight.bold,
-  },
   dayLabel: {
-    fontSize: 12,
-    fontWeight: typography.fontWeight.extraBold,
-    color: colors.neutral.gray400,
-  },
-  dayLabelCompleted: {
-    color: colors.text.secondary,
+    fontWeight: '700',
   },
 });
 

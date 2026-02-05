@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
-import { spacing, typography } from '../../theme';
-import { Button } from '../../components';
+import { spacing } from '../../theme';
+import { Button, Typography } from '../../components';
 
 export interface PlanProps {
   onComplete: () => void;
@@ -15,36 +15,24 @@ export const Home = ({ onComplete }: PlanProps) => {
   return (
     <OnboardingContainer>
       <View style={styles.top}>
-        <Text style={{ ...styles.fontAlign, ...typography.styles.light.title }}>
+        <Typography variant="title" center>
           🎉
-        </Text>
+        </Typography>
       </View>
       <View style={styles.center}>
-        <Text
-          style={{
-            ...typography.styles.light.largeHeading,
-            ...styles.fontAlign,
-          }}
-        >
+        <Typography variant="heading" center>
           Expand your mind by walking outside you little
-        </Text>
-        <Text
-          style={{
-            ...typography.styles.light.body,
-            ...styles.fontAlign,
-          }}
-        >
+        </Typography>
+        <Typography variant="body" center>
           Learn to be a better person with more walking and such, it's just
           better for you.
-        </Text>
+        </Typography>
       </View>
 
       <View style={styles.bottom}>
-        <Text
-          style={{ ...typography.styles.light.caption, ...styles.fontAlign }}
-        >
+        <Typography variant="body" color="secondary" center>
           Some text would go here
-        </Text>
+        </Typography>
         <Button size="lg" onPress={handleContinue}>
           Get started
         </Button>
@@ -62,17 +50,5 @@ const styles = StyleSheet.create({
   },
   bottom: {
     gap: spacing.xxl,
-  },
-  fontAlign: {
-    textAlign: 'center',
-  },
-  item: {
-    flex: 1,
-    flexDirection: 'column',
-    gap: spacing.md,
-  },
-  selectWrapper: {
-    marginHorizontal: spacing.xxxxl,
-    marginTop: spacing.lg, // Optional: adds a bit of breathing room below the subTitle
   },
 });

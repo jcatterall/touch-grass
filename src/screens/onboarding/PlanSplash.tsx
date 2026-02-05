@@ -1,7 +1,6 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
-import { typography } from '../../theme';
-import { Button } from '../../components';
+import { Button, Typography } from '../../components';
 import { onboardingStyles as styles } from './onboarding.styles';
 
 export interface PlanSplashProps {
@@ -14,10 +13,12 @@ export const PlanSplash = ({ onComplete }: PlanSplashProps) => (
   <OnboardingContainer>
     <View style={styles.flex}>
       <View style={styles.contentCentered}>
-        <Text style={typography.styles.light.largeTitle}>📚</Text>
-        <Text style={[typography.styles.light.heading, styles.textCenter]}>
+        <Typography variant="heading" center>
+          📚
+        </Typography>
+        <Typography variant="title" center>
           Let's set up your plan
-        </Text>
+        </Typography>
       </View>
     </View>
     <Button size="lg" onPress={onComplete}>

@@ -5,14 +5,13 @@ import {
   Image,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
 import { ArrowLeft, Search, Square, CheckSquare } from 'lucide-react-native';
 import { Main } from '../components/layout/Main';
-import { Button } from '../components';
-import { colors, spacing, borderRadius, typography } from '../theme';
+import { Button, Typography } from '../components';
+import { colors, spacing, borderRadius, textStyles } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
 import { getAllInstalledApps } from '../native/AppListModule';
 
@@ -97,9 +96,9 @@ export const BlocklistScreen = ({
       >
         <View style={styles.appLeft}>
           <Image source={{ uri: app.icon }} style={styles.appIconImage} />
-          <Text style={styles.appName} numberOfLines={1}>
+          <Typography variant="subtitle" style={styles.appName} numberOfLines={1}>
             {app.name}
-          </Text>
+          </Typography>
         </View>
         {isSelected ? (
           <CheckSquare
@@ -137,7 +136,7 @@ export const BlocklistScreen = ({
               }}
             />
           ) : (
-            <Text style={styles.title}>Blocklist</Text>
+            <Typography variant="title" style={styles.title}>Blocklist</Typography>
           )}
           <Pressable
             onPress={() => setIsSearchVisible(!isSearchVisible)}
@@ -150,7 +149,7 @@ export const BlocklistScreen = ({
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary.blue} />
-            <Text style={styles.loadingText}>Loading apps...</Text>
+            <Typography variant="body" color="secondary">Loading apps...</Typography>
           </View>
         ) : (
           <FlatList
@@ -162,9 +161,9 @@ export const BlocklistScreen = ({
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={typography.styles.light.subheading}>
+                <Typography variant="subtitle">
                   {searchQuery ? 'No apps found' : 'No apps available'}
-                </Text>
+                </Typography>
               </View>
             }
           />
@@ -195,7 +194,6 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     marginLeft: spacing.md,
-    ...typography.styles.light.heading,
   },
   searchInput: {
     flex: 1,
@@ -203,7 +201,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.primary.blue,
-    ...typography.styles.light.body,
+    ...textStyles.body,
   },
   list: {
     flex: 1,
@@ -230,7 +228,6 @@ const styles = StyleSheet.create({
   },
   appName: {
     flex: 1,
-    ...typography.styles.light.subheading,
   },
   footer: {
     paddingVertical: spacing.md,
@@ -240,10 +237,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.md,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: colors.dark.textSecondary,
   },
   emptyContainer: {
     flex: 1,

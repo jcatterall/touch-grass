@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { UsageApps } from '../../../components/usage/UsageApps';
 import { UsageChart } from '../../../components/usage/UsageChart';
 import { UsagePickups } from '../../../components/usage/UsagePickups';
-import { spacing, typography } from '../../../theme';
+import { spacing } from '../../../theme';
+import { Typography } from '../../../components';
 import { AppUsage, DailyUsage } from '../../../native/UsageStats';
 
 interface UsageStatsProps {
@@ -22,13 +23,15 @@ export const UsageStatsPage = ({
 }: UsageStatsProps) => (
   <View style={styles.content}>
     <View style={styles.header}>
-      <Text style={typography.styles.light.subheading}>
+      <Typography variant="subtitle" color="primary">
         Your current screen time
-      </Text>
-      <Text style={typography.styles.light.largeTitle}>
+      </Typography>
+      <Typography variant="heading">
         {average.hours}h {average.minutes}m
-      </Text>
-      <Text style={typography.styles.light.body}>Last week avg.</Text>
+      </Typography>
+      <Typography variant="body" color="secondary">
+        Last week avg.
+      </Typography>
     </View>
     <UsageChart data={weeklyData} />
     <UsageApps apps={appData} />

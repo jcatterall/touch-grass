@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, View } from 'react-native';
 import { OnboardingContainer } from '../../../components/onboarding/OnboardingContainer';
-import { spacing, typography } from '../../../theme';
-import { Button } from '../../../components';
+import { spacing } from '../../../theme';
+import { Button, Typography } from '../../../components';
 import UsageStats from '../../../native/UsageStats';
 
 export interface UsagePermissionsProps {
@@ -56,24 +56,14 @@ export const UsagePermissions = ({
     <OnboardingContainer>
       <View style={styles.flex}>
         <View style={styles.item}>
-          <Text style={typography.styles.light.largeTitle}>📚</Text>
-          <Text
-            style={{
-              ...typography.styles.light.heading,
-              ...styles.textCentered,
-            }}
-          >
+          <Typography variant="heading">📚</Typography>
+          <Typography variant="title" center>
             Now, let's uncover your actual screen time
-          </Text>
-          <Text
-            style={{
-              ...typography.styles.light.subheading,
-              ...styles.textCentered,
-            }}
-          >
+          </Typography>
+          <Typography variant="subtitle" color="secondary" center>
             If you give us the usage access permission, we'll show you how well
             you're staying focused
-          </Text>
+          </Typography>
         </View>
       </View>
 
@@ -82,9 +72,9 @@ export const UsagePermissions = ({
           Give permission
         </Button>
         <Pressable onPress={handleSkip}>
-          <Text style={{ ...styles.textCentered }}>
+          <Typography variant="link" color="secondary" center>
             Continue without report
-          </Text>
+          </Typography>
         </Pressable>
       </View>
     </OnboardingContainer>
@@ -104,8 +94,5 @@ const styles = StyleSheet.create({
   },
   bottom: {
     gap: spacing.lg,
-  },
-  textCentered: {
-    textAlign: 'center',
   },
 });

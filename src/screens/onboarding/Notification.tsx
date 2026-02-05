@@ -1,6 +1,5 @@
 import {
   StyleSheet,
-  Text,
   View,
   Platform,
   PermissionsAndroid,
@@ -8,8 +7,8 @@ import {
   Linking,
 } from 'react-native';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
-import { Button } from '../../components';
-import { spacing, typography } from '../../theme';
+import { Button, Typography } from '../../components';
+import { spacing } from '../../theme';
 
 interface NotificationProps {
   onComplete: () => void;
@@ -24,7 +23,6 @@ const requestNotificationPermission = async (): Promise<boolean> => {
       );
       return result === PermissionsAndroid.RESULTS.GRANTED;
     }
-    // Android < 13 doesn't require runtime permission for notifications
     return true;
   }
   return true;
@@ -56,24 +54,14 @@ export const Notification = ({ onComplete }: NotificationProps) => {
     <OnboardingContainer>
       <View style={styles.flex}>
         <View style={styles.item}>
-          <Text style={typography.styles.light.largeTitle}>🔔</Text>
+          <Typography variant="heading">🔔</Typography>
           <View style={styles.heading}>
-            <Text
-              style={{
-                ...typography.styles.light.heading,
-                ...styles.textAligned,
-              }}
-            >
+            <Typography variant="title" center>
               Block unwanted notifications
-            </Text>
-            <Text
-              style={{
-                ...typography.styles.light.subheading,
-                ...styles.textAligned,
-              }}
-            >
+            </Typography>
+            <Typography variant="subtitle" color="secondary" center>
               Grant notification access to block any unwanted notifications
-            </Text>
+            </Typography>
           </View>
         </View>
       </View>
@@ -103,9 +91,6 @@ const styles = StyleSheet.create({
   },
   heading: {
     gap: spacing.sm,
-  },
-  textAligned: {
-    textAlign: 'center',
   },
   bottom: {
     gap: spacing.sm,

@@ -1,12 +1,17 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
-import { Button, DayChip, SegmentedControl } from '../../components';
+import {
+  Button,
+  DayChip,
+  SegmentedControl,
+  Typography,
+} from '../../components';
 import { TimeRangeSlider } from '../../components/TimeRangeSlider';
 import { AppBlockList } from '../../components/AppBlockList';
 import { Slider } from '../../components/Slider';
 import { BlocklistScreen, type AppItem } from '../BlocklistScreen';
-import { spacing, colors, typography } from '../../theme';
+import { spacing, colors } from '../../theme';
 import { triggerHaptic } from '../../utils/haptics';
 import {
   DayKey,
@@ -105,9 +110,15 @@ export const Plan = ({ onComplete }: PlanProps) => {
   return (
     <OnboardingContainer>
       <View style={styles.container}>
-        <Text style={typography.styles.light.heading}>Your plan</Text>
+        <Typography variant="title">Your plan</Typography>
         <View style={{ ...styles.frequencySection, ...styles.section }}>
-          <Text style={styles.sectionLabel}>FREQUENCY</Text>
+          <Typography
+            variant="body"
+            color="tertiary"
+            style={styles.sectionLabel}
+          >
+            FREQUENCY
+          </Typography>
           <View style={styles.daysContainer}>
             {DAYS.map(day => (
               <DayChip
@@ -122,7 +133,13 @@ export const Plan = ({ onComplete }: PlanProps) => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>ACTIVE TIME</Text>
+            <Typography
+              variant="body"
+              color="tertiary"
+              style={styles.sectionLabel}
+            >
+              ACTIVE TIME
+            </Typography>
             <SegmentedControl
               options={['Entire Day', 'Specific Hours']}
               selectedIndex={durationType === 'entire_day' ? 0 : 1}
@@ -145,7 +162,13 @@ export const Plan = ({ onComplete }: PlanProps) => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>CRITERIA</Text>
+            <Typography
+              variant="body"
+              color="tertiary"
+              style={styles.sectionLabel}
+            >
+              CRITERIA
+            </Typography>
             <SegmentedControl
               options={['Distance', 'Time']}
               selectedIndex={criteriaType === 'distance' ? 0 : 1}
@@ -167,29 +190,31 @@ export const Plan = ({ onComplete }: PlanProps) => {
               </Text>
             </View>
             {criteriaType === 'distance' && (
-              <SegmentedControl
-                size="sm"
-                options={['mi', 'km']}
-                selectedIndex={distanceUnit === 'mi' ? 0 : 1}
-                onSelect={index => {
-                  const newUnit = index === 0 ? 'mi' : 'km';
-                  if (newUnit !== distanceUnit) {
-                    const convertedValue =
-                      distanceUnit === 'km'
-                        ? criteriaValue.distance * KM_TO_MI
-                        : criteriaValue.distance * MI_TO_KM;
-                    const clampedValue = Math.min(
-                      Math.max(convertedValue, DISTANCE_CONFIG[newUnit].min),
-                      DISTANCE_CONFIG[newUnit].max,
-                    );
-                    setCriteriaValue(prev => ({
-                      ...prev,
-                      distance: Math.round(clampedValue * 2) / 2,
-                    }));
-                    setDistanceUnit(newUnit);
-                  }
-                }}
-              />
+              <View>
+                <SegmentedControl
+                  size="sm"
+                  options={['mi', 'km']}
+                  selectedIndex={distanceUnit === 'mi' ? 0 : 1}
+                  onSelect={index => {
+                    const newUnit = index === 0 ? 'mi' : 'km';
+                    if (newUnit !== distanceUnit) {
+                      const convertedValue =
+                        distanceUnit === 'km'
+                          ? criteriaValue.distance * KM_TO_MI
+                          : criteriaValue.distance * MI_TO_KM;
+                      const clampedValue = Math.min(
+                        Math.max(convertedValue, DISTANCE_CONFIG[newUnit].min),
+                        DISTANCE_CONFIG[newUnit].max,
+                      );
+                      setCriteriaValue(prev => ({
+                        ...prev,
+                        distance: Math.round(clampedValue * 2) / 2,
+                      }));
+                      setDistanceUnit(newUnit);
+                    }
+                  }}
+                />
+              </View>
             )}
           </View>
 
@@ -206,12 +231,12 @@ export const Plan = ({ onComplete }: PlanProps) => {
               style={styles.sliderStyle}
             />
             <View style={styles.sliderLabels}>
-              <Text style={styles.sliderLabelText}>
+              <Typography variant="body" color="tertiary">
                 {config.min} {config.label}
-              </Text>
-              <Text style={styles.sliderLabelText}>
+              </Typography>
+              <Typography variant="body" color="tertiary">
                 {config.max} {config.label}
-              </Text>
+              </Typography>
             </View>
           </View>
         </View>
@@ -237,9 +262,6 @@ const styles = StyleSheet.create({
   },
   section: {},
   sectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text.tertiary,
     letterSpacing: 1,
   },
   sectionHeader: {
@@ -271,12 +293,12 @@ const styles = StyleSheet.create({
   criteriaValue: {
     fontSize: 48,
     fontWeight: '300',
-    color: colors.primary.blue,
+    color: colors.secondary60,
   },
   criteriaUnit: {
     fontSize: 18,
     fontWeight: '400',
-    color: colors.text.secondary,
+    color: colors.neutral70,
   },
   sliderSection: {
     marginTop: spacing.xs,
@@ -289,11 +311,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: spacing.xs,
-  },
-  sliderLabelText: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.text.tertiary,
   },
   footer: {
     paddingTop: spacing.md,

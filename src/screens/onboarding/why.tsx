@@ -1,13 +1,7 @@
-import {
-  ListRenderItemInfo,
-  Text,
-  View,
-  Dimensions,
-  StyleSheet,
-} from 'react-native';
-import { spacing, typography } from '../../theme';
+import { ListRenderItemInfo, View, Dimensions, StyleSheet } from 'react-native';
+import { spacing } from '../../theme';
 import { useCallback, useRef, useState } from 'react';
-import { Button, Carousel, CarouselRef } from '../../components';
+import { Button, Carousel, CarouselRef, Typography } from '../../components';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
 
 export interface WhyProps {
@@ -61,16 +55,12 @@ export const Why = ({ onComplete }: WhyProps) => {
     ({ item }: ListRenderItemInfo<CarouselItem>) => {
       return (
         <View style={styles.onboardingItem}>
-          <Text
-            style={{ ...typography.styles.light.title, ...styles.textCentered }}
-          >
+          <Typography variant="heading" center>
             {item.title}
-          </Text>
-          <Text
-            style={{ ...typography.styles.light.body, ...styles.textCentered }}
-          >
+          </Typography>
+          <Typography variant="subtitle" color="secondary" center>
             {item.subTitle}
-          </Text>
+          </Typography>
         </View>
       );
     },
@@ -112,9 +102,6 @@ const styles = StyleSheet.create({
   },
   pagination: {
     marginBottom: spacing.xxxxl,
-  },
-  textCentered: {
-    textAlign: 'center',
   },
   onboardingItem: {
     flex: 1,

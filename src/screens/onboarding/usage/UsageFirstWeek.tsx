@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { typography } from '../../../theme';
+import { Typography } from '../../../components';
 import {
   usageStyles,
   createBigNumberStyle,
@@ -16,18 +16,13 @@ export const UsageFirstWeek = () => (
     style={usageStyles.slidePage}
   >
     <View style={usageStyles.slideHeader}>
-      <Text
-        style={[
-          typography.styles.light.largeHeading,
-          usageStyles.textCentered,
-        ]}
-      >
+      <Typography variant="heading" center>
         The first week is the most important for changing your habits.
-      </Text>
-      <Text style={[typography.styles.light.body, usageStyles.textCentered]}>
+      </Typography>
+      <Typography variant="subtitle" color="secondary" center>
         AppBlock can help cut down the time on your phone by up to 32% in the
         first week of use.
-      </Text>
+      </Typography>
     </View>
     <View style={usageStyles.centerContent}>
       <Text style={bigNumberGreen}>32%</Text>

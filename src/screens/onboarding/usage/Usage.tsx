@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { OnboardingContainer } from '../../../components/onboarding/OnboardingContainer';
-import { spacing, typography } from '../../../theme';
-import { Button } from '../../../components';
+import { spacing, textStyles } from '../../../theme';
+import { Button, Typography } from '../../../components';
 import Slider from '../../../components/Slider';
 import { useEffect, useState } from 'react';
 import Animated, {
@@ -30,12 +30,15 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
     setUsage(currentUsage);
   }, [currentUsage, animatedUsage, setUsage]);
 
-  const animatedTextStyle = useAnimatedStyle(() => ({
-    fontSize: interpolate(animatedUsage.value, [1, 12], [32, 92]),
-    padding: 8,
-    minWidth: 120,
-    textAlign: 'center',
-  }));
+  const animatedTextStyle = useAnimatedStyle(() => {
+    const fontSize = interpolate(animatedUsage.value, [1, 12], [32, 92]);
+    return {
+      fontSize,
+      lineHeight: fontSize * 1.2,
+      minWidth: 100,
+      textAlign: 'center' as const,
+    };
+  });
 
   const handleContinue = () => {
     onComplete();
@@ -44,20 +47,15 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
   return (
     <OnboardingContainer>
       <View style={{ ...styles.item, gap: spacing.xxxxl }}>
-        <Text
-          style={{
-            ...typography.styles.light.largeHeading,
-            ...styles.textCentered,
-          }}
-        >
+        <Typography variant="heading" center>
           How much time do you spend on your phone every day?
-        </Text>
+        </Typography>
         <View style={styles.slider}>
-          <Animated.Text
-            style={[typography.styles.light.largeTitle, animatedTextStyle]}
-          >
-            {currentUsage}h
-          </Animated.Text>
+          <View style={styles.textContainer}>
+            <Animated.Text style={[textStyles.title, animatedTextStyle]}>
+              {currentUsage}h
+            </Animated.Text>
+          </View>
           <View>
             <Slider
               min={1}
@@ -67,8 +65,8 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
               showValue={false}
             />
             <View style={styles.sliderLabels}>
-              <Text style={typography.styles.light.subheading}>1</Text>
-              <Text style={typography.styles.light.subheading}>12+</Text>
+              <Typography variant="subtitle">1</Typography>
+              <Typography variant="subtitle">12+</Typography>
             </View>
           </View>
         </View>
@@ -84,9 +82,6 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
 };
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
   item: {
     flex: 1,
     flexDirection: 'column',
@@ -98,19 +93,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     width: '100%',
-    gap: spacing.xxl,
+  },
+  textContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 120,
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: 16,
-  },
-  textCentered: {
-    textAlign: 'center',
-  },
-  selectWrapper: {
-    marginHorizontal: spacing.xxxxl,
-    marginTop: spacing.lg, // Optional: adds a bit of breathing room below the subTitle
   },
 });

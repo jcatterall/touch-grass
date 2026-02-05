@@ -1,6 +1,7 @@
 import { CircleCheck } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '../theme';
+import { StyleSheet, View } from 'react-native';
+import { colors, spacing } from '../theme';
+import { Typography } from './Typography';
 
 interface ListItemProps {
   value: string;
@@ -11,11 +12,11 @@ export const ListItem = ({ value }: ListItemProps) => {
     <View style={styles.container}>
       <CircleCheck
         size={28}
-        color={colors.neutral.white}
-        fill={colors.primary.orange}
+        color={colors.white}
+        fill={colors.primary60}
         strokeWidth={2}
       />
-      <Text style={typography.styles.light.body}>{value}</Text>
+      <Typography variant="subtitle">{value}</Typography>
     </View>
   );
 };

@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, borderRadius, spacing, typography } from '../theme';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { colors, borderRadius, spacing } from '../theme';
+import { Typography } from './Typography';
 
 export interface DayChipProps {
   label: string;
@@ -16,13 +17,14 @@ export const DayChip = ({ label, isSelected, onPress }: DayChipProps) => {
         onPress={onPress}
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       >
-        <Text
+        <Typography
+          variant="body"
           style={[styles.dayChipText, isSelected && styles.dayChipTextSelected]}
         >
           {simpleLabel}
-        </Text>
+        </Typography>
       </Pressable>
-      <Text style={styles.label}>{label}</Text>
+      <Typography variant="body" color="secondary" style={styles.label}>{label}</Typography>
     </View>
   );
 };
@@ -55,7 +57,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   label: {
-    ...typography.styles.dark.caption,
     textAlign: 'center',
   },
 });

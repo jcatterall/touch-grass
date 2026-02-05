@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { colors, spacing, typography } from '../../../theme';
+import { colors, spacing, textStyles } from '../../../theme';
+import { Typography } from '../../../components';
 import { usageStyles } from './Usage.styles';
 import { ArrowDown, ArrowUp } from 'lucide-react-native';
 
@@ -41,24 +42,19 @@ export const UsageActual = ({ usage, average }: UsageActualProps) => {
       style={usageStyles.slidePage}
     >
       <View style={usageStyles.slideHeader}>
-        <Text
-          style={[
-            typography.styles.light.largeHeading,
-            usageStyles.textCentered,
-          ]}
-        >
+        <Typography variant="heading" center>
           {title}
-        </Text>
-        <Text style={[typography.styles.light.body, usageStyles.textCentered]}>
+        </Typography>
+        <Typography variant="subtitle" color="secondary" center>
           {subtitle}
-        </Text>
+        </Typography>
       </View>
 
       <View style={styles.statsSection}>
         <View style={[styles.iconCircle, { backgroundColor: color }]}>
-          <Icon stroke={colors.neutral.white} size={32} />
+          <Icon stroke={colors.white} size={32} />
         </View>
-        <Text style={typography.styles.light.largeTitle}>
+        <Text style={textStyles.heading}>
           {formatTime(average.hours, average.minutes)}
         </Text>
         <Text style={[styles.percentText, { color }]}>
@@ -74,7 +70,7 @@ export const UsageActual = ({ usage, average }: UsageActualProps) => {
                 styles.bar,
                 {
                   height: `${(usage / max) * 100}%`,
-                  borderTopColor: colors.neutral.white,
+                  borderTopColor: colors.white,
                 },
               ]}
             />
@@ -94,14 +90,18 @@ export const UsageActual = ({ usage, average }: UsageActualProps) => {
         </View>
         <View style={styles.labelsRow}>
           <View>
-            <Text style={styles.labelValue}>{usage}h 0m</Text>
-            <Text style={styles.labelText}>Your guess</Text>
+            <Typography variant="subtitle">{usage}h 0m</Typography>
+            <Typography variant="body" color="secondary">
+              Your guess
+            </Typography>
           </View>
           <View style={styles.labelRight}>
-            <Text style={[styles.labelValue, { color }]}>
+            <Typography variant="subtitle" style={{ color }}>
               {formatTime(average.hours, average.minutes)}
-            </Text>
-            <Text style={styles.labelText}>Last week avg.</Text>
+            </Typography>
+            <Typography variant="body" color="secondary">
+              Last week avg.
+            </Typography>
           </View>
         </View>
       </View>
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   barWrapper: {
     flex: 1,
     height: 100,
-    backgroundColor: colors.dark.cardBackground,
+    backgroundColor: colors.dark70,
     borderRadius: 8,
     justifyContent: 'flex-end',
     overflow: 'hidden',
@@ -132,11 +132,9 @@ const styles = StyleSheet.create({
   bar: {
     width: '100%',
     borderRadius: 8,
-    backgroundColor: colors.dark.border,
+    backgroundColor: colors.dark50,
     borderTopWidth: 3,
   },
   labelsRow: { flexDirection: 'row', justifyContent: 'space-between' },
   labelRight: { alignItems: 'flex-end' },
-  labelValue: { ...typography.styles.light.heading, fontSize: 16 },
-  labelText: { ...typography.styles.light.subheading, fontSize: 14 },
 });

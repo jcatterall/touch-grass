@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { typography } from '../../../theme';
+import { Typography } from '../../../components';
 import {
   usageStyles,
   createBigNumberStyle,
@@ -24,24 +24,19 @@ export const UsageYearly = ({ average, yearsIn30 }: UsageYearlyProps) => (
     style={usageStyles.slidePage}
   >
     <View style={usageStyles.slideHeader}>
-      <Text style={typography.styles.light.heading}>
+      <Typography variant="title">
         {average.hours}h {average.minutes}m a day.
-      </Text>
-      <Text
-        style={[
-          typography.styles.light.largeHeading,
-          usageStyles.textCentered,
-        ]}
-      >
+      </Typography>
+      <Typography variant="heading" center>
         In 30 years that adds up to
-      </Text>
+      </Typography>
     </View>
     <View style={usageStyles.centerContent}>
       <Text style={bigNumberPurple}>{yearsIn30}</Text>
-      <Text style={typography.styles.light.largeHeading}>YEARS</Text>
-      <Text style={typography.styles.light.subheading}>
+      <Typography variant="heading">YEARS</Typography>
+      <Typography variant="subtitle" color="secondary">
         spent on your phone
-      </Text>
+      </Typography>
     </View>
   </Animated.View>
 );

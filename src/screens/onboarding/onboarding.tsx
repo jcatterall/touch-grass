@@ -44,8 +44,8 @@ export const Onboarding = () => {
   const currentStep = STEPS[stepIndex];
   const canGoBack = stepIndex > 0;
 
-  const handleNext = useCallback((skip = false) => {
-    const increment = skip ? 2 : 1;
+  const handleNext = useCallback((skip: boolean = false) => {
+    const increment = skip === true ? 2 : 1;
     setStepIndex(prev => {
       const nextIndex = prev + increment;
       if (nextIndex < STEPS.length) {
@@ -62,7 +62,6 @@ export const Onboarding = () => {
     return true;
   }, [canGoBack]);
 
-  // Android hardware back button support
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',

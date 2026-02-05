@@ -1,6 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { AppIcon } from './AppIcon';
-import { colors, spacing, typography } from '../theme';
+import { colors, spacing } from '../theme';
+import { Typography } from './Typography';
 import Button from './Button';
 
 export interface BlockedApp {
@@ -21,7 +22,9 @@ export const AppBlockList = ({ apps, onEdit }: AppBlockListProps) => {
   return (
     <View>
       <View style={styles.header}>
-        <Text style={styles.sectionLabel}>BLOCK LIST</Text>
+        <Typography variant="body" color="tertiary" style={styles.sectionLabel}>
+          BLOCK LIST
+        </Typography>
         <Button onPress={onEdit} variant="link">
           EDIT
         </Button>
@@ -39,14 +42,14 @@ export const AppBlockList = ({ apps, onEdit }: AppBlockListProps) => {
             ))}
             {hasRemaining && (
               <View style={styles.moreApps}>
-                <Text style={typography.styles.light.subheading}>
-                  {remainingCount}+
-                </Text>
+                <Typography variant="subtitle">{remainingCount}+</Typography>
               </View>
             )}
           </View>
         ) : (
-          <Text style={typography.styles.light.body}>No apps</Text>
+          <Typography variant="subtitle" color="secondary">
+            No apps
+          </Typography>
         )}
       </View>
     </View>
@@ -61,13 +64,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   sectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text.tertiary,
     letterSpacing: 1,
   },
   appIconRowContainer: {
-    backgroundColor: colors.neutral.gray100,
+    backgroundColor: colors.neutral10,
     padding: spacing.md,
     borderRadius: 8,
     minHeight: 80,
