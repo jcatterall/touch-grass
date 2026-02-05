@@ -8,7 +8,7 @@ import { GoalsSplash } from './GoalsSplash';
 import { PlanSplash } from './PlanSplash';
 import { Streak } from './Streak';
 import { Paywall } from './Paywall';
-import { Notification } from '../Notification';
+import { Notification } from './Notification';
 import { UsageReport } from './usage/UsageReport';
 import { UsagePermissions } from './usage/UsagePermissions';
 import { BlockingPlan } from '../../types';
@@ -44,7 +44,7 @@ type OnboardingStep =
 
 export const Onboarding = () => {
   //TODO: default to home
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>('paywall');
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>('home');
   const [usage, setUsage] = useState(0);
   const [blockingPlan, setBlockingPlan] = useState<BlockingPlan | null>(null);
 

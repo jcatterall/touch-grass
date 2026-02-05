@@ -14,6 +14,8 @@
     "lucide-react-native": "^0.563.0",
     "react": "19.2.0",
     "react-native": "0.83.1",
+    "react-native-purchases": "^9.7.6",
+    "react-native-purchases-ui": "^9.7.6",
     "react-native-reanimated": "^4.2.1",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-svg": "^15.15.1",

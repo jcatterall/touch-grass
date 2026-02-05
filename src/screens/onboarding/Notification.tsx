@@ -1,19 +1,54 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { OnboardingContainer } from '../components/onboarding/OnboardingContainer';
-import { Button } from '../components';
-import { spacing, typography } from '../theme';
+import {
+  StyleSheet,
+  Text,
+  View,
+  Platform,
+  PermissionsAndroid,
+  Alert,
+  Linking,
+} from 'react-native';
+import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
+import { Button } from '../../components';
+import { spacing, typography } from '../../theme';
 
 interface NotificationProps {
   onComplete: () => void;
 }
+
+const requestNotificationPermission = async (): Promise<boolean> => {
+  if (Platform.OS === 'android') {
+    if (Platform.Version >= 33) {
+      const result = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+      );
+      return result === PermissionsAndroid.RESULTS.GRANTED;
+    }
+    // Android < 13 doesn't require runtime permission for notifications
+    return true;
+  }
+  return true;
+};
 
 export const Notification = ({ onComplete }: NotificationProps) => {
   const handleContinue = () => {
     onComplete();
   };
 
-  const handleNotification = () => {
-    console.log('Trigger notification logic');
+  const handleNotification = async () => {
+    const granted = await requestNotificationPermission();
+
+    if (granted) {
+      onComplete();
+    } else {
+      Alert.alert(
+        'Permission Required',
+        'Notification access is needed to block unwanted notifications. Please enable it in settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
+    }
   };
 
   return (
