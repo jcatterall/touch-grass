@@ -13,6 +13,7 @@ import { spacing, typography } from '../../theme';
 
 interface NotificationProps {
   onComplete: () => void;
+  onBack?: () => void;
 }
 
 const requestNotificationPermission = async (): Promise<boolean> => {

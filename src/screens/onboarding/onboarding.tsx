@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState, ReactNode } from 'react';
+import { BackHandler } from 'react-native';
 import { Why } from './Why';
 import { Goals } from './Goals';
 import { Plan } from './Plan';
@@ -13,7 +14,12 @@ import { UsageReport } from './usage/UsageReport';
 import { UsagePermissions } from './usage/UsagePermissions';
 import { BlockingPlan } from '../../types';
 
-const Steps: OnboardingStep[] = [
+export interface OnboardingStepProps {
+  onComplete: () => void;
+  onBack?: () => void;
+}
+
+const STEPS = [
   'home',
   'why',
   'usage',
@@ -26,47 +32,56 @@ const Steps: OnboardingStep[] = [
   'streak',
   'paywall',
   'notification',
-]; //ordered
+] as const;
 
-type OnboardingStep =
-  | 'home'
-  | 'why'
-  | 'goalsSplash'
-  | 'goals'
-  | 'planSplash'
-  | 'plan'
-  | 'usage'
-  | 'usagePermissions'
-  | 'usageReport'
-  | 'streak'
-  | 'paywall'
-  | 'notification';
+type OnboardingStep = (typeof STEPS)[number];
 
 export const Onboarding = () => {
-  //TODO: default to home
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>('home');
-  const [usage, setUsage] = useState(0);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [usage, setUsage] = useState(1);
   const [blockingPlan, setBlockingPlan] = useState<BlockingPlan | null>(null);
 
-  const handleNext = (skip: boolean = false) => {
-    const currentIndex = Steps.indexOf(currentStep);
-    const nextIndex = skip ? 2 : 1; //skip next
-    const nextStep = Steps[currentIndex + nextIndex];
+  const currentStep = STEPS[stepIndex];
+  const canGoBack = stepIndex > 0;
 
-    if (nextStep) {
-      setCurrentStep(nextStep);
-    } else {
+  const handleNext = useCallback((skip = false) => {
+    const increment = skip ? 2 : 1;
+    setStepIndex(prev => {
+      const nextIndex = prev + increment;
+      if (nextIndex < STEPS.length) {
+        return nextIndex;
+      }
       console.log('Onboarding Finished');
-    }
-  };
+      return prev;
+    });
+  }, []);
 
-  const StepComponent = {
+  const handleBack = useCallback(() => {
+    if (!canGoBack) return false;
+    setStepIndex(prev => prev - 1);
+    return true;
+  }, [canGoBack]);
+
+  // Android hardware back button support
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBack,
+    );
+    return () => subscription.remove();
+  }, [handleBack]);
+
+  const stepComponents: Record<OnboardingStep, ReactNode> = {
     home: <Home onComplete={handleNext} />,
-    why: <Why onComplete={handleNext} />,
-    goalsSplash: <GoalsSplash onComplete={handleNext} />,
-    goals: <Goals onComplete={handleNext} />,
+    why: <Why onComplete={handleNext} onBack={handleBack} />,
+    goalsSplash: <GoalsSplash onComplete={handleNext} onBack={handleBack} />,
+    goals: <Goals onComplete={handleNext} onBack={handleBack} />,
     planSplash: (
-      <PlanSplash onSkip={() => handleNext(true)} onComplete={handleNext} />
+      <PlanSplash
+        onSkip={() => handleNext(true)}
+        onComplete={handleNext}
+        onBack={handleBack}
+      />
     ),
     plan: (
       <Plan
@@ -74,22 +89,31 @@ export const Onboarding = () => {
           setBlockingPlan(plan);
           handleNext();
         }}
+        onBack={handleBack}
       />
     ),
     usage: (
-      <Usage onComplete={handleNext} setUsage={value => setUsage(value)} />
+      <Usage
+        usage={usage}
+        onComplete={handleNext}
+        setUsage={setUsage}
+        onBack={handleBack}
+      />
     ),
     usagePermissions: (
       <UsagePermissions
         onSkip={() => handleNext(true)}
         onComplete={handleNext}
+        onBack={handleBack}
       />
     ),
-    usageReport: <UsageReport usage={usage} onComplete={handleNext} />,
-    streak: <Streak onComplete={handleNext} />,
-    paywall: <Paywall onComplete={handleNext} />,
-    notification: <Notification onComplete={handleNext} />,
-  }[currentStep];
+    usageReport: (
+      <UsageReport usage={usage} onComplete={handleNext} onBack={handleBack} />
+    ),
+    streak: <Streak onComplete={handleNext} onBack={handleBack} />,
+    paywall: <Paywall onComplete={handleNext} onBack={handleBack} />,
+    notification: <Notification onComplete={handleNext} onBack={handleBack} />,
+  };
 
-  return <>{StepComponent}</>;
+  return <>{stepComponents[currentStep]}</>;
 };

@@ -19,6 +19,7 @@ import { X } from 'lucide-react-native';
 
 export interface PaywallProps {
   onComplete: () => void;
+  onBack?: () => void;
 }
 
 export const Paywall = ({ onComplete }: PaywallProps) => {

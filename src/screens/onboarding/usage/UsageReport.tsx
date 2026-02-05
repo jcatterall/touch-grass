@@ -15,6 +15,7 @@ import { UsageActual } from './UsageActual';
 export interface UsageReportProps {
   onComplete: () => void;
   usage: number;
+  onBack?: () => void;
 }
 
 const Steps: UsageReportStep[] = [

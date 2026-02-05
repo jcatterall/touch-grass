@@ -8,6 +8,7 @@ import UsageStats from '../../../native/UsageStats';
 export interface UsagePermissionsProps {
   onComplete: () => void;
   onSkip: () => void;
+  onBack?: () => void;
 }
 
 export const UsagePermissions = ({

@@ -21,6 +21,7 @@ import {
 
 export interface PlanProps {
   onComplete: (plan: BlockingPlan) => void;
+  onBack?: () => void;
 }
 
 const DISTANCE_CONFIG = {

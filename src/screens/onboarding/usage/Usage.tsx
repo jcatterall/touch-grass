@@ -12,12 +12,14 @@ import Animated, {
 } from 'react-native-reanimated';
 
 export interface UsageProps {
+  usage: number;
   onComplete: () => void;
   setUsage: (value: number) => void;
+  onBack?: () => void;
 }
 
-export const Usage = ({ onComplete, setUsage }: UsageProps) => {
-  const [currentUsage, setCurrentUsage] = useState(1);
+export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
+  const [currentUsage, setCurrentUsage] = useState(usage);
   const animatedUsage = useSharedValue(1);
 
   useEffect(() => {

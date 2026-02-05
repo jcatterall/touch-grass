@@ -6,6 +6,7 @@ import { Button, Select } from '../../components';
 
 export interface GoalsProps {
   onComplete: () => void;
+  onBack?: () => void;
 }
 
 interface Details {

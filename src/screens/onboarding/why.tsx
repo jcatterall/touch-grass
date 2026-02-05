@@ -12,6 +12,7 @@ import { OnboardingContainer } from '../../components/onboarding/OnboardingConta
 
 export interface WhyProps {
   onComplete: () => void;
+  onBack?: () => void;
 }
 
 interface CarouselItem {
