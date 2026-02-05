@@ -10,9 +10,9 @@ import {
   View,
 } from 'react-native';
 import { ArrowLeft, Search, Square, CheckSquare } from 'lucide-react-native';
-import { Main } from '../layout/Main';
+import { Main } from '../components/layout/Main';
 import { Button } from '../components';
-import { colors, spacing, borderRadius } from '../theme';
+import { colors, spacing, borderRadius, typography } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
 import { getAllInstalledApps } from '../native/AppListModule';
 
@@ -23,38 +23,24 @@ export interface AppItem {
 }
 
 export interface BlocklistScreenProps {
-  selectedAppIds?: string[];
-  onSave: (selectedAppIds: string[]) => void;
+  selectedApps?: AppItem[];
+  onSave: (selectedApps: AppItem[]) => void;
   onClose: () => void;
 }
 
-// Generate a consistent color from app name for fallback
-function getAppColor(name: string): string {
-  const colors = [
-    '#E4405F', '#1877F2', '#25D366', '#FF0000', '#1DB954',
-    '#5865F2', '#FF4500', '#0088CC', '#E50914', '#9146FF',
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
-
 export const BlocklistScreen = ({
-  selectedAppIds: initialSelectedIds = [],
+  selectedApps: initialSelectedApps = [],
   onSave,
   onClose,
 }: BlocklistScreenProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [selectedAppIds, setSelectedAppIds] = useState<Set<string>>(
-    new Set(initialSelectedIds)
+    new Set(initialSelectedApps.map(app => app.id)),
   );
   const [apps, setApps] = useState<AppItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load installed apps on mount
   useEffect(() => {
     async function loadApps() {
       try {
@@ -64,7 +50,7 @@ export const BlocklistScreen = ({
             id: app.id,
             name: app.name,
             icon: app.icon,
-          }))
+          })),
         );
       } catch (error) {
         console.error('Failed to load installed apps:', error);
@@ -72,10 +58,10 @@ export const BlocklistScreen = ({
         setLoading(false);
       }
     }
+
     loadApps();
   }, []);
 
-  // Filter apps based on search query
   const filteredApps = useMemo(() => {
     if (!searchQuery.trim()) return apps;
     const query = searchQuery.toLowerCase();
@@ -97,7 +83,8 @@ export const BlocklistScreen = ({
 
   const handleSave = () => {
     triggerHaptic('impactMedium');
-    onSave(Array.from(selectedAppIds));
+    const selectedApps = apps.filter(app => selectedAppIds.has(app.id));
+    onSave(selectedApps);
   };
 
   const renderAppItem = ({ item: app }: { item: AppItem }) => {
@@ -109,24 +96,17 @@ export const BlocklistScreen = ({
         onPress={() => toggleAppSelection(app.id)}
       >
         <View style={styles.appLeft}>
-          {app.icon ? (
-            <Image
-              source={{ uri: app.icon }}
-              style={styles.appIconImage}
-            />
-          ) : (
-            <View style={[styles.appIcon, { backgroundColor: getAppColor(app.name) }]}>
-              <Text style={styles.appIconText}>
-                {app.name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
+          <Image source={{ uri: app.icon }} style={styles.appIconImage} />
           <Text style={styles.appName} numberOfLines={1}>
             {app.name}
           </Text>
         </View>
         {isSelected ? (
-          <CheckSquare size={24} color={colors.primary.blue} fill={colors.primary.blue} />
+          <CheckSquare
+            size={24}
+            color={colors.primary.blue}
+            fill={colors.primary.blue}
+          />
         ) : (
           <Square size={24} color={colors.dark.textTertiary} />
         )}
@@ -137,7 +117,6 @@ export const BlocklistScreen = ({
   return (
     <Main style={styles.main}>
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <Pressable
             onPress={onClose}
@@ -151,7 +130,7 @@ export const BlocklistScreen = ({
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search apps..."
-              placeholderTextColor={colors.dark.textTertiary}
+              placeholderTextColor={colors.neutral.black}
               autoFocus
               onBlur={() => {
                 if (!searchQuery) setIsSearchVisible(false);
@@ -168,7 +147,6 @@ export const BlocklistScreen = ({
           </Pressable>
         </View>
 
-        {/* App List */}
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary.blue} />
@@ -184,7 +162,7 @@ export const BlocklistScreen = ({
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>
+                <Text style={typography.styles.light.subheading}>
                   {searchQuery ? 'No apps found' : 'No apps available'}
                 </Text>
               </View>
@@ -192,7 +170,6 @@ export const BlocklistScreen = ({
           />
         )}
 
-        {/* Save Button */}
         <View style={styles.footer}>
           <Button size="lg" onPress={handleSave}>
             Save
@@ -204,9 +181,7 @@ export const BlocklistScreen = ({
 };
 
 const styles = StyleSheet.create({
-  main: {
-    backgroundColor: colors.dark.background,
-  },
+  main: {},
   container: {
     flex: 1,
     paddingHorizontal: spacing.lg,
@@ -219,19 +194,16 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.dark.textPrimary,
     marginLeft: spacing.md,
+    ...typography.styles.light.heading,
   },
   searchInput: {
     flex: 1,
-    fontSize: 18,
-    color: colors.dark.textPrimary,
     marginHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.primary.blue,
+    ...typography.styles.light.body,
   },
   list: {
     flex: 1,
@@ -243,7 +215,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   appLeft: {
     flex: 1,
@@ -251,28 +223,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  appIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   appIconImage: {
-    width: 44,
-    height: 44,
+    width: 32,
+    height: 32,
     borderRadius: borderRadius.md,
-  },
-  appIconText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.neutral.white,
   },
   appName: {
     flex: 1,
-    fontSize: 17,
-    fontWeight: '500',
-    color: colors.dark.textPrimary,
+    ...typography.styles.light.subheading,
   },
   footer: {
     paddingVertical: spacing.md,
@@ -292,10 +250,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xl,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: colors.dark.textTertiary,
   },
 });
 

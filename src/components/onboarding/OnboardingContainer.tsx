@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { spacing } from '../../theme';
 import { ReactNode } from 'react';
-import { Main } from '../../layout/Main';
+import { Main } from '../layout/Main';
 
 export const OnboardingContainer = ({ children }: { children: ReactNode }) => {
   return (

@@ -172,6 +172,15 @@ export const ColorSchemes = {
       text: Colors.white,
       textDisabled: Colors.disabled,
     },
+    // Link Button (text-only, no background)
+    link: {
+      background: 'transparent',
+      backgroundPressed: 'transparent',
+      backgroundDisabled: 'transparent',
+      text: Colors.primaryBlue,
+      textPressed: '#3A4AD9',
+      textDisabled: Colors.disabled,
+    },
   },
   dark: {
     // Primary Button (Solid)
@@ -206,6 +215,15 @@ export const ColorSchemes = {
       backgroundPressed: '#EF5350',
       backgroundDisabled: '#3D3D47',
       text: Colors.white,
+      textDisabled: '#6B6B73',
+    },
+    // Link Button (text-only, no background)
+    link: {
+      background: 'transparent',
+      backgroundPressed: 'transparent',
+      backgroundDisabled: 'transparent',
+      text: '#8B9AFF',
+      textPressed: '#A8B5FF',
       textDisabled: '#6B6B73',
     },
   },
@@ -400,7 +418,7 @@ export const ChipColorSchemes = {
 // TYPE DEFINITIONS
 // =============================================================================
 
-export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'link';
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 export type ButtonShape = 'pill' | 'rounded';
 export type ColorMode = 'light' | 'dark';

@@ -11,6 +11,7 @@ import { Paywall } from './Paywall';
 import { Notification } from '../Notification';
 import { UsageReport } from './usage/UsageReport';
 import { UsagePermissions } from './usage/UsagePermissions';
+import { BlockingPlan } from '../../types';
 
 const Steps: OnboardingStep[] = [
   'home',
@@ -43,8 +44,9 @@ type OnboardingStep =
 
 export const Onboarding = () => {
   //TODO: default to home
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>('plan');
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>('paywall');
   const [usage, setUsage] = useState(0);
+  const [blockingPlan, setBlockingPlan] = useState<BlockingPlan | null>(null);
 
   const handleNext = (skip: boolean = false) => {
     const currentIndex = Steps.indexOf(currentStep);
@@ -66,7 +68,14 @@ export const Onboarding = () => {
     planSplash: (
       <PlanSplash onSkip={() => handleNext(true)} onComplete={handleNext} />
     ),
-    plan: <Plan onComplete={handleNext} />,
+    plan: (
+      <Plan
+        onComplete={plan => {
+          setBlockingPlan(plan);
+          handleNext();
+        }}
+      />
+    ),
     usage: (
       <Usage onComplete={handleNext} setUsage={value => setUsage(value)} />
     ),

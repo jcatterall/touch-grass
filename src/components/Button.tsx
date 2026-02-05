@@ -75,12 +75,20 @@ export const Button: React.FC<ButtonProps> = ({
   const borderRadius = ButtonShapes[shape];
   const isDisabled = disabled || isLoading;
 
+  const isLink = variant === 'link';
+
   const getBackgroundColor = (pressed: boolean): string => {
     if (isDisabled) return colorScheme.backgroundDisabled;
     return pressed ? colorScheme.backgroundPressed : colorScheme.background;
   };
 
-  const textColor = isDisabled ? colorScheme.textDisabled : colorScheme.text;
+  const getTextColor = (pressed: boolean): string => {
+    if (isDisabled) return colorScheme.textDisabled;
+    if (isLink && pressed && 'textPressed' in colorScheme) {
+      return (colorScheme as { textPressed: string }).textPressed;
+    }
+    return colorScheme.text;
+  };
 
   const getBorderStyle = (): ViewStyle | null => {
     if (variant !== 'tertiary') return null;
@@ -95,22 +103,24 @@ export const Button: React.FC<ButtonProps> = ({
 
   const getContainerStyle = (state: PressableStateCallbackType): StyleProp<ViewStyle> => [
     styles.container,
-    {
-      height: sizeConfig.height,
-      paddingHorizontal: sizeConfig.paddingHorizontal,
-      borderRadius,
-      backgroundColor: getBackgroundColor(state.pressed),
-    },
+    isLink
+      ? { paddingHorizontal: 0 }
+      : {
+          height: sizeConfig.height,
+          paddingHorizontal: sizeConfig.paddingHorizontal,
+          borderRadius,
+        },
+    { backgroundColor: getBackgroundColor(state.pressed) },
     getBorderStyle(),
     style,
   ];
 
-  const computedTextStyle: StyleProp<TextStyle> = [
+  const getComputedTextStyle = (pressed: boolean): StyleProp<TextStyle> => [
     styles.text,
     {
       fontSize: sizeConfig.fontSize,
       fontWeight: sizeConfig.fontWeight,
-      color: textColor,
+      color: getTextColor(pressed),
       letterSpacing: ButtonTypography.letterSpacing,
     },
     textStyle,
@@ -128,12 +138,12 @@ export const Button: React.FC<ButtonProps> = ({
     onLongPress?.(event);
   };
 
-  const renderContent = () => {
+  const renderContent = (pressed: boolean) => {
     if (isLoading) {
       return (
         <ActivityIndicator
           size="small"
-          color={textColor}
+          color={getTextColor(false)}
           testID={testID ? `${testID}-loading` : undefined}
         />
       );
@@ -142,7 +152,7 @@ export const Button: React.FC<ButtonProps> = ({
     return (
       <View style={styles.contentContainer}>
         {iconLeft && <View style={styles.iconContainer}>{iconLeft}</View>}
-        <Text style={computedTextStyle} numberOfLines={1} allowFontScaling={false}>
+        <Text style={getComputedTextStyle(pressed)} numberOfLines={1} allowFontScaling={false}>
           {children}
         </Text>
       </View>
@@ -165,7 +175,7 @@ export const Button: React.FC<ButtonProps> = ({
         testID={testID}
         android_ripple={null}
       >
-        {renderContent()}
+        {({ pressed }) => renderContent(pressed)}
       </Pressable>
     </Animated.View>
   );

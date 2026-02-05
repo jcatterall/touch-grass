@@ -2,29 +2,36 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, borderRadius, spacing } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
 
+type SegmentedControlSize = 'sm' | 'md';
+
 export interface SegmentedControlProps {
   options: string[];
   selectedIndex: number;
   onSelect: (index: number) => void;
+  size?: SegmentedControlSize;
 }
 
 export const SegmentedControl = ({
   options,
   selectedIndex,
   onSelect,
+  size = 'md',
 }: SegmentedControlProps) => {
   const handleSelect = (index: number) => {
     triggerHaptic('selection');
     onSelect(index);
   };
 
+  const isSmall = size === 'sm';
+
   return (
-    <View style={styles.segmentedContainer}>
+    <View style={[styles.segmentedContainer, isSmall && styles.segmentedContainerSm]}>
       {options.map((option, index) => (
         <Pressable
           key={option}
           style={[
             styles.segmentedOption,
+            isSmall && styles.segmentedOptionSm,
             selectedIndex === index && styles.segmentedOptionSelected,
           ]}
           onPress={() => handleSelect(index)}
@@ -33,6 +40,7 @@ export const SegmentedControl = ({
           <Text
             style={[
               styles.segmentedText,
+              isSmall && styles.segmentedTextSm,
               selectedIndex === index && styles.segmentedTextSelected,
             ]}
           >
@@ -51,6 +59,9 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
     padding: 1,
   },
+  segmentedContainerSm: {
+    padding: 2,
+  },
   segmentedOption: {
     flex: 1,
     paddingVertical: spacing.xxs,
@@ -59,6 +70,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: borderRadius.pill,
   },
+  segmentedOptionSm: {
+    paddingVertical: spacing.xxxs,
+    paddingHorizontal: spacing.sm,
+    maxWidth: undefined,
+    flex: 0,
+  },
   segmentedOptionSelected: {
     backgroundColor: colors.primary.blue,
   },
@@ -66,6 +83,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: colors.text.secondary,
+  },
+  segmentedTextSm: {
+    fontSize: 13,
   },
   segmentedTextSelected: {
     color: colors.neutral.white,

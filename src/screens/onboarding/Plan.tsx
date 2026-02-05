@@ -3,60 +3,34 @@ import { StyleSheet, Text, View } from 'react-native';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
 import { Button, DayChip, SegmentedControl } from '../../components';
 import { TimeRangeSlider } from '../../components/TimeRangeSlider';
-import { AppBlockList, type BlockedApp } from '../../components/AppBlockList';
+import { AppBlockList } from '../../components/AppBlockList';
 import { Slider } from '../../components/Slider';
-import { BlocklistScreen } from '../BlocklistScreen';
-import { spacing, colors } from '../../theme';
+import { BlocklistScreen, type AppItem } from '../BlocklistScreen';
+import { spacing, colors, typography } from '../../theme';
 import { triggerHaptic } from '../../utils/haptics';
+import {
+  DayKey,
+  DurationType,
+  CriteriaType,
+  DAYS,
+  DistanceUnit,
+  KM_TO_MI,
+  MI_TO_KM,
+  BlockingPlan,
+} from '../../types';
 
 export interface PlanProps {
-  onComplete: () => void;
+  onComplete: (plan: BlockingPlan) => void;
 }
 
-type DayKey = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
-type DurationType = 'entire_day' | 'specific_hours';
-type CriteriaType = 'distance' | 'time';
-
-const DAYS: { key: DayKey; label: string }[] = [
-  { key: 'MON', label: 'Mon' },
-  { key: 'TUE', label: 'Tue' },
-  { key: 'WED', label: 'Wed' },
-  { key: 'THU', label: 'Thu' },
-  { key: 'FRI', label: 'Fri' },
-  { key: 'SAT', label: 'Sat' },
-  { key: 'SUN', label: 'Sun' },
-];
-
-const DEFAULT_BLOCKED_APP_IDS = ['netflix', 'discord', 'youtube', 'tiktok'];
-
-const APP_NAMES: Record<string, string> = {
-  instagram: 'Instagram',
-  facebook: 'Facebook',
-  twitter: 'Twitter',
-  tiktok: 'TikTok',
-  snapchat: 'Snapchat',
-  discord: 'Discord',
-  whatsapp: 'WhatsApp',
-  messenger: 'Messenger',
-  telegram: 'Telegram',
-  reddit: 'Reddit',
-  'candy-crush': 'Candy Crush',
-  'pokemon-go': 'Pokemon Go',
-  'clash-royale': 'Clash Royale',
-  netflix: 'Netflix',
-  youtube: 'YouTube',
-  spotify: 'Spotify',
-  twitch: 'Twitch',
-  amazon: 'Amazon',
-  doordash: 'DoorDash',
-  'uber-eats': 'Uber Eats',
-  airbnb: 'Airbnb',
-  'google-maps': 'Google Maps',
-};
+const DISTANCE_CONFIG = {
+  km: { min: 1, max: 15, step: 0.5, label: 'km' },
+  mi: { min: 0.5, max: 10, step: 0.5, label: 'mi' },
+} as const;
 
 const CRITERIA_CONFIG = {
-  distance: { min: 1, max: 15, step: 0.5, unit: 'Kilometers', label: 'km' },
-  time: { min: 5, max: 120, step: 5, unit: 'Minutes', label: 'min' },
+  distance: DISTANCE_CONFIG.km,
+  time: { min: 5, max: 120, step: 5, label: 'min' },
 } as const;
 
 export const Plan = ({ onComplete }: PlanProps) => {
@@ -66,17 +40,13 @@ export const Plan = ({ onComplete }: PlanProps) => {
   const [fromTime, setFromTime] = useState('09:00 AM');
   const [toTime, setToTime] = useState('05:00 PM');
   const [criteriaType, setCriteriaType] = useState<CriteriaType>('distance');
+  const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('km');
   const [criteriaValue, setCriteriaValue] = useState({
     distance: 5.0,
     time: 30,
   });
   const [showBlocklist, setShowBlocklist] = useState(false);
-  const [blockedAppIds, setBlockedAppIds] = useState<string[]>(DEFAULT_BLOCKED_APP_IDS);
-
-  // Convert blocked app IDs to BlockedApp format for display
-  const blockedApps: BlockedApp[] = blockedAppIds.map(id => ({
-    name: APP_NAMES[id] || id,
-  }));
+  const [blockedApps, setBlockedApps] = useState<AppItem[]>([]);
 
   const toggleDay = (day: DayKey) => {
     triggerHaptic('selection');
@@ -87,21 +57,44 @@ export const Plan = ({ onComplete }: PlanProps) => {
 
   const handleSaveRule = () => {
     triggerHaptic('impactMedium');
-    onComplete();
+    const plan: BlockingPlan = {
+      days: selectedDays,
+      duration:
+        durationType === 'entire_day'
+          ? { type: 'entire_day' }
+          : { type: 'specific_hours', from: fromTime, to: toTime },
+      criteria:
+        criteriaType === 'distance'
+          ? {
+              type: 'distance',
+              value: criteriaValue.distance,
+              unit: distanceUnit,
+            }
+          : { type: 'time', value: criteriaValue.time },
+      blockedApps: blockedApps.map(app => ({
+        id: app.id,
+        name: app.name,
+        icon: app.icon,
+      })),
+    };
+    onComplete(plan);
   };
 
-  const config = CRITERIA_CONFIG[criteriaType];
+  const config =
+    criteriaType === 'distance'
+      ? DISTANCE_CONFIG[distanceUnit]
+      : CRITERIA_CONFIG.time;
   const currentValue = criteriaValue[criteriaType];
 
-  const handleBlocklistSave = (selectedIds: string[]) => {
-    setBlockedAppIds(selectedIds);
+  const handleBlocklistSave = (selectedApps: AppItem[]) => {
+    setBlockedApps(selectedApps);
     setShowBlocklist(false);
   };
 
   if (showBlocklist) {
     return (
       <BlocklistScreen
-        selectedAppIds={blockedAppIds}
+        selectedApps={blockedApps}
         onSave={handleBlocklistSave}
         onClose={() => setShowBlocklist(false)}
       />
@@ -111,6 +104,7 @@ export const Plan = ({ onComplete }: PlanProps) => {
   return (
     <OnboardingContainer>
       <View style={styles.container}>
+        <Text style={typography.styles.light.heading}>Your plan</Text>
         <View style={{ ...styles.frequencySection, ...styles.section }}>
           <Text style={styles.sectionLabel}>FREQUENCY</Text>
           <View style={styles.daysContainer}>
@@ -161,14 +155,41 @@ export const Plan = ({ onComplete }: PlanProps) => {
           </View>
 
           <View style={{ ...styles.criteriaValueRow, ...styles.section }}>
-            <Text style={styles.criteriaValue}>
-              {criteriaType === 'distance'
-                ? currentValue.toFixed(1)
-                : currentValue}
-            </Text>
-            <Text style={styles.criteriaUnit}>
-              {config.label.toUpperCase()}
-            </Text>
+            <View style={styles.criteriaValueGroup}>
+              <Text style={styles.criteriaValue}>
+                {criteriaType === 'distance'
+                  ? currentValue.toFixed(1)
+                  : currentValue}
+              </Text>
+              <Text style={styles.criteriaUnit}>
+                {config.label.toUpperCase()}
+              </Text>
+            </View>
+            {criteriaType === 'distance' && (
+              <SegmentedControl
+                size="sm"
+                options={['mi', 'km']}
+                selectedIndex={distanceUnit === 'mi' ? 0 : 1}
+                onSelect={index => {
+                  const newUnit = index === 0 ? 'mi' : 'km';
+                  if (newUnit !== distanceUnit) {
+                    const convertedValue =
+                      distanceUnit === 'km'
+                        ? criteriaValue.distance * KM_TO_MI
+                        : criteriaValue.distance * MI_TO_KM;
+                    const clampedValue = Math.min(
+                      Math.max(convertedValue, DISTANCE_CONFIG[newUnit].min),
+                      DISTANCE_CONFIG[newUnit].max,
+                    );
+                    setCriteriaValue(prev => ({
+                      ...prev,
+                      distance: Math.round(clampedValue * 2) / 2,
+                    }));
+                    setDistanceUnit(newUnit);
+                  }
+                }}
+              />
+            )}
           </View>
 
           <View style={{ ...styles.sliderSection, ...styles.section }}>
@@ -194,7 +215,10 @@ export const Plan = ({ onComplete }: PlanProps) => {
           </View>
         </View>
 
-        <AppBlockList apps={blockedApps} onEdit={() => setShowBlocklist(true)} />
+        <AppBlockList
+          apps={blockedApps}
+          onEdit={() => setShowBlocklist(true)}
+        />
       </View>
 
       <View style={styles.footer}>
@@ -234,6 +258,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   criteriaValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  criteriaValueGroup: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: spacing.xs,
