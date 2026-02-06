@@ -1,8 +1,46 @@
+import { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { type DailyUsage } from '../../native/UsageStats';
 import { colors, spacing } from '../../theme';
 import { calculateAverage, formatTime } from './Usage.utils';
 import { Typography } from '../Typography';
+
+const ANIMATION_CONFIG = {
+  duration: 600,
+  easing: Easing.bezier(0.4, 0.0, 0.2, 1),
+};
+const STAGGER_DELAY = 80;
+
+interface AnimatedBarProps {
+  targetHeight: number;
+  index: number;
+  isToday: boolean;
+}
+
+const AnimatedBar = ({ targetHeight, index, isToday }: AnimatedBarProps) => {
+  const height = useSharedValue(0);
+
+  useEffect(() => {
+    height.value = withDelay(
+      index * STAGGER_DELAY,
+      withTiming(Math.max(targetHeight, 4), ANIMATION_CONFIG),
+    );
+  }, [targetHeight, index, height]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    height: height.value,
+    backgroundColor: isToday ? colors.primary.blue : 'rgba(48, 149, 255, 0.7)',
+  }));
+
+  return <Animated.View style={[styles.bar, animatedStyle]} />;
+};
 
 export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
   if (data.length === 0) {
@@ -33,16 +71,14 @@ export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
           const barHeight =
             maxMinutes > 0 ? (day.totalMinutes / maxMinutes) * chartHeight : 0;
           const isToday = index === data.length - 1;
-          const isTodayStyle = {
-            height: Math.max(barHeight, 4),
-            backgroundColor: isToday
-              ? colors.primary.blue
-              : 'rgba(48, 149, 255, 0.7)',
-          };
           return (
             <View key={`${day.day}-${index}`} style={styles.barWrapper}>
               <View style={styles.barArea}>
-                <View style={[styles.bar, isTodayStyle]} />
+                <AnimatedBar
+                  targetHeight={barHeight}
+                  index={index}
+                  isToday={isToday}
+                />
               </View>
               <View style={styles.labelContainer}>
                 <Typography variant="body" color="secondary">

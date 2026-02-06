@@ -16,22 +16,22 @@ export const Home = ({ onComplete }: PlanProps) => {
     <OnboardingContainer>
       <View style={styles.top}>
         <Typography variant="title" center>
-          🎉
+          🌿
         </Typography>
       </View>
       <View style={styles.center}>
         <Typography variant="heading" center>
-          Expand your mind by walking outside you little
+          Less scrolling. More living.
         </Typography>
-        <Typography variant="body" center>
-          Learn to be a better person with more walking and such, it's just
-          better for you.
+        <Typography variant="subtitle" center>
+          Break free from screen addiction by making you earn your app time with
+          real movement.
         </Typography>
       </View>
 
       <View style={styles.bottom}>
         <Typography variant="body" color="secondary" center>
-          Some text would go here
+          Takes less than 2 minutes to set up
         </Typography>
         <Button size="lg" onPress={handleContinue}>
           Get started

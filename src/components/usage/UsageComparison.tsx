@@ -1,7 +1,22 @@
+import { useEffect } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
 import { colors, spacing } from '../../theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const ANIMATION_CONFIG = {
+  duration: 500,
+  easing: Easing.bezier(0.4, 0.0, 0.2, 1),
+};
+const MIN_BAR_WIDTH = 60;
+const STAGGER_DELAY = 150;
 
 export const UsageComparison = ({
   label,
@@ -9,28 +24,42 @@ export const UsageComparison = ({
   maxValue,
   suffix,
   isReduced,
+  index = 0,
 }: {
   label: string;
   value: number;
   maxValue: number;
   suffix: string;
   isReduced?: boolean;
+  index?: number;
 }) => {
-  const barWidth =
-    (value / maxValue) * (SCREEN_WIDTH - spacing.screenPadding * 2 - 100);
+  const targetWidth =
+    (value / maxValue) * (SCREEN_WIDTH - spacing.lg * 2 - 100);
+  const width = useSharedValue(MIN_BAR_WIDTH);
+
+  useEffect(() => {
+    width.value = withDelay(
+      index * STAGGER_DELAY,
+      withTiming(Math.max(targetWidth, MIN_BAR_WIDTH), ANIMATION_CONFIG),
+    );
+  }, [targetWidth, index, width]);
+
+  const animatedBarStyle = useAnimatedStyle(() => ({
+    width: width.value,
+  }));
 
   return (
     <View style={styles.barContainer}>
       <View style={styles.barWrapper}>
-        <View
+        <Animated.View
           style={[
             styles.bar,
-            { width: Math.max(barWidth, 60) },
+            animatedBarStyle,
             isReduced ? styles.barReduced : styles.barNormal,
           ]}
         >
           <Text style={styles.barValue}>{suffix}</Text>
-        </View>
+        </Animated.View>
         <Text style={styles.barLabel}>{label}</Text>
       </View>
     </View>

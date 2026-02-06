@@ -16,6 +16,7 @@ function App() {
 
   const style: StyleProp<ViewStyle> = {
     flex: 1,
+    backgroundColor: isDarkMode ? '#000' : '#fff',
   };
 
   useEffect(() => {

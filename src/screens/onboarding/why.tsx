@@ -18,21 +18,21 @@ interface CarouselItem {
 const onboardingSlides: CarouselItem[] = [
   {
     id: '1',
-    title: 'Everything your mind needs',
+    title: 'Break free from endless scrolling',
     subTitle:
-      'Stress less, sleep soundly, and get one-on-one support to feel your best. Explore hundreds of exercises, courses, and guided programs designed to help you live a healthier, happier life.',
+      'TouchGrass blocks your most distracting apps until you step outside and move. Trade screen time for fresh air and reclaim hours of your day.',
   },
   {
     id: '2',
-    title: 'Support on your schedule',
+    title: 'Walk to unlock your apps',
     subTitle:
-      "Navigate life's ups and downs with a mental health coach, a therapist, or Ebb, your empathetic AI companion.",
+      "Set a distance or time goal, and your blocked apps stay locked until you've earned them. It's simple — the more you move, the more you unlock.",
   },
   {
     id: '3',
-    title: 'Loved by millions. Backed by science.',
+    title: 'Build healthier habits naturally',
     subTitle:
-      'Join members around the world who are feeling the benefits. Headspace has been proven to decrease stress and increase happiness in just 10 days.',
+      'Replace mindless scrolling with mindful movement. Users reduce screen time by up to 30% in their first week while getting more steps than ever.',
   },
 ];
 

@@ -16,7 +16,7 @@ export const UsagePickups = ({ count }: { count: number }) => {
   return (
     <View style={styles.container}>
       <View style={styles.leftContent}>
-        <Typography mode="dark" variant="subtitle">
+        <Typography mode="light" variant="subtitle">
           Daily pickups
         </Typography>
         <Chip label={status} variant="blue" size="sm" mode="dark" isSelected />
@@ -28,8 +28,8 @@ export const UsagePickups = ({ count }: { count: number }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.dark.cardBackground,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.neutral10,
+    borderRadius: borderRadius.md,
     padding: spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',

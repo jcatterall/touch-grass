@@ -22,7 +22,7 @@ export const UsageApps = ({ apps }: { apps: AppUsage[] }) => {
 
   return (
     <View style={styles.container}>
-      <Typography mode="dark" variant="subtitle">
+      <Typography mode="light" variant="subtitle">
         Most used apps
       </Typography>
       <View style={styles.appsRow}>
@@ -41,8 +41,8 @@ export const UsageApps = ({ apps }: { apps: AppUsage[] }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.dark.cardBackground,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.neutral10,
+    borderRadius: borderRadius.md,
     padding: spacing.md,
   },
   appsRow: {

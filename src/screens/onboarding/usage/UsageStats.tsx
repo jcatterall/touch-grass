@@ -1,4 +1,5 @@
 import { View, StyleSheet } from 'react-native';
+import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { UsageApps } from '../../../components/usage/UsageApps';
 import { UsageChart } from '../../../components/usage/UsageChart';
 import { UsagePickups } from '../../../components/usage/UsagePickups';
@@ -22,7 +23,7 @@ export const UsageStatsPage = ({
   weeklyData,
 }: UsageStatsProps) => (
   <View style={styles.content}>
-    <View style={styles.header}>
+    <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
       <Typography variant="subtitle" color="primary">
         Your current screen time
       </Typography>
@@ -32,10 +33,16 @@ export const UsageStatsPage = ({
       <Typography variant="body" color="secondary">
         Last week avg.
       </Typography>
-    </View>
-    <UsageChart data={weeklyData} />
-    <UsageApps apps={appData} />
-    <UsagePickups count={average.pickups} />
+    </Animated.View>
+    <Animated.View entering={FadeInUp.delay(0).duration(400)}>
+      <UsageChart data={weeklyData} />
+    </Animated.View>
+    <Animated.View entering={FadeInUp.delay(200).duration(400)}>
+      <UsageApps apps={appData} />
+    </Animated.View>
+    <Animated.View entering={FadeInUp.delay(400).duration(400)}>
+      <UsagePickups count={average.pickups} />
+    </Animated.View>
   </View>
 );
 

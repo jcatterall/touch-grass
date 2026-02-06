@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { BackHandler } from 'react-native';
 import { OnboardingContainer } from '../../../components/onboarding/OnboardingContainer';
 import { Button } from '../../../components';
 import UsageStats, {
@@ -33,7 +34,7 @@ type UsageReportStep =
   | 'comparison'
   | 'firstWeek';
 
-export const UsageReport = ({ onComplete, usage }: UsageReportProps) => {
+export const UsageReport = ({ onComplete, usage, onBack }: UsageReportProps) => {
   const [currentStep, setCurrentStep] = useState<UsageReportStep>('actual');
   const [weeklyData, setWeeklyData] = useState<DailyUsage[]>([]);
   const [appData, setAppData] = useState<AppUsage[]>([]);
@@ -80,32 +81,61 @@ export const UsageReport = ({ onComplete, usage }: UsageReportProps) => {
     }
   };
 
+  const handleBack = useCallback((): boolean => {
+    const currentIndex = Steps.indexOf(currentStep);
+    if (currentIndex > 0) {
+      setCurrentStep(Steps[currentIndex - 1]);
+      return true;
+    }
+    if (onBack) {
+      onBack();
+      return true;
+    }
+    return false;
+  }, [currentStep, onBack]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBack,
+    );
+    return () => subscription.remove();
+  }, [handleBack]);
+
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 'actual':
-        return UsageActual({ usage, average });
+        return <UsageActual key="actual" usage={usage} average={average} />;
       case 'stats':
-        return UsageStatsPage({
-          appData,
-          average: { ...average, pickups: pickupCount },
-          weeklyData,
-        });
+        return (
+          <UsageStatsPage
+            key="stats"
+            appData={appData}
+            average={{ ...average, pickups: pickupCount }}
+            weeklyData={weeklyData}
+          />
+        );
       case 'yearly':
-        return UsageYearly({ average, yearsIn30 });
+        return (
+          <UsageYearly key="yearly" average={average} yearsIn30={yearsIn30} />
+        );
       case 'comparison':
-        return UsageReportComparison({
-          average: { ...average, pickups: pickupCount },
-          reduced: {
-            hours: reducedHours,
-            minutes: reducedMinutes,
-            pickups: reducedPickups,
-          },
-          totalHours,
-        });
+        return (
+          <UsageReportComparison
+            key="comparison"
+            average={{ ...average, pickups: pickupCount }}
+            reduced={{
+              hours: reducedHours,
+              minutes: reducedMinutes,
+              pickups: reducedPickups,
+            }}
+            totalHours={totalHours}
+          />
+        );
       case 'firstWeek':
-        return UsageFirstWeek();
+        return <UsageFirstWeek key="firstWeek" />;
       default:
-        return <></>;
+        return null;
     }
   };
 

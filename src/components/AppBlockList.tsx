@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { AppIcon } from './AppIcon';
-import { colors, spacing } from '../theme';
+import { borderRadius, colors, spacing } from '../theme';
 import { Typography } from './Typography';
 import Button from './Button';
 
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   appIconRowContainer: {
     backgroundColor: colors.neutral10,
     padding: spacing.md,
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
     minHeight: 80,
   },
   appIconsRow: {

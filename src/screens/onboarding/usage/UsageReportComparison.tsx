@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { Typography } from '../../../components';
 import { UsageComparison } from '../../../components/usage/UsageComparison';
 import { usageStyles } from './Usage.styles';
@@ -23,11 +23,7 @@ export const UsageReportComparison = ({
   average,
   reduced,
 }: UsageReportComparisonProps) => (
-  <Animated.View
-    entering={FadeIn.duration(300)}
-    exiting={FadeOut.duration(200)}
-    style={usageStyles.slidePage}
-  >
+  <Animated.View entering={FadeIn.duration(300)} style={usageStyles.slidePage}>
     <View style={usageStyles.slideHeader}>
       <Typography variant="heading" center>
         No stress, we've got your back. Let's take a look at your potential.
@@ -36,8 +32,11 @@ export const UsageReportComparison = ({
         This is estimated based on our research
       </Typography>
     </View>
-    <View style={usageStyles.comparisonSection}>
-      <Typography variant="subtitle" mode="dark">
+    <Animated.View
+      entering={FadeInUp.delay(100).duration(400)}
+      style={usageStyles.comparisonSection}
+    >
+      <Typography variant="subtitle" mode="light">
         Time on phone
       </Typography>
       <View style={usageStyles.barsGroup}>
@@ -46,6 +45,7 @@ export const UsageReportComparison = ({
           value={totalHours}
           maxValue={totalHours}
           suffix={`${average.hours}h ${average.minutes}m`}
+          index={0}
         />
         <UsageComparison
           label="With TouchGrass"
@@ -53,11 +53,15 @@ export const UsageReportComparison = ({
           maxValue={totalHours}
           suffix={`${reduced.hours}h ${reduced.minutes}m`}
           isReduced
+          index={1}
         />
       </View>
-    </View>
-    <View style={usageStyles.comparisonSection}>
-      <Typography variant="subtitle" mode="dark">
+    </Animated.View>
+    <Animated.View
+      entering={FadeInUp.delay(300).duration(400)}
+      style={usageStyles.comparisonSection}
+    >
+      <Typography variant="subtitle" mode="light">
         Daily pickups
       </Typography>
       <View style={usageStyles.barsGroup}>
@@ -66,6 +70,7 @@ export const UsageReportComparison = ({
           value={average.pickups}
           maxValue={average.pickups}
           suffix={`${average.pickups}×`}
+          index={2}
         />
         <UsageComparison
           label="With TouchGrass"
@@ -73,8 +78,9 @@ export const UsageReportComparison = ({
           maxValue={average.pickups}
           suffix={`${reduced.pickups}×`}
           isReduced
+          index={3}
         />
       </View>
-    </View>
+    </Animated.View>
   </Animated.View>
 );
