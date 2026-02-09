@@ -5,6 +5,7 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import Purchases, {
   PurchasesPackage,
@@ -15,11 +16,27 @@ import { Button, Typography } from '../../components';
 import { ListItem } from '../../components/ListItem';
 import { colors, spacing, borderRadius } from '../../theme';
 import { X } from 'lucide-react-native';
+import { Illustration } from '../../components/Illustration';
 
 export interface PaywallProps {
   onComplete: () => void;
   onBack?: () => void;
 }
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') {
+    console.warn(`${title}: ${message}`);
+  } else {
+    // Delay alert slightly to ensure activity is attached
+    setTimeout(() => {
+      try {
+        Alert.alert(title, message);
+      } catch {
+        console.warn(`${title}: ${message}`);
+      }
+    }, 100);
+  }
+};
 
 export const Paywall = ({ onComplete }: PaywallProps) => {
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
@@ -47,7 +64,7 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
         }
       } catch (error) {
         console.error('Error fetching offerings:', error);
-        Alert.alert('Error', 'Failed to load subscription options');
+        showAlert('Error', 'Failed to load subscription options');
       } finally {
         setIsLoading(false);
       }
@@ -70,7 +87,7 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
       }
     } catch (error: any) {
       if (!error.userCancelled) {
-        Alert.alert('Purchase Failed', error.message || 'Something went wrong');
+        showAlert('Purchase Failed', error.message || 'Something went wrong');
       }
     } finally {
       setIsPurchasing(false);
@@ -82,13 +99,13 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
     try {
       const customerInfo = await Purchases.restorePurchases();
       if (Object.keys(customerInfo.entitlements.active).length > 0) {
-        Alert.alert('Success', 'Your purchase has been restored!');
+        showAlert('Success', 'Your purchase has been restored!');
         onComplete();
       } else {
-        Alert.alert('No Purchases', 'No previous purchases found to restore.');
+        showAlert('No Purchases', 'No previous purchases found to restore.');
       }
     } catch (error: any) {
-      Alert.alert('Restore Failed', error.message || 'Something went wrong');
+      showAlert('Restore Failed', error.message || 'Something went wrong');
     } finally {
       setIsPurchasing(false);
     }
@@ -130,13 +147,16 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
     <OnboardingContainer>
       <View style={styles.header}>
         <Pressable onPress={skipClicked} hitSlop={8}>
-          <X size={24} color={colors.dark20} />
+          <X size={24} color={colors.neutral.white} />
         </Pressable>
         <Pressable onPress={handleRestore} disabled={isPurchasing}>
-          <Typography variant="link" color="secondary">
+          <Typography mode="dark" variant="link">
             Restore Purchase
           </Typography>
         </Pressable>
+      </View>
+      <View style={styles.imageContainer}>
+        <Illustration source="prize" size="sm" />
       </View>
 
       <View style={styles.content}>
@@ -202,7 +222,7 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
         >
           {isPurchasing ? 'Processing...' : 'Try free and subscribe'}
         </Button>
-        <Typography variant="body" color="tertiary">
+        <Typography mode="dark" variant="body">
           Cancel anytime in Settings
         </Typography>
       </View>
@@ -266,5 +286,9 @@ const styles = StyleSheet.create({
   bottom: {
     gap: spacing.sm,
     alignItems: 'center',
+  },
+  imageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

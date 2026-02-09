@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { colors, spacing } from '../../theme';
+import { spacing } from '../../theme';
 import { ReactNode } from 'react';
 import { Main } from '../layout/Main';
 
@@ -16,6 +16,5 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'column',
     justifyContent: 'space-between',
-    backgroundColor: colors.dark.cardBackground,
   },
 });

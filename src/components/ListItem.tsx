@@ -16,7 +16,9 @@ export const ListItem = ({ value }: ListItemProps) => {
         fill={colors.primary60}
         strokeWidth={2}
       />
-      <Typography variant="subtitle">{value}</Typography>
+      <Typography mode="dark" variant="subtitle">
+        {value}
+      </Typography>
     </View>
   );
 };

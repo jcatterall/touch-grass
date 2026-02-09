@@ -9,6 +9,7 @@ import {
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
 import { Button, Typography } from '../../components';
 import { spacing } from '../../theme';
+import { Illustration } from '../../components/Illustration';
 
 interface NotificationProps {
   onComplete: () => void;
@@ -54,12 +55,12 @@ export const Notification = ({ onComplete }: NotificationProps) => {
     <OnboardingContainer>
       <View style={styles.flex}>
         <View style={styles.item}>
-          <Typography variant="heading">🔔</Typography>
+          <Illustration source="shield" size="md" />
           <View style={styles.heading}>
-            <Typography variant="title" center>
+            <Typography mode="dark" variant="title" center>
               Block unwanted notifications
             </Typography>
-            <Typography variant="subtitle" color="secondary" center>
+            <Typography mode="dark" variant="subtitle" color="secondary" center>
               Grant notification access to block any unwanted notifications
             </Typography>
           </View>
@@ -70,7 +71,7 @@ export const Notification = ({ onComplete }: NotificationProps) => {
         <Button size="lg" onPress={handleNotification}>
           Block notifications
         </Button>
-        <Button variant="secondary" size="lg" onPress={handleContinue}>
+        <Button mode="dark" variant="link" size="lg" onPress={handleContinue}>
           Maybe later
         </Button>
       </View>

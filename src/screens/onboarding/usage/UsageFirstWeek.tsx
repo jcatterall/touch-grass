@@ -42,10 +42,10 @@ export const UsageFirstWeek = () => {
       style={usageStyles.slidePage}
     >
       <View style={usageStyles.slideHeader}>
-        <Typography variant="heading" center>
+        <Typography mode="dark" variant="heading" center>
           The first week is the most important for changing your habits.
         </Typography>
-        <Typography variant="subtitle" color="secondary" center>
+        <Typography mode="dark" variant="subtitle" color="secondary" center>
           AppBlock can help cut down the time on your phone by up to 32% in the
           first week of use.
         </Typography>

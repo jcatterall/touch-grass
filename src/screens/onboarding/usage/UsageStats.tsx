@@ -24,13 +24,13 @@ export const UsageStatsPage = ({
 }: UsageStatsProps) => (
   <View style={styles.content}>
     <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
-      <Typography variant="subtitle" color="primary">
+      <Typography mode="dark" variant="subtitle" color="primary">
         Your current screen time
       </Typography>
-      <Typography variant="heading">
+      <Typography mode="dark" variant="heading">
         {average.hours}h {average.minutes}m
       </Typography>
-      <Typography variant="body" color="secondary">
+      <Typography mode="dark" variant="body" color="secondary">
         Last week avg.
       </Typography>
     </Animated.View>

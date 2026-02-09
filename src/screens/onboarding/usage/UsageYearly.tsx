@@ -15,6 +15,7 @@ import {
   createBigNumberStyle,
   bigNumberColors,
 } from './Usage.styles';
+import { colors } from '../../../theme';
 
 interface UsageYearlyProps {
   average: {
@@ -24,7 +25,7 @@ interface UsageYearlyProps {
   yearsIn30: string;
 }
 
-const bigNumberPurple = createBigNumberStyle(bigNumberColors.purple, 120);
+const bigNumberPurple = createBigNumberStyle(colors.terracotta, 120);
 
 const ANIMATION_CONFIG = {
   duration: 400,
@@ -51,10 +52,10 @@ export const UsageYearly = ({ average, yearsIn30 }: UsageYearlyProps) => {
       style={usageStyles.slidePage}
     >
       <View style={usageStyles.slideHeader}>
-        <Typography variant="title">
+        <Typography mode="dark" variant="title">
           {average.hours}h {average.minutes}m a day.
         </Typography>
-        <Typography variant="heading" center>
+        <Typography mode="dark" variant="heading" center>
           In 30 years that adds up to
         </Typography>
       </View>
@@ -63,10 +64,12 @@ export const UsageYearly = ({ average, yearsIn30 }: UsageYearlyProps) => {
           {yearsIn30}
         </Animated.Text>
         <Animated.View entering={FadeInUp.delay(400).duration(300)}>
-          <Typography variant="heading">YEARS</Typography>
+          <Typography mode="dark" variant="heading">
+            YEARS
+          </Typography>
         </Animated.View>
         <Animated.View entering={FadeInUp.delay(500).duration(300)}>
-          <Typography variant="subtitle" color="secondary">
+          <Typography mode="dark" variant="subtitle" color="secondary">
             spent on your phone
           </Typography>
         </Animated.View>

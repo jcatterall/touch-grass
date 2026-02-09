@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -8,6 +8,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { colors, spacing } from '../../theme';
+import Typography from '../Typography';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -58,9 +59,13 @@ export const UsageComparison = ({
             isReduced ? styles.barReduced : styles.barNormal,
           ]}
         >
-          <Text style={styles.barValue}>{suffix}</Text>
+          <Typography mode="dark" style={styles.barValue}>
+            {suffix}
+          </Typography>
         </Animated.View>
-        <Text style={styles.barLabel}>{label}</Text>
+        <Typography mode="dark" style={styles.barLabel}>
+          {label}
+        </Typography>
       </View>
     </View>
   );

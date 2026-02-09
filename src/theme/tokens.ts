@@ -14,35 +14,35 @@ export const FontFamily = {
   light: 'Apercu',
 };
 
-// Color Palette
+// Color Palette (Touch Grass)
 const colors = {
-  // Primary - Orange
-  primary100: '#7A3E18',
-  primary80: '#C45A1F',
-  primary60: '#F47D31',
-  primary40: '#FF9F4A',
-  primary20: '#FFDCC4',
+  // Primary - Terracotta
+  primary100: '#8A3D2E',
+  primary80: '#C85D47',
+  primary60: '#E2725B',
+  primary40: '#EF9A88',
+  primary20: '#F9D5CD',
 
-  // Secondary - Blue
-  secondary100: '#1A3D7A',
-  secondary80: '#2558B3',
-  secondary60: '#3478F6',
-  secondary40: '#6B9EFF',
-  secondary20: '#C4DAFF',
+  // Secondary - Sky Blue
+  secondary100: '#4A7A8F',
+  secondary80: '#6BB8D4',
+  secondary60: '#87CEEB',
+  secondary40: '#A8DAEF',
+  secondary20: '#D4EDF7',
 
-  // Accent - Teal
-  accent100: '#1F5C57',
-  accent80: '#2E8A82',
-  accent60: '#4ECDC4',
-  accent40: '#8EEAE4',
-  accent20: '#D4F7F5',
+  // Accent - Meadow Green
+  accent100: '#2D4A24',
+  accent80: '#3D6333',
+  accent60: '#4F7942',
+  accent40: '#7CA070',
+  accent20: '#C4D9BE',
 
-  // Warm - Yellow
-  warm100: '#8A6B00',
-  warm80: '#CCA000',
-  warm60: '#FFD93D',
-  warm40: '#FFE566',
-  warm20: '#FFF5C4',
+  // Warm - Oatmeal
+  warm100: '#8A8466',
+  warm80: '#CCC4A0',
+  warm60: '#F5F5DC',
+  warm40: '#F8F8E6',
+  warm20: '#FCFCF3',
 
   // Neutral
   neutral100: '#1A1A1A',
@@ -83,16 +83,15 @@ const colors = {
   // Illustration
   skyBlue: '#87CEEB',
   skyBlueLight: '#B0E0E6',
-  pink: '#FFB6C1',
-  pinkLight: '#FFC0CB',
-  purple: '#9B59B6',
-  mint: '#7ED9A6',
-  peach: '#FFAB91',
+  meadowGreen: '#4F7942',
+  terracotta: '#E2725B',
+  oatmeal: '#F5F5DC',
+  charcoalDark: '#2F2F2F',
 
   // Legacy nested structures for compatibility
   primary: {
-    blue: '#3095FF',
-    orange: '#F47D31',
+    blue: '#87CEEB',
+    orange: '#E2725B',
   },
   neutral: {
     white: '#FFFFFF',
@@ -113,7 +112,7 @@ const colors = {
     tertiary: '#9E9E9E',
   },
   accent: {
-    purple: '#9B59B6',
+    green: '#4F7942',
   },
 };
 

@@ -88,10 +88,10 @@ export const UsageActual = ({ usage, average }: UsageActualProps) => {
       style={usageStyles.slidePage}
     >
       <View style={usageStyles.slideHeader}>
-        <Typography variant="heading" center>
+        <Typography mode="dark" variant="heading" center>
           {title}
         </Typography>
-        <Typography variant="subtitle" color="secondary" center>
+        <Typography mode="dark" variant="subtitle" color="secondary" center>
           {subtitle}
         </Typography>
       </View>
@@ -103,9 +103,9 @@ export const UsageActual = ({ usage, average }: UsageActualProps) => {
         <View style={[styles.iconCircle, { backgroundColor: color }]}>
           <Icon stroke={colors.white} size={32} />
         </View>
-        <Text style={textStyles.heading}>
+        <Typography mode="dark" style={textStyles.heading}>
           {formatTime(average.hours, average.minutes)}
-        </Text>
+        </Typography>
         <Text style={[styles.percentText, { color }]}>
           {pct}% {actual < usage ? 'less' : 'more'} than your guess
         </Text>
@@ -135,16 +135,18 @@ export const UsageActual = ({ usage, average }: UsageActualProps) => {
           style={styles.labelsRow}
         >
           <View>
-            <Typography variant="subtitle">{usage}h 0m</Typography>
-            <Typography variant="body" color="secondary">
+            <Typography mode="dark" variant="subtitle">
+              {usage}h 0m
+            </Typography>
+            <Typography mode="dark" variant="body" color="secondary">
               Your guess
             </Typography>
           </View>
           <View style={styles.labelRight}>
-            <Typography variant="subtitle" style={{ color }}>
+            <Typography mode="dark" variant="subtitle" style={{ color }}>
               {formatTime(average.hours, average.minutes)}
             </Typography>
-            <Typography variant="body" color="secondary">
+            <Typography mode="dark" variant="body" color="secondary">
               Last week avg.
             </Typography>
           </View>

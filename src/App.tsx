@@ -1,22 +1,14 @@
-import {
-  Platform,
-  StatusBar,
-  StyleProp,
-  useColorScheme,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { Platform, StatusBar, StyleProp, View, ViewStyle } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Onboarding } from './screens';
 import { useEffect } from 'react';
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+import { colors } from './theme';
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
   const style: StyleProp<ViewStyle> = {
     flex: 1,
-    backgroundColor: isDarkMode ? '#000' : '#fff',
+    backgroundColor: colors.dark.cardBackground,
   };
 
   useEffect(() => {
@@ -36,7 +28,7 @@ function App() {
   return (
     <SafeAreaProvider>
       <View style={style}>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <StatusBar barStyle="light-content" />
         <Onboarding />
       </View>
     </SafeAreaProvider>

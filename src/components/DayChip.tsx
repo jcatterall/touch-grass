@@ -24,7 +24,6 @@ export const DayChip = ({ label, isSelected, onPress }: DayChipProps) => {
           {simpleLabel}
         </Typography>
       </Pressable>
-      <Typography variant="body" color="secondary" style={styles.label}>{label}</Typography>
     </View>
   );
 };

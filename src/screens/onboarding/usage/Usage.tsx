@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { OnboardingContainer } from '../../../components/onboarding/OnboardingContainer';
-import { spacing, textStyles } from '../../../theme';
+import { colors, spacing, textStyles } from '../../../theme';
 import { Button, Typography } from '../../../components';
 import Slider from '../../../components/Slider';
 import { useEffect, useState } from 'react';
@@ -35,6 +35,7 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
     return {
       fontSize,
       lineHeight: fontSize * 1.2,
+      color: colors.skyBlue,
       minWidth: 100,
       textAlign: 'center' as const,
     };
@@ -47,7 +48,7 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
   return (
     <OnboardingContainer>
       <View style={{ ...styles.item, gap: spacing.xxxxl }}>
-        <Typography variant="heading" center>
+        <Typography mode="dark" variant="heading" center>
           How much time do you spend on your phone every day?
         </Typography>
         <View style={styles.slider}>
@@ -58,6 +59,7 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
           </View>
           <View>
             <Slider
+              mode="light"
               min={1}
               max={12}
               value={currentUsage}
@@ -65,8 +67,12 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
               showValue={false}
             />
             <View style={styles.sliderLabels}>
-              <Typography variant="subtitle">1</Typography>
-              <Typography variant="subtitle">12+</Typography>
+              <Typography mode="dark" variant="subtitle">
+                1
+              </Typography>
+              <Typography mode="dark" variant="subtitle">
+                12+
+              </Typography>
             </View>
           </View>
         </View>

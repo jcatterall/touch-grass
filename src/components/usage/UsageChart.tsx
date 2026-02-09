@@ -81,10 +81,10 @@ export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
                 />
               </View>
               <View style={styles.labelContainer}>
-                <Typography variant="body" color="secondary">
+                <Typography mode="dark" variant="body" color="secondary">
                   {day.day}
                 </Typography>
-                <Typography variant="body" color="secondary">
+                <Typography mode="dark" variant="body" color="secondary">
                   {formatTime(day.hours, day.minutes)}
                 </Typography>
               </View>

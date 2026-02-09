@@ -21,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { triggerHaptic } from '../utils/haptics';
+import { colors } from '../theme';
 import {
   Colors,
   DisabledColors,
@@ -28,7 +29,7 @@ import {
   type ColorMode,
 } from '../theme/theme';
 
-const THUMB_SIZE = 28;
+const THUMB_SIZE = 24;
 const TRACK_HEIGHT = 6;
 
 const SPRING_CONFIG = {
@@ -78,7 +79,7 @@ export const Slider: React.FC<SliderProps> = ({
   const lastValue = useRef(value);
 
   const colorScheme = mode === 'light' ? SliderColors.light : SliderColors.dark;
-  const colors = disabled ? colorScheme.disabled : colorScheme.active;
+  const sliderColors = disabled ? colorScheme.disabled : colorScheme.active;
 
   // Convert value to position
   const valueToPosition = useCallback(
@@ -131,7 +132,10 @@ export const Slider: React.FC<SliderProps> = ({
     [disabled, trackWidth, translateX, positionToValue, onValueChange],
   );
 
-  const handleStartShouldSetResponder = useCallback(() => !disabled, [disabled]);
+  const handleStartShouldSetResponder = useCallback(
+    () => !disabled,
+    [disabled],
+  );
 
   const handleResponderGrant = useCallback(
     (event: GestureResponderEvent) => {
@@ -173,8 +177,8 @@ export const Slider: React.FC<SliderProps> = ({
     color: disabled
       ? DisabledColors[mode].text
       : mode === 'dark'
-        ? Colors.textDark
-        : Colors.charcoal,
+      ? Colors.textDark
+      : Colors.charcoal,
   };
 
   return (
@@ -211,11 +215,11 @@ export const Slider: React.FC<SliderProps> = ({
           text: displayValue,
         }}
       >
-        <View style={[styles.track, { backgroundColor: colors.track }]}>
+        <View style={[styles.track, { backgroundColor: sliderColors.track }]}>
           <Animated.View
             style={[
               styles.fill,
-              { backgroundColor: colors.fill },
+              { backgroundColor: sliderColors.fill },
               animatedFillStyle,
             ]}
           />
@@ -223,7 +227,11 @@ export const Slider: React.FC<SliderProps> = ({
         <Animated.View
           style={[
             styles.thumb,
-            { backgroundColor: colors.thumb },
+            {
+              backgroundColor: sliderColors.thumb,
+              borderWidth: 3,
+              borderColor: sliderColors.thumbBorder,
+            },
             animatedThumbStyle,
           ]}
         />
@@ -236,28 +244,32 @@ const SliderColors = {
   light: {
     active: {
       track: '#EAEAEA',
-      fill: Colors.primaryBlue,
-      thumb: Colors.white,
+      fill: colors.primary.blue,
+      thumb: colors.neutral.white,
+      thumbBorder: colors.primary.blue,
     },
     disabled: {
       track: '#F0F0F0',
       fill: '#D1D1D1',
       thumb: '#F5F5F5',
+      thumbBorder: '#D1D1D1',
     },
   },
   dark: {
     active: {
-      track: '#4A4A54',
-      fill: Colors.primaryBlue,
-      thumb: '#E0E0E0',
+      track: colors.neutral.white,
+      fill: colors.primary.blue,
+      thumb: colors.neutral.white,
+      thumbBorder: colors.primary.blue,
     },
     disabled: {
       track: '#3D3D47',
       fill: '#5A5A62',
       thumb: '#5A5A62',
+      thumbBorder: '#5A5A62',
     },
   },
-} as const;
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -280,15 +292,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sliderContainer: {
-    height: THUMB_SIZE,
+    height: THUMB_SIZE + 8,
     justifyContent: 'center',
   },
   track: {
     height: TRACK_HEIGHT,
     borderRadius: TRACK_HEIGHT / 2,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   fill: {
+    position: 'absolute',
     height: '100%',
     borderRadius: TRACK_HEIGHT / 2,
   },

@@ -257,12 +257,12 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
     <View style={styles.container}>
       <View style={styles.labelsRow}>
         <View style={styles.timeLabel}>
-          <Clock size={16} color={colors.primary.blue} />
+          <Clock size={16} color={colors.neutral.white} />
           <Text style={styles.timeLabelText}>{startTime}</Text>
         </View>
         <View style={styles.timeLabel}>
           <Text style={styles.timeLabelText}>{endTime}</Text>
-          <Clock size={16} color={colors.primary.blue} />
+          <Clock size={16} color={colors.neutral.white} />
         </View>
       </View>
 
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   timeLabelText: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.primary.blue,
+    color: colors.neutral.white,
   },
   sliderContainer: {
     height: THUMB_SIZE + 8,
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   track: {
     height: TRACK_HEIGHT,
     borderRadius: TRACK_HEIGHT / 2,
-    backgroundColor: colors.primary.blue + '30', // 30% opacity
+    backgroundColor: colors.neutral.white,
     overflow: 'visible',
   },
   fill: {

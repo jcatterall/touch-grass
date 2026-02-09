@@ -22,11 +22,15 @@ export const AppBlockList = ({ apps, onEdit }: AppBlockListProps) => {
   return (
     <View>
       <View style={styles.header}>
-        <Typography variant="body" color="tertiary" style={styles.sectionLabel}>
-          BLOCK LIST
+        <Typography variant="body" color="inverse" style={styles.sectionLabel}>
+          Blocked Apps
         </Typography>
-        <Button onPress={onEdit} variant="link">
-          EDIT
+        <Button
+          onPress={onEdit}
+          variant="link"
+          textStyle={{ color: colors.neutral.white }}
+        >
+          Edit
         </Button>
       </View>
       <View style={styles.appIconRowContainer}>

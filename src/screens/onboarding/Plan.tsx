@@ -110,14 +110,16 @@ export const Plan = ({ onComplete }: PlanProps) => {
   return (
     <OnboardingContainer>
       <View style={styles.container}>
-        <Typography variant="title">Your plan</Typography>
+        <Typography mode="dark" variant="title">
+          Your plan
+        </Typography>
         <View style={{ ...styles.frequencySection, ...styles.section }}>
           <Typography
             variant="body"
-            color="tertiary"
+            color="inverse"
             style={styles.sectionLabel}
           >
-            FREQUENCY
+            Repeat
           </Typography>
           <View style={styles.daysContainer}>
             {DAYS.map(day => (
@@ -135,10 +137,10 @@ export const Plan = ({ onComplete }: PlanProps) => {
           <View style={styles.sectionHeader}>
             <Typography
               variant="body"
-              color="tertiary"
+              color="inverse"
               style={styles.sectionLabel}
             >
-              ACTIVE TIME
+              Range
             </Typography>
             <SegmentedControl
               options={['Entire Day', 'Specific Hours']}
@@ -164,10 +166,10 @@ export const Plan = ({ onComplete }: PlanProps) => {
           <View style={styles.sectionHeader}>
             <Typography
               variant="body"
-              color="tertiary"
+              color="inverse"
               style={styles.sectionLabel}
             >
-              CRITERIA
+              Criteria
             </Typography>
             <SegmentedControl
               options={['Distance', 'Time']}
@@ -231,10 +233,10 @@ export const Plan = ({ onComplete }: PlanProps) => {
               style={styles.sliderStyle}
             />
             <View style={styles.sliderLabels}>
-              <Typography variant="body" color="tertiary">
+              <Typography mode="dark" variant="body" color="secondary">
                 {config.min} {config.label}
               </Typography>
-              <Typography variant="body" color="tertiary">
+              <Typography mode="dark" variant="body" color="secondary">
                 {config.max} {config.label}
               </Typography>
             </View>
@@ -293,12 +295,12 @@ const styles = StyleSheet.create({
   criteriaValue: {
     fontSize: 48,
     fontWeight: '300',
-    color: colors.secondary60,
+    color: colors.neutral.white,
   },
   criteriaUnit: {
     fontSize: 18,
     fontWeight: '400',
-    color: colors.neutral70,
+    color: colors.neutral.white,
   },
   sliderSection: {
     marginTop: spacing.xs,

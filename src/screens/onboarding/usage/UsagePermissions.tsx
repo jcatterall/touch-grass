@@ -4,6 +4,7 @@ import { OnboardingContainer } from '../../../components/onboarding/OnboardingCo
 import { spacing } from '../../../theme';
 import { Button, Typography } from '../../../components';
 import UsageStats from '../../../native/UsageStats';
+import { Illustration } from '../../../components/Illustration';
 
 export interface UsagePermissionsProps {
   onComplete: () => void;
@@ -56,11 +57,16 @@ export const UsagePermissions = ({
     <OnboardingContainer>
       <View style={styles.flex}>
         <View style={styles.item}>
-          <Typography variant="heading">📚</Typography>
-          <Typography variant="title" center>
-            Now, let's uncover your actual screen time
-          </Typography>
-          <Typography variant="subtitle" color="secondary" center>
+          <View style={styles.top}>
+            <View style={styles.imageContainer}>
+              <Illustration source="clock" size="lg" />
+            </View>
+            <Typography mode="dark" variant="title" center>
+              Now, let's uncover your actual screen time
+            </Typography>
+          </View>
+
+          <Typography mode="dark" variant="subtitle" color="secondary" center>
             If you give us the usage access permission, we'll show you how well
             you're staying focused
           </Typography>
@@ -72,7 +78,7 @@ export const UsagePermissions = ({
           Give permission
         </Button>
         <Pressable onPress={handleSkip}>
-          <Typography variant="link" color="secondary" center>
+          <Typography mode="dark" variant="body" color="secondary" center>
             Continue without report
           </Typography>
         </Pressable>
@@ -94,5 +100,13 @@ const styles = StyleSheet.create({
   },
   bottom: {
     gap: spacing.lg,
+  },
+  top: {
+    width: '100%',
+  },
+  imageContainer: {
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

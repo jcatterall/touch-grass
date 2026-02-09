@@ -46,16 +46,16 @@ export const Goals = ({ onComplete }: GoalsProps) => {
       <View style={{ ...styles.flex, gap: spacing.xxxxl }}>
         <View style={styles.flexReverse}>
           <Pressable onPress={handleContinue}>
-            <Typography variant="link" color="link">
+            <Typography mode="dark" variant="link">
               Skip
             </Typography>
           </Pressable>
         </View>
         <View style={styles.item}>
-          <Typography variant="heading" center>
+          <Typography mode="dark" variant="heading" center>
             {currentStep.title}
           </Typography>
-          <Typography variant="subtitle" color="secondary" center>
+          <Typography mode="dark" variant="subtitle" color="secondary" center>
             {currentStep.subTitle}
           </Typography>
 
@@ -65,6 +65,7 @@ export const Goals = ({ onComplete }: GoalsProps) => {
               value={selectedValue ?? ''}
               onValueChange={handleSelect}
               variant="blue"
+              mode="dark"
             />
           </View>
         </View>
@@ -92,7 +93,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   selectWrapper: {
-    marginHorizontal: spacing.xxxxl,
+    marginHorizontal: spacing.md,
     marginTop: spacing.lg,
   },
 });
@@ -144,7 +145,8 @@ const Steps: Details[] = [
   },
   {
     title: 'How much screen time do you want to cut?',
-    subTitle: 'Start small — even 30 minutes daily adds up to 180+ hours a year',
+    subTitle:
+      'Start small — even 30 minutes daily adds up to 180+ hours a year',
     options: [
       { label: '30 minutes per day', value: '30min' },
       { label: '1 hour per day', value: '1hr' },
@@ -155,7 +157,8 @@ const Steps: Details[] = [
   },
   {
     title: 'How do you want to earn your screen time?',
-    subTitle: 'Walking reduces stress and boosts mood — a natural swap for scrolling',
+    subTitle:
+      'Walking reduces stress and boosts mood — a natural swap for scrolling',
     options: [
       { label: 'Walk a certain distance', value: 'distance' },
       { label: 'Walk for a set amount of time', value: 'time' },

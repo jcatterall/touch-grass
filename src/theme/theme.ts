@@ -8,23 +8,27 @@
 // =============================================================================
 
 export const Colors = {
-  // Brand Colors
-  primaryBlue: '#4759FF',
-  orange: '#F27D42',
-  yellow: '#FFC52C',
-  charcoal: '#2D2E36',
+  // Brand Colors (Touch Grass Palette)
+  meadowGreen: '#4F7942',
+  meadowGreenPressed: '#3D6333',
+  skyBlue: '#87CEEB',
+  skyBluePressed: '#6BB8D4',
+  terracotta: '#E2725B',
+  terracottaPressed: '#C85D47',
+  oatmeal: '#F5F5DC',
+  charcoal: '#2F2F2F',
 
   // Extended Palette
   white: '#FFFFFF',
   black: '#000000',
 
   // Text Colors
-  textLight: '#2D2E36', // Same as charcoal, for light mode
-  textDark: '#E0E0E0', // Light text for dark mode
+  textLight: '#2F2F2F',
+  textDark: '#F5F5DC',
 
   // Danger/Error
-  danger: '#E53935',
-  dangerDark: '#C62828',
+  danger: '#E2725B',
+  dangerDark: '#C85D47',
 
   // State Colors
   disabled: '#B0B0B0',
@@ -140,28 +144,28 @@ export const ColorSchemes = {
   light: {
     // Primary Button (Solid)
     primary: {
-      background: Colors.primaryBlue,
-      backgroundPressed: '#3A4AD9',
+      background: Colors.skyBlue,
+      backgroundPressed: Colors.skyBluePressed,
       backgroundDisabled: Colors.disabledBackground,
-      text: Colors.white,
+      text: Colors.black,
       textDisabled: Colors.disabled,
     },
     // Secondary Button (Toned/Filled Subtle)
     secondary: {
-      background: 'rgba(71, 89, 255, 0.12)',
-      backgroundPressed: 'rgba(71, 89, 255, 0.20)',
+      background: 'rgba(79, 121, 66, 0.12)',
+      backgroundPressed: 'rgba(79, 121, 66, 0.20)',
       backgroundDisabled: Colors.disabledBackground,
-      text: Colors.primaryBlue,
+      text: Colors.meadowGreen,
       textDisabled: Colors.disabled,
     },
     // Tertiary Button (Outline/Ghost)
     tertiary: {
       background: 'transparent',
-      backgroundPressed: 'rgba(71, 89, 255, 0.08)',
+      backgroundPressed: 'rgba(79, 121, 66, 0.08)',
       backgroundDisabled: 'transparent',
-      borderColor: Colors.primaryBlue,
+      borderColor: Colors.meadowGreen,
       borderColorDisabled: Colors.disabled,
-      text: Colors.primaryBlue,
+      text: Colors.meadowGreen,
       textDisabled: Colors.disabled,
     },
     // Danger Button
@@ -177,42 +181,42 @@ export const ColorSchemes = {
       background: 'transparent',
       backgroundPressed: 'transparent',
       backgroundDisabled: 'transparent',
-      text: Colors.primaryBlue,
-      textPressed: '#3A4AD9',
+      text: Colors.meadowGreen,
+      textPressed: Colors.meadowGreenPressed,
       textDisabled: Colors.disabled,
     },
   },
   dark: {
     // Primary Button (Solid)
     primary: {
-      background: Colors.primaryBlue,
-      backgroundPressed: '#5A6BFF',
+      background: Colors.skyBlue,
+      backgroundPressed: Colors.skyBluePressed,
       backgroundDisabled: '#3D3D47',
-      text: Colors.white,
+      text: Colors.black,
       textDisabled: '#6B6B73',
     },
     // Secondary Button (Toned/Filled Subtle)
     secondary: {
-      background: 'rgba(71, 89, 255, 0.20)',
-      backgroundPressed: 'rgba(71, 89, 255, 0.30)',
+      background: 'rgba(79, 121, 66, 0.25)',
+      backgroundPressed: 'rgba(79, 121, 66, 0.35)',
       backgroundDisabled: '#3D3D47',
-      text: '#8B9AFF',
+      text: '#FFFFFF',
       textDisabled: '#6B6B73',
     },
     // Tertiary Button (Outline/Ghost)
     tertiary: {
       background: 'transparent',
-      backgroundPressed: 'rgba(71, 89, 255, 0.15)',
+      backgroundPressed: 'rgba(135, 206, 235, 0.15)',
       backgroundDisabled: 'transparent',
-      borderColor: '#8B9AFF',
+      borderColor: Colors.skyBlue,
       borderColorDisabled: '#4D4D57',
-      text: '#8B9AFF',
+      text: Colors.skyBlue,
       textDisabled: '#6B6B73',
     },
     // Danger Button
     danger: {
       background: Colors.danger,
-      backgroundPressed: '#EF5350',
+      backgroundPressed: Colors.dangerDark,
       backgroundDisabled: '#3D3D47',
       text: Colors.white,
       textDisabled: '#6B6B73',
@@ -222,8 +226,8 @@ export const ColorSchemes = {
       background: 'transparent',
       backgroundPressed: 'transparent',
       backgroundDisabled: 'transparent',
-      text: '#8B9AFF',
-      textPressed: '#A8B5FF',
+      text: Colors.skyBlue,
+      textPressed: '#A8DAEF',
       textDisabled: '#6B6B73',
     },
   },
@@ -327,11 +331,11 @@ export const ChipSizes = {
 
 export const ChipColorSchemes = {
   light: {
-    // Blue variant (Primary Blue when selected)
+    // Blue variant (Meadow Green when selected)
     blue: {
       selected: {
-        background: Colors.primaryBlue,
-        backgroundPressed: '#3A4AD9',
+        background: Colors.meadowGreen,
+        backgroundPressed: Colors.meadowGreenPressed,
         text: Colors.white,
       },
       unselected: {
@@ -340,11 +344,11 @@ export const ChipColorSchemes = {
         text: Colors.charcoal,
       },
     },
-    // Orange variant (Orange when selected)
+    // Orange variant (Terracotta when selected)
     orange: {
       selected: {
-        background: Colors.orange,
-        backgroundPressed: '#E06A30',
+        background: Colors.terracotta,
+        backgroundPressed: Colors.terracottaPressed,
         text: Colors.white,
       },
       unselected: {
@@ -356,10 +360,10 @@ export const ChipColorSchemes = {
     // Outline variant (bordered style)
     outline: {
       selected: {
-        background: 'rgba(71, 89, 255, 0.08)',
-        backgroundPressed: 'rgba(71, 89, 255, 0.15)',
-        text: Colors.primaryBlue,
-        borderColor: Colors.primaryBlue,
+        background: 'rgba(79, 121, 66, 0.08)',
+        backgroundPressed: 'rgba(79, 121, 66, 0.15)',
+        text: Colors.meadowGreen,
+        borderColor: Colors.meadowGreen,
       },
       unselected: {
         background: 'transparent',
@@ -373,36 +377,36 @@ export const ChipColorSchemes = {
     // Blue variant
     blue: {
       selected: {
-        background: Colors.primaryBlue,
-        backgroundPressed: '#5A6BFF',
+        background: Colors.meadowGreen,
+        backgroundPressed: Colors.meadowGreenPressed,
         text: Colors.white,
       },
       unselected: {
-        background: '#3D3D47',
-        backgroundPressed: '#4A4A54',
-        text: '#E0E0E0',
+        background: 'rgba(255, 255, 255, 0.08)',
+        backgroundPressed: 'rgba(255, 255, 255, 0.12)',
+        text: Colors.oatmeal,
       },
     },
     // Orange variant
     orange: {
       selected: {
-        background: Colors.orange,
-        backgroundPressed: '#FF8F55',
+        background: Colors.terracotta,
+        backgroundPressed: Colors.terracottaPressed,
         text: Colors.white,
       },
       unselected: {
-        background: '#3D3D47',
-        backgroundPressed: '#4A4A54',
-        text: '#E0E0E0',
+        background: 'rgba(255, 255, 255, 0.08)',
+        backgroundPressed: 'rgba(255, 255, 255, 0.12)',
+        text: Colors.oatmeal,
       },
     },
     // Outline variant
     outline: {
       selected: {
-        background: 'rgba(71, 89, 255, 0.20)',
-        backgroundPressed: 'rgba(71, 89, 255, 0.30)',
-        text: '#8B9AFF',
-        borderColor: '#8B9AFF',
+        background: 'rgba(135, 206, 235, 0.20)',
+        backgroundPressed: 'rgba(135, 206, 235, 0.30)',
+        text: Colors.skyBlue,
+        borderColor: Colors.skyBlue,
       },
       unselected: {
         background: 'transparent',
@@ -418,7 +422,12 @@ export const ChipColorSchemes = {
 // TYPE DEFINITIONS
 // =============================================================================
 
-export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'link';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'tertiary'
+  | 'danger'
+  | 'link';
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 export type ButtonShape = 'pill' | 'rounded';
 export type ColorMode = 'light' | 'dark';
@@ -449,11 +458,11 @@ export const ToggleSizes = {
 export const ToggleColorSchemes = {
   light: {
     on: {
-      track: '#01A652', // Vibrant green
+      track: Colors.meadowGreen,
       thumb: '#FFFFFF',
     },
     off: {
-      track: '#EAEAEA', // Soft gray
+      track: '#EAEAEA',
       thumb: '#FFFFFF',
     },
     disabled: {
@@ -463,7 +472,7 @@ export const ToggleColorSchemes = {
   },
   dark: {
     on: {
-      track: '#01A652',
+      track: Colors.meadowGreen,
       thumb: '#FFFFFF',
     },
     off: {
@@ -508,11 +517,11 @@ export const SelectColorSchemes = {
   light: {
     blue: {
       selected: {
-        background: 'rgba(71, 89, 255, 0.08)',
-        backgroundPressed: 'rgba(71, 89, 255, 0.15)',
-        borderColor: Colors.primaryBlue,
+        background: 'rgba(79, 121, 66, 0.08)',
+        backgroundPressed: 'rgba(79, 121, 66, 0.15)',
+        borderColor: Colors.meadowGreen,
         text: Colors.charcoal,
-        indicator: Colors.primaryBlue,
+        indicator: Colors.meadowGreen,
         checkIcon: Colors.white,
       },
       unselected: {
@@ -526,11 +535,11 @@ export const SelectColorSchemes = {
     },
     orange: {
       selected: {
-        background: 'rgba(242, 125, 66, 0.08)',
-        backgroundPressed: 'rgba(242, 125, 66, 0.15)',
-        borderColor: Colors.orange,
+        background: 'rgba(226, 114, 91, 0.08)',
+        backgroundPressed: 'rgba(226, 114, 91, 0.15)',
+        borderColor: Colors.terracotta,
         text: Colors.charcoal,
-        indicator: Colors.orange,
+        indicator: Colors.terracotta,
         checkIcon: Colors.white,
       },
       unselected: {
@@ -546,37 +555,37 @@ export const SelectColorSchemes = {
   dark: {
     blue: {
       selected: {
-        background: 'rgba(71, 89, 255, 0.20)',
-        backgroundPressed: 'rgba(71, 89, 255, 0.30)',
-        borderColor: '#8B9AFF',
-        text: '#E0E0E0',
-        indicator: Colors.primaryBlue,
-        checkIcon: Colors.white,
+        background: 'rgba(135, 206, 235, 0.20)',
+        backgroundPressed: 'rgba(135, 206, 235, 0.30)',
+        borderColor: Colors.skyBlue,
+        text: '#FFFFFF',
+        indicator: Colors.skyBlue,
+        checkIcon: Colors.charcoal,
       },
       unselected: {
-        background: '#3D3D47',
-        backgroundPressed: '#4A4A54',
-        borderColor: 'transparent',
-        text: '#B0B0B0',
-        indicator: '#5A5A62',
+        background: 'rgba(255, 255, 255, 0.08)',
+        backgroundPressed: 'rgba(255, 255, 255, 0.12)',
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+        text: '#E0E0E0',
+        indicator: '#6B6B73',
         checkIcon: 'transparent',
       },
     },
     orange: {
       selected: {
-        background: 'rgba(242, 125, 66, 0.20)',
-        backgroundPressed: 'rgba(242, 125, 66, 0.30)',
-        borderColor: '#FF8F55',
-        text: '#E0E0E0',
-        indicator: Colors.orange,
+        background: 'rgba(226, 114, 91, 0.25)',
+        backgroundPressed: 'rgba(226, 114, 91, 0.35)',
+        borderColor: Colors.terracotta,
+        text: '#FFFFFF',
+        indicator: Colors.terracotta,
         checkIcon: Colors.white,
       },
       unselected: {
-        background: '#3D3D47',
-        backgroundPressed: '#4A4A54',
-        borderColor: 'transparent',
-        text: '#B0B0B0',
-        indicator: '#5A5A62',
+        background: 'rgba(255, 255, 255, 0.08)',
+        backgroundPressed: 'rgba(255, 255, 255, 0.12)',
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+        text: '#E0E0E0',
+        indicator: '#6B6B73',
         checkIcon: 'transparent',
       },
     },
@@ -662,17 +671,17 @@ export const PaginationSizes = {
 
 export const PaginationColorSchemes = {
   light: {
-    inactive: '#EAEAEA', // Soft gray
+    inactive: '#EAEAEA',
     active: {
-      blue: Colors.primaryBlue,
-      orange: Colors.orange,
+      blue: Colors.skyBlue,
+      orange: Colors.terracotta,
     },
   },
   dark: {
     inactive: '#4A4A54',
     active: {
-      blue: '#8B9AFF',
-      orange: '#FF8F55',
+      blue: Colors.skyBlue,
+      orange: Colors.terracotta,
     },
   },
 } as const;
