@@ -58,10 +58,11 @@ export const Notification = ({ onComplete }: NotificationProps) => {
           <Illustration source="shield" size="md" />
           <View style={styles.heading}>
             <Typography mode="dark" variant="title" center>
-              Block unwanted notifications
+              Stay focused, not distracted
             </Typography>
             <Typography mode="dark" variant="subtitle" color="secondary" center>
-              Grant notification access to block any unwanted notifications
+              Allow notification access so TouchGrass can mute alerts from
+              blocked apps during your active plans
             </Typography>
           </View>
         </View>

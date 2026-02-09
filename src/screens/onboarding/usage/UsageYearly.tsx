@@ -24,7 +24,10 @@ interface UsageYearlyProps {
   yearsIn30: string;
 }
 
-const bigNumberTerracotta = createBigNumberStyle(bigNumberColors.terracotta, 120);
+const bigNumberTerracotta = createBigNumberStyle(
+  bigNumberColors.terracotta,
+  120,
+);
 
 const ANIMATION_CONFIG = {
   duration: 400,
@@ -52,7 +55,7 @@ export const UsageYearly = ({ average, yearsIn30 }: UsageYearlyProps) => {
     >
       <View style={usageStyles.slideHeader}>
         <Typography mode="dark" variant="title">
-          {average.hours}h {average.minutes}m a day.
+          {average.hours}h {average.minutes}m a day
         </Typography>
         <Typography mode="dark" variant="heading" center>
           In 30 years that adds up to

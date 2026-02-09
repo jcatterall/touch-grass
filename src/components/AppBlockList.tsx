@@ -3,6 +3,7 @@ import { AppIcon } from './AppIcon';
 import { borderRadius, colors, spacing } from '../theme';
 import { Typography } from './Typography';
 import Button from './Button';
+import { Illustration } from './Illustration';
 
 export interface BlockedApp {
   name: string;
@@ -16,46 +17,55 @@ export interface AppBlockListProps {
 
 export const AppBlockList = ({ apps, onEdit }: AppBlockListProps) => {
   const hasApps = apps.length > 0;
-  const displayedApps = apps.slice(0, 4);
+  const displayedApps = apps.slice(0, 5);
   const remainingCount = apps.length - displayedApps.length;
   const hasRemaining = remainingCount > 0;
   return (
     <View>
-      <View style={styles.header}>
-        <Typography variant="body" color="inverse" style={styles.sectionLabel}>
-          Blocked Apps
-        </Typography>
-        <Button
-          onPress={onEdit}
-          variant="link"
-          textStyle={{ color: colors.neutral.white }}
-        >
-          Edit
-        </Button>
-      </View>
-      <View style={styles.appIconRowContainer}>
-        {hasApps ? (
+      {hasApps && (
+        <View style={styles.header}>
+          <Typography
+            variant="body"
+            color="inverse"
+            style={styles.sectionLabel}
+          >
+            Blocked Apps
+          </Typography>
+          <Button
+            onPress={onEdit}
+            variant="link"
+            textStyle={{ color: colors.neutral.white }}
+          >
+            Edit
+          </Button>
+        </View>
+      )}
+      {hasApps ? (
+        <View style={styles.appIconRowContainer}>
           <View style={styles.appIconsRow}>
             {displayedApps.map(app => (
-              <AppIcon
-                key={app.name}
-                name={app.name}
-                label={app.name}
-                icon={app.icon}
-              />
+              <AppIcon key={app.name} name={app.name} icon={app.icon} />
             ))}
             {hasRemaining && (
               <View style={styles.moreApps}>
-                <Typography variant="subtitle">{remainingCount}+</Typography>
+                <Typography mode="dark" variant="subtitle">
+                  {remainingCount}+
+                </Typography>
               </View>
             )}
           </View>
-        ) : (
-          <Typography variant="subtitle" color="secondary">
-            No apps
-          </Typography>
-        )}
-      </View>
+        </View>
+      ) : (
+        <View style={styles.chooseApps}>
+          <Illustration source="chest" size="xxs" />
+
+          <View>
+            <Button mode="dark" variant="secondary" onPress={onEdit}>
+              Choose blocked apps
+            </Button>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -65,25 +75,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  chooseApps: {
+    justifyContent: 'center',
+    alignContent: 'center',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   sectionLabel: {
     letterSpacing: 1,
   },
   appIconRowContainer: {
-    backgroundColor: colors.neutral10,
-    padding: spacing.md,
     borderRadius: borderRadius.md,
     minHeight: 80,
   },
   appIconsRow: {
     flexDirection: 'row',
-    gap: spacing.lg,
   },
   moreApps: {
+    marginLeft: spacing.sm,
     justifyContent: 'center',
     alignContent: 'center',
-    alignItems: 'center',
     flex: 1,
   },
 });

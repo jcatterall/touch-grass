@@ -6,10 +6,9 @@ import {
   DayChip,
   SegmentedControl,
   Typography,
+  TimeRangeSlider,
+  AppBlockList,
 } from '../../components';
-import { TimeRangeSlider } from '../../components/TimeRangeSlider';
-import { AppBlockList } from '../../components/AppBlockList';
-import { Slider } from '../../components/Slider';
 import { BlocklistScreen, type AppItem } from '../BlocklistScreen';
 import { spacing, colors } from '../../theme';
 import { triggerHaptic } from '../../utils/haptics';
@@ -23,10 +22,11 @@ import {
   MI_TO_KM,
   BlockingPlan,
 } from '../../types';
+import Slider from '../../components/Slider';
 
 export interface PlanProps {
   onComplete: (plan: BlockingPlan) => void;
-  onBack?: () => void;
+  plan: BlockingPlan | null;
 }
 
 const DISTANCE_CONFIG = {
@@ -39,75 +39,105 @@ const CRITERIA_CONFIG = {
   time: { min: 5, max: 120, step: 5, label: 'min' },
 } as const;
 
-export const Plan = ({ onComplete }: PlanProps) => {
-  const [selectedDays, setSelectedDays] = useState<DayKey[]>([
-    'MON',
-    'TUE',
-    'WED',
-    'THU',
-    'FRI',
-  ]);
-  const [durationType, setDurationType] =
-    useState<DurationType>('specific_hours');
-  const [fromTime, setFromTime] = useState('09:00 AM');
-  const [toTime, setToTime] = useState('05:00 PM');
-  const [criteriaType, setCriteriaType] = useState<CriteriaType>('distance');
-  const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('km');
-  const [criteriaValue, setCriteriaValue] = useState({
-    distance: 5.0,
-    time: 30,
+export const Plan = ({ onComplete, plan }: PlanProps) => {
+  const [schedule, setSchedule] = useState({
+    days: plan?.days ?? (['MON', 'TUE', 'WED', 'THU', 'FRI'] as DayKey[]),
+    durationType: (plan?.duration.type ?? 'specific_hours') as DurationType,
+    from:
+      (plan?.duration.type === 'specific_hours'
+        ? plan.duration.from
+        : undefined) ?? '09:00 AM',
+    to:
+      (plan?.duration.type === 'specific_hours'
+        ? plan.duration.to
+        : undefined) ?? '05:00 PM',
   });
+
+  const [criteria, setCriteria] = useState({
+    type: (plan?.criteria.type ?? 'distance') as CriteriaType,
+    unit: ((plan?.criteria.type === 'distance'
+      ? plan.criteria.unit
+      : undefined) ?? 'km') as DistanceUnit,
+    value: {
+      distance: plan?.criteria.type === 'distance' ? plan.criteria.value : 5.0,
+      time: plan?.criteria.type === 'time' ? plan.criteria.value : 30,
+    },
+  });
+
   const [showBlocklist, setShowBlocklist] = useState(false);
-  const [blockedApps, setBlockedApps] = useState<AppItem[]>([]);
+  const [blockedApps, setBlockedApps] = useState<AppItem[]>(
+    (plan?.blockedApps as unknown as AppItem[]) ?? [],
+  );
+
+  const config =
+    criteria.type === 'distance'
+      ? DISTANCE_CONFIG[criteria.unit]
+      : CRITERIA_CONFIG.time;
+
+  const currentValue = criteria.value[criteria.type];
 
   const toggleDay = (day: DayKey) => {
     triggerHaptic('selection');
-    setSelectedDays(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day],
-    );
+    setSchedule(prev => ({
+      ...prev,
+      days: prev.days.includes(day)
+        ? prev.days.filter(d => d !== day)
+        : [...prev.days, day],
+    }));
   };
 
-  const handleSaveRule = () => {
+  const handleUnitChange = (index: number) => {
+    const newUnit = index === 0 ? 'mi' : 'km';
+    if (newUnit === criteria.unit) return;
+
+    const isKm = criteria.unit === 'km';
+    const converted = isKm
+      ? criteria.value.distance * KM_TO_MI
+      : criteria.value.distance * MI_TO_KM;
+
+    const limits = DISTANCE_CONFIG[newUnit];
+    const clamped = Math.min(Math.max(converted, limits.min), limits.max);
+
+    setCriteria(prev => ({
+      ...prev,
+      unit: newUnit,
+      value: { ...prev.value, distance: Math.round(clamped * 2) / 2 },
+    }));
+  };
+
+  const handleSavePlan = () => {
     triggerHaptic('impactMedium');
-    const plan: BlockingPlan = {
-      days: selectedDays,
+    const newPlan: BlockingPlan = {
+      days: schedule.days,
       duration:
-        durationType === 'entire_day'
+        schedule.durationType === 'entire_day'
           ? { type: 'entire_day' }
-          : { type: 'specific_hours', from: fromTime, to: toTime },
+          : { type: 'specific_hours', from: schedule.from, to: schedule.to },
       criteria:
-        criteriaType === 'distance'
+        criteria.type === 'distance'
           ? {
               type: 'distance',
-              value: criteriaValue.distance,
-              unit: distanceUnit,
+              value: criteria.value.distance,
+              unit: criteria.unit,
             }
-          : { type: 'time', value: criteriaValue.time },
+          : { type: 'time', value: criteria.value.time },
       blockedApps: blockedApps.map(app => ({
         id: app.id,
         name: app.name,
         icon: app.icon,
       })),
     };
-    onComplete(plan);
-  };
-
-  const config =
-    criteriaType === 'distance'
-      ? DISTANCE_CONFIG[distanceUnit]
-      : CRITERIA_CONFIG.time;
-  const currentValue = criteriaValue[criteriaType];
-
-  const handleBlocklistSave = (selectedApps: AppItem[]) => {
-    setBlockedApps(selectedApps);
-    setShowBlocklist(false);
+    onComplete(newPlan);
   };
 
   if (showBlocklist) {
     return (
       <BlocklistScreen
         selectedApps={blockedApps}
-        onSave={handleBlocklistSave}
+        onSave={apps => {
+          setBlockedApps(apps);
+          setShowBlocklist(false);
+        }}
         onClose={() => setShowBlocklist(false)}
       />
     );
@@ -117,22 +147,19 @@ export const Plan = ({ onComplete }: PlanProps) => {
     <OnboardingContainer>
       <View style={styles.container}>
         <Typography mode="dark" variant="title">
-          Your plan
+          {plan ? 'Edit plan' : 'Your plan'}
         </Typography>
-        <View style={{ ...styles.frequencySection, ...styles.section }}>
-          <Typography
-            variant="body"
-            color="inverse"
-            style={styles.sectionLabel}
-          >
+
+        <View style={styles.section}>
+          <Typography variant="body" color="inverse" style={styles.label}>
             Repeat
           </Typography>
-          <View style={styles.daysContainer}>
+          <View style={styles.row}>
             {DAYS.map(day => (
               <DayChip
                 key={day.key}
                 label={day.label}
-                isSelected={selectedDays.includes(day.key)}
+                isSelected={schedule.days.includes(day.key)}
                 onPress={() => toggleDay(day.key)}
                 mode="dark"
               />
@@ -141,109 +168,90 @@ export const Plan = ({ onComplete }: PlanProps) => {
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Typography
-              variant="body"
-              color="inverse"
-              style={styles.sectionLabel}
-            >
+          <View style={styles.row}>
+            <Typography variant="body" color="inverse" style={styles.label}>
               Range
             </Typography>
             <SegmentedControl
               options={['Entire Day', 'Specific Hours']}
-              selectedIndex={durationType === 'entire_day' ? 0 : 1}
-              onSelect={index =>
-                setDurationType(index === 0 ? 'entire_day' : 'specific_hours')
+              selectedIndex={schedule.durationType === 'entire_day' ? 0 : 1}
+              onSelect={idx =>
+                setSchedule(p => ({
+                  ...p,
+                  durationType: idx === 0 ? 'entire_day' : 'specific_hours',
+                }))
               }
             />
           </View>
-          {durationType === 'specific_hours' && (
-            <View style={styles.timeSection}>
+          {schedule.durationType === 'specific_hours' && (
+            <View style={styles.subSection}>
               <TimeRangeSlider
-                startTime={fromTime}
-                endTime={toTime}
-                onStartTimeChange={setFromTime}
-                onEndTimeChange={setToTime}
+                startTime={schedule.from}
+                endTime={schedule.to}
+                onStartTimeChange={v => setSchedule(p => ({ ...p, from: v }))}
+                onEndTimeChange={v => setSchedule(p => ({ ...p, to: v }))}
               />
             </View>
           )}
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Typography
-              variant="body"
-              color="inverse"
-              style={styles.sectionLabel}
-            >
+          <View style={styles.row}>
+            <Typography variant="body" color="inverse" style={styles.label}>
               Criteria
             </Typography>
             <SegmentedControl
               options={['Distance', 'Time']}
-              selectedIndex={criteriaType === 'distance' ? 0 : 1}
-              onSelect={index =>
-                setCriteriaType(index === 0 ? 'distance' : 'time')
+              selectedIndex={criteria.type === 'distance' ? 0 : 1}
+              onSelect={idx =>
+                setCriteria(p => ({
+                  ...p,
+                  type: idx === 0 ? 'distance' : 'time',
+                }))
               }
             />
           </View>
 
-          <View style={{ ...styles.criteriaValueRow, ...styles.section }}>
-            <View style={styles.criteriaValueGroup}>
-              <Text style={styles.criteriaValue}>
-                {criteriaType === 'distance'
+          <View style={[styles.row, styles.subSection]}>
+            <View style={styles.valueGroup}>
+              <Text style={styles.bigValue}>
+                {criteria.type === 'distance'
                   ? currentValue.toFixed(1)
                   : currentValue}
               </Text>
-              <Text style={styles.criteriaUnit}>
-                {config.label.toUpperCase()}
-              </Text>
+              <Text style={styles.unitLabel}>{config.label.toUpperCase()}</Text>
             </View>
-            {criteriaType === 'distance' && (
-              <View>
-                <SegmentedControl
-                  size="sm"
-                  options={['mi', 'km']}
-                  selectedIndex={distanceUnit === 'mi' ? 0 : 1}
-                  onSelect={index => {
-                    const newUnit = index === 0 ? 'mi' : 'km';
-                    if (newUnit !== distanceUnit) {
-                      const convertedValue =
-                        distanceUnit === 'km'
-                          ? criteriaValue.distance * KM_TO_MI
-                          : criteriaValue.distance * MI_TO_KM;
-                      const clampedValue = Math.min(
-                        Math.max(convertedValue, DISTANCE_CONFIG[newUnit].min),
-                        DISTANCE_CONFIG[newUnit].max,
-                      );
-                      setCriteriaValue(prev => ({
-                        ...prev,
-                        distance: Math.round(clampedValue * 2) / 2,
-                      }));
-                      setDistanceUnit(newUnit);
-                    }
-                  }}
-                />
-              </View>
+
+            {criteria.type === 'distance' && (
+              <SegmentedControl
+                size="sm"
+                options={['mi', 'km']}
+                selectedIndex={criteria.unit === 'mi' ? 0 : 1}
+                onSelect={handleUnitChange}
+              />
             )}
           </View>
 
-          <View style={{ ...styles.sliderSection, ...styles.section }}>
+          <View>
             <Slider
               min={config.min}
               max={config.max}
               value={currentValue}
               step={config.step}
-              onValueChange={v =>
-                setCriteriaValue(prev => ({ ...prev, [criteriaType]: v }))
-              }
               showValue={false}
-              style={styles.sliderStyle}
+              style={styles.slider}
+              onValueChange={v =>
+                setCriteria(p => ({
+                  ...p,
+                  value: { ...p.value, [criteria.type]: v },
+                }))
+              }
             />
-            <View style={styles.sliderLabels}>
-              <Typography mode="dark" variant="body" color="secondary">
+            <View style={styles.row}>
+              <Typography mode="dark" variant="body">
                 {config.min} {config.label}
               </Typography>
-              <Typography mode="dark" variant="body" color="secondary">
+              <Typography mode="dark" variant="body">
                 {config.max} {config.label}
               </Typography>
             </View>
@@ -257,8 +265,8 @@ export const Plan = ({ onComplete }: PlanProps) => {
       </View>
 
       <View style={styles.footer}>
-        <Button size="lg" onPress={handleSaveRule}>
-          Continue
+        <Button size="lg" onPress={handleSavePlan}>
+          {plan ? 'Save Changes' : 'Continue'}
         </Button>
       </View>
     </OnboardingContainer>
@@ -267,59 +275,40 @@ export const Plan = ({ onComplete }: PlanProps) => {
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.xxxl,
+    gap: spacing.xl,
   },
-  section: {},
-  sectionLabel: {
-    letterSpacing: 1,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  section: {
     gap: spacing.sm,
   },
-  frequencySection: {
-    gap: spacing.sm,
-  },
-  daysContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  timeSection: {
+  subSection: {
     marginTop: spacing.xs,
   },
-  criteriaValueRow: {
+  row: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  criteriaValueGroup: {
+  label: {
+    letterSpacing: 1,
+  },
+  valueGroup: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: spacing.xs,
   },
-  criteriaValue: {
+  bigValue: {
     fontSize: 48,
     fontWeight: '500',
     color: colors.neutral.white,
   },
-  criteriaUnit: {
+  unitLabel: {
     fontSize: 18,
     fontWeight: '400',
     color: colors.neutral.white,
   },
-  sliderSection: {
-    marginTop: spacing.xs,
-  },
-  sliderStyle: {
+  slider: {
     paddingHorizontal: 0,
     paddingVertical: 0,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.xs,
   },
   footer: {
     paddingTop: spacing.md,

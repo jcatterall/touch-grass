@@ -6,6 +6,7 @@ import { UsagePickups } from '../../../components/usage/UsagePickups';
 import { spacing } from '../../../theme';
 import { Typography } from '../../../components';
 import { AppUsage, DailyUsage } from '../../../native/UsageStats';
+import { UsageTotalTime } from './UsageTotalTime';
 
 interface UsageStatsProps {
   weeklyData: DailyUsage[];
@@ -40,9 +41,14 @@ export const UsageStatsPage = ({
     <Animated.View entering={FadeInUp.delay(200).duration(400)}>
       <UsageApps apps={appData} />
     </Animated.View>
-    <Animated.View entering={FadeInUp.delay(400).duration(400)}>
-      <UsagePickups count={average.pickups} />
-    </Animated.View>
+    <View style={styles.row}>
+      <Animated.View entering={FadeInUp.delay(400).duration(400)}>
+        <UsagePickups count={average.pickups} />
+      </Animated.View>
+      <Animated.View entering={FadeInUp.delay(400).duration(400)}>
+        <UsageTotalTime totalHours={average.hours} />
+      </Animated.View>
+    </View>
   </View>
 );
 
@@ -54,6 +60,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    gap: spacing.xl,
+    gap: spacing.sm,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
 });

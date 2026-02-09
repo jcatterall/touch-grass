@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   timeLabelText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
     color: colors.neutral.white,
   },

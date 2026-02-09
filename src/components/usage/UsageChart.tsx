@@ -17,6 +17,7 @@ const ANIMATION_CONFIG = {
   easing: Easing.bezier(0.4, 0.0, 0.2, 1),
 };
 const STAGGER_DELAY = 80;
+const CHART_HEIGHT = 150;
 
 interface AnimatedBarProps {
   targetHeight: number;
@@ -54,11 +55,12 @@ export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
   }
 
   const maxMinutes = Math.max(...data.map(d => d.totalMinutes));
-  const chartHeight = 150;
   const average = calculateAverage(data);
   const avgMinutes = average.hours * 60 + average.minutes;
   const avgLinePosition =
-    maxMinutes > 0 ? chartHeight - (avgMinutes / maxMinutes) * chartHeight : 0;
+    maxMinutes > 0
+      ? CHART_HEIGHT - (avgMinutes / maxMinutes) * CHART_HEIGHT
+      : 0;
 
   return (
     <View style={styles.container}>
@@ -69,7 +71,7 @@ export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
       <View style={styles.barsContainer}>
         {data.map((day, index) => {
           const barHeight =
-            maxMinutes > 0 ? (day.totalMinutes / maxMinutes) * chartHeight : 0;
+            maxMinutes > 0 ? (day.totalMinutes / maxMinutes) * CHART_HEIGHT : 0;
           const isToday = index === data.length - 1;
           return (
             <View key={`${day.day}-${index}`} style={styles.barWrapper}>
@@ -81,10 +83,21 @@ export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
                 />
               </View>
               <View style={styles.labelContainer}>
-                <Typography mode="dark" variant="body" color="secondary">
+                <Typography
+                  mode="dark"
+                  variant="body"
+                  color="secondary"
+                  style={styles.dayText}
+                >
                   {day.day}
                 </Typography>
-                <Typography mode="dark" variant="body" color="secondary">
+                <Typography
+                  mode="dark"
+                  variant="body"
+                  color="secondary"
+                  numberOfLines={1}
+                  style={styles.timeText}
+                >
                   {formatTime(day.hours, day.minutes)}
                 </Typography>
               </View>
@@ -96,11 +109,11 @@ export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
   );
 };
 
-const CHART_HEIGHT = 150;
-
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
+    // Reduced side padding to give the row more room
+    paddingHorizontal: spacing.xxs,
   },
   emptyContainer: {
     height: 200,
@@ -111,7 +124,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    height: 2,
+    height: 1,
     borderStyle: 'dashed',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
@@ -120,11 +133,11 @@ const styles = StyleSheet.create({
   barsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xs,
   },
   barWrapper: {
     alignItems: 'center',
     flex: 1,
+    overflow: 'visible',
   },
   barArea: {
     height: CHART_HEIGHT,
@@ -133,12 +146,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bar: {
-    width: 28,
-    borderRadius: 6,
+    width: 36,
+    borderRadius: 4,
     minHeight: 4,
   },
   labelContainer: {
     alignItems: 'center',
     paddingTop: spacing.xs,
+    width: '100%',
+  },
+  dayText: {
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  timeText: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.neutral.white,
+    minWidth: 48,
   },
 });

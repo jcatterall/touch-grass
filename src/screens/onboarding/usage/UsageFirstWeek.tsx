@@ -43,7 +43,7 @@ export const UsageFirstWeek = () => {
     >
       <View style={usageStyles.slideHeader}>
         <Typography mode="dark" variant="heading" center>
-          The first week is the most important for changing your habits.
+          Change starts faster than you think.
         </Typography>
         <Typography mode="dark" variant="subtitle" color="secondary" center>
           TouchGrass can help cut down the time on your phone by up to 32% in

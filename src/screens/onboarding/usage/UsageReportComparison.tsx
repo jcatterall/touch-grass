@@ -27,7 +27,7 @@ export const UsageReportComparison = ({
   <Animated.View entering={FadeIn.duration(300)} style={{ ...styles.content }}>
     <View style={usageStyles.slideHeader}>
       <Typography mode="dark" variant="heading" center>
-        No stress, we've got your back. Let's take a look at your potential.
+        We've got your back.{'\n'}Here's what's possible.
       </Typography>
       <Typography mode="dark" variant="subtitle" color="secondary" center>
         This is estimated based on our research

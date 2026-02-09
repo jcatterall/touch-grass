@@ -1,8 +1,9 @@
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
 import { Button, Typography } from '../../components';
-import { onboardingStyles as styles } from './onboarding.styles';
+import { onboardingStyles } from './onboarding.styles';
 import { Illustration } from '../../components/Illustration';
+import { spacing } from '../../theme';
 
 export interface GoalsSplashProps {
   onComplete: () => void;
@@ -11,12 +12,17 @@ export interface GoalsSplashProps {
 
 export const GoalsSplash = ({ onComplete }: GoalsSplashProps) => (
   <OnboardingContainer>
-    <View style={styles.flex}>
-      <View style={styles.contentCentered}>
+    <View style={onboardingStyles.flex}>
+      <View style={onboardingStyles.contentCentered}>
         <Illustration source="goals" size="lg" />
-        <Typography mode="dark" variant="title" center>
-          Set up your goals to help you achieve them
-        </Typography>
+        <View style={styles.heading}>
+          <Typography mode="dark" variant="title" center>
+            Let's set you up for success
+          </Typography>
+          <Typography mode="dark" variant="subtitle" center>
+            A few quick questions to build your personalised plan
+          </Typography>
+        </View>
       </View>
     </View>
     <Button size="lg" onPress={onComplete}>
@@ -24,3 +30,9 @@ export const GoalsSplash = ({ onComplete }: GoalsSplashProps) => (
     </Button>
   </OnboardingContainer>
 );
+
+const styles = StyleSheet.create({
+  heading: {
+    gap: spacing.sm,
+  },
+});

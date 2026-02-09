@@ -21,9 +21,10 @@ export type IllustrationSource =
   | 'shield'
   | 'wave'
   | 'flag'
-  | 'goals';
+  | 'goals'
+  | 'chest';
 
-export type ImageSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type ImageSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 const images: Record<IllustrationSource, ImageSourcePropType> = {
   breaking: require('../../assets/illustrations/breaking.png'),
@@ -42,6 +43,7 @@ const images: Record<IllustrationSource, ImageSourcePropType> = {
   wave: require('../../assets/illustrations/wave.png'),
   flag: require('../../assets/illustrations/flag.png'),
   goals: require('../../assets/illustrations/goals.png'),
+  chest: require('../../assets/illustrations/chest.png'),
 };
 
 interface ImageProps {
@@ -51,6 +53,7 @@ interface ImageProps {
 
 export const Illustration = (props: ImageProps) => {
   const getHeight = () => {
+    if (props.size === 'xxs') return 100;
     if (props.size === 'xs') return 150;
     if (props.size === 'sm') return 275;
     if (props.size === 'md') return 300;

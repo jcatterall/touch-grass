@@ -16,7 +16,7 @@ const ANIMATION_CONFIG = {
   duration: 500,
   easing: Easing.bezier(0.4, 0.0, 0.2, 1),
 };
-const MIN_BAR_WIDTH = 60;
+const MIN_BAR_WIDTH = 110;
 const STAGGER_DELAY = 150;
 
 export const UsageComparison = ({
@@ -59,7 +59,7 @@ export const UsageComparison = ({
             isReduced ? styles.barReduced : styles.barNormal,
           ]}
         >
-          <Typography mode="dark" style={styles.barValue}>
+          <Typography mode="dark" style={styles.barValue} numberOfLines={1}>
             {suffix}
           </Typography>
         </Animated.View>

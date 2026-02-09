@@ -1,11 +1,11 @@
 import { StyleSheet, View } from 'react-native';
 import { AppUsage } from '../../native/UsageStats';
-import { borderRadius, colors, spacing } from '../../theme/tokens';
+import { borderRadius, spacing } from '../../theme/tokens';
 import { AppIcon } from '../AppIcon';
 import { Typography } from '../Typography';
 
 export const UsageApps = ({ apps }: { apps: AppUsage[] }) => {
-  const displayApps = apps.slice(0, 6);
+  const displayApps = apps.slice(0, 5);
 
   if (displayApps.length === 0) {
     return (
@@ -22,7 +22,7 @@ export const UsageApps = ({ apps }: { apps: AppUsage[] }) => {
 
   return (
     <View style={styles.container}>
-      <Typography mode="light" variant="subtitle">
+      <Typography mode="dark" variant="subtitle">
         Most used apps
       </Typography>
       <View style={styles.appsRow}>
@@ -30,7 +30,7 @@ export const UsageApps = ({ apps }: { apps: AppUsage[] }) => {
           <AppIcon
             key={`${app.packageName}-${index}`}
             name={app.name}
-            time={app.time}
+            label={app.time}
             icon={app.icon}
           />
         ))}
@@ -41,9 +41,9 @@ export const UsageApps = ({ apps }: { apps: AppUsage[] }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.neutral10,
     borderRadius: borderRadius.md,
     padding: spacing.md,
+    gap: spacing.xs,
   },
   appsRow: {
     flexDirection: 'row',

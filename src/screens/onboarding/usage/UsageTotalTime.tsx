@@ -1,26 +1,19 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { borderRadius, colors, spacing } from '../../theme';
-import Chip from '../Chip';
-import { Typography } from '../Typography';
+import { Typography } from '../../../components';
+import { borderRadius, colors, spacing } from '../../../theme';
 
-const getPickupStatus = (count: number): string => {
-  if (count < 30) return 'Low';
-  if (count < 60) return 'Normal';
-  if (count < 100) return 'High';
-  return 'Very High';
-};
+interface UsageTotalTimeProps {
+  totalHours: number;
+}
 
-export const UsagePickups = ({ count }: { count: number }) => {
-  const status = getPickupStatus(count);
-
+export const UsageTotalTime = ({ totalHours }: UsageTotalTimeProps) => {
   return (
     <View style={styles.container}>
       <Typography mode="dark" variant="subtitle">
-        Daily pickups
+        Screen time avg.
       </Typography>
       <View style={styles.rightContent}>
-        <Text style={styles.countText}>{count}x</Text>
-        <Chip label={status} variant="blue" size="sm" mode="dark" isSelected />
+        <Text style={styles.countText}>{totalHours}h</Text>
       </View>
     </View>
   );

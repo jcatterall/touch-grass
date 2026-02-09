@@ -4,20 +4,15 @@ import { Typography } from './Typography';
 
 export interface AppIconProps {
   name: string;
-  /** Time to display (e.g., "2h 30m") */
-  time?: string;
-  /** Generic label to display below icon (used if time not provided) */
-  label?: string;
-  /** Base64-encoded PNG app icon */
   icon?: string;
+  label?: string;
 }
 
-export const AppIcon = ({ name, time, label, icon }: AppIconProps) => {
-  const displayLabel = time ?? label ?? name;
-
+export const AppIcon = ({ name, icon, label }: AppIconProps) => {
   return (
     <View style={appStyles.appItem}>
-      <View style={[appStyles.iconContainer]}>
+      {/* Icon Wrapper */}
+      <View style={appStyles.iconContainer}>
         {icon ? (
           <Image
             source={{
@@ -28,14 +23,18 @@ export const AppIcon = ({ name, time, label, icon }: AppIconProps) => {
             style={appStyles.iconImage}
           />
         ) : (
-          <Typography mode="light" variant="subtitle">
+          <Typography mode="dark" variant="subtitle">
             {name.charAt(0).toUpperCase()}
           </Typography>
         )}
       </View>
-      <Typography mode="light" variant="body" numberOfLines={1}>
-        {displayLabel}
-      </Typography>
+
+      {/* Label moved outside the container */}
+      {label && (
+        <Typography mode="dark" variant="link" style={appStyles.label}>
+          {label}
+        </Typography>
+      )}
     </View>
   );
 };
@@ -43,20 +42,23 @@ export const AppIcon = ({ name, time, label, icon }: AppIconProps) => {
 const appStyles = StyleSheet.create({
   appItem: {
     alignItems: 'center',
+    // Gap handles the spacing between the icon and the label
     gap: spacing.xs,
-    width: 52,
+    width: 60, // Increased width slightly to prevent text wrapping too early
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   iconImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: '100%',
+    height: '100%',
+  },
+  label: {
+    textAlign: 'center',
   },
 });

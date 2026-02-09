@@ -41,11 +41,21 @@ export const Onboarding = () => {
   const [usage, setUsage] = useState(1);
   const [blockingPlan, setBlockingPlan] = useState<BlockingPlan | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [skippedSteps, setSkippedSteps] = useState<Set<OnboardingStep>>(
+    new Set(),
+  );
 
   const currentStep = STEPS[stepIndex];
   const canGoBack = stepIndex > 0;
 
   const handleNext = useCallback((skip: boolean = false) => {
+    if (skip) {
+      setSkippedSteps(prev => {
+        const next = new Set(prev);
+        next.add(STEPS[stepIndex + 1]);
+        return next;
+      });
+    }
     const increment = skip === true ? 2 : 1;
     setStepIndex(prev => {
       const nextIndex = prev + increment;
@@ -55,13 +65,19 @@ export const Onboarding = () => {
       console.log('Onboarding Finished');
       return prev;
     });
-  }, []);
+  }, [stepIndex]);
 
   const handleBack = useCallback(() => {
     if (!canGoBack) return false;
-    setStepIndex(prev => prev - 1);
+    setStepIndex(prev => {
+      let target = prev - 1;
+      while (target > 0 && skippedSteps.has(STEPS[target])) {
+        target--;
+      }
+      return target;
+    });
     return true;
-  }, [canGoBack]);
+  }, [canGoBack, skippedSteps]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
@@ -94,6 +110,7 @@ export const Onboarding = () => {
     ),
     plan: (
       <Plan
+        plan={blockingPlan}
         onComplete={plan => {
           setBlockingPlan(plan);
           handleNext();

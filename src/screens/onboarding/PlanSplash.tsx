@@ -1,8 +1,9 @@
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
 import { Button, Typography } from '../../components';
-import { onboardingStyles as styles } from './onboarding.styles';
+import { onboardingStyles } from './onboarding.styles';
 import { Illustration } from '../../components/Illustration';
+import { spacing } from '../../theme';
 
 export interface PlanSplashProps {
   onComplete: () => void;
@@ -12,12 +13,17 @@ export interface PlanSplashProps {
 
 export const PlanSplash = ({ onComplete }: PlanSplashProps) => (
   <OnboardingContainer>
-    <View style={styles.flex}>
-      <View style={styles.contentCentered}>
+    <View style={onboardingStyles.flex}>
+      <View style={onboardingStyles.contentCentered}>
         <Illustration source="clock" size="lg" />
-        <Typography mode="dark" variant="title" center>
-          Let's set up your plan
-        </Typography>
+        <View style={styles.heading}>
+          <Typography mode="dark" variant="title" center>
+            Design your daily reset
+          </Typography>
+          <Typography mode="dark" variant="subtitle" center>
+            Create a plan that fits your schedule and keeps you moving
+          </Typography>
+        </View>
       </View>
     </View>
     <Button size="lg" onPress={onComplete}>
@@ -25,3 +31,9 @@ export const PlanSplash = ({ onComplete }: PlanSplashProps) => (
     </Button>
   </OnboardingContainer>
 );
+
+const styles = StyleSheet.create({
+  heading: {
+    gap: spacing.sm,
+  },
+});

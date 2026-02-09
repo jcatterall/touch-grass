@@ -156,7 +156,7 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
         </Pressable>
       </View>
       <View style={styles.imageContainer}>
-        <Illustration source="prize" size="sm" />
+        <Illustration source="map" size="sm" />
       </View>
 
       <View style={styles.content}>
@@ -204,11 +204,25 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
               ]}
               onPress={() => setSelectedPackage(monthlyPackage)}
             >
-              <Typography variant="subtitle">Monthly</Typography>
-              <Typography variant="body" color="secondary">
-                {monthlyPackage.product.priceString} / month{' '}
-                {getTrialText(monthlyPackage)}
-              </Typography>
+              {selectedPackage?.identifier === monthlyPackage.identifier ? (
+                <>
+                  <Typography variant="subtitle">Monthly</Typography>
+                  <Typography variant="body" color="secondary">
+                    {monthlyPackage.product.priceString} / month{' '}
+                    {getTrialText(monthlyPackage)}
+                  </Typography>
+                </>
+              ) : (
+                <>
+                  <Typography variant="subtitle" color="inverse">
+                    Monthly
+                  </Typography>
+                  <Typography variant="body" color="inverse">
+                    {monthlyPackage.product.priceString} / month{' '}
+                    {getTrialText(monthlyPackage)}
+                  </Typography>
+                </>
+              )}
             </Pressable>
           )}
         </View>
@@ -255,21 +269,22 @@ const styles = StyleSheet.create({
   packageCard: {
     borderRadius: borderRadius.md,
     padding: spacing.md,
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: 'transparent',
   },
   packageCardAnnual: {
-    backgroundColor: colors.primary60,
+    backgroundColor: colors.dark60,
   },
   packageCardMonthly: {
-    backgroundColor: colors.white,
-    borderColor: colors.neutral20,
+    backgroundColor: colors.dark60,
   },
   packageCardSelected: {
     borderColor: colors.white,
+    backgroundColor: colors.primary60,
   },
   packageCardMonthlySelected: {
     borderColor: colors.secondary60,
+    backgroundColor: colors.white,
   },
   bestValueBadge: {
     position: 'absolute',

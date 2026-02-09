@@ -74,8 +74,9 @@ const DayIndicator: React.FC<DayIndicatorProps> = ({
   return (
     <View style={styles.dayWrapper}>
       <Typography
+        mode="light"
         variant="body"
-        color={isCompleted ? 'secondary' : 'tertiary'}
+        color={isCompleted ? 'primary' : 'tertiary'}
         style={styles.dayLabel}
       >
         {day}
@@ -117,7 +118,7 @@ export const DailyStreak: React.FC<DailyStreakProps> = ({
           />
         ))}
       </View>
-      <Typography variant="body" color="secondary" center style={styles.caption}>
+      <Typography variant="body" center style={styles.caption}>
         Build a streak, one day at a time
       </Typography>
     </View>
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   dayLabel: {
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });
 
