@@ -28,17 +28,12 @@ export const AppIcon = ({ name, time, label, icon }: AppIconProps) => {
             style={appStyles.iconImage}
           />
         ) : (
-          <Typography variant="subtitle">
+          <Typography mode="light" variant="subtitle">
             {name.charAt(0).toUpperCase()}
           </Typography>
         )}
       </View>
-      <Typography
-        mode="dark"
-        variant="body"
-        color="secondary"
-        numberOfLines={1}
-      >
+      <Typography mode="light" variant="body" numberOfLines={1}>
         {displayLabel}
       </Typography>
     </View>

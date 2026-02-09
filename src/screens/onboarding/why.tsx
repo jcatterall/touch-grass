@@ -29,7 +29,7 @@ const onboardingSlides: CarouselItem[] = [
     subTitle:
       'TouchGrass blocks your most distracting apps until you step outside and move. Trade screen time for fresh air and reclaim hours of your day.',
     image: 'breaking',
-    imageSize: 'lg',
+    imageSize: 'md',
   },
   {
     id: '2',

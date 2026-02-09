@@ -15,7 +15,6 @@ import {
   createBigNumberStyle,
   bigNumberColors,
 } from './Usage.styles';
-import { colors } from '../../../theme';
 
 interface UsageYearlyProps {
   average: {
@@ -25,7 +24,7 @@ interface UsageYearlyProps {
   yearsIn30: string;
 }
 
-const bigNumberPurple = createBigNumberStyle(colors.terracotta, 120);
+const bigNumberTerracotta = createBigNumberStyle(bigNumberColors.terracotta, 120);
 
 const ANIMATION_CONFIG = {
   duration: 400,
@@ -60,7 +59,7 @@ export const UsageYearly = ({ average, yearsIn30 }: UsageYearlyProps) => {
         </Typography>
       </View>
       <View style={usageStyles.centerContent}>
-        <Animated.Text style={[bigNumberPurple, animatedBigNumberStyle]}>
+        <Animated.Text style={[bigNumberTerracotta, animatedBigNumberStyle]}>
           {yearsIn30}
         </Animated.Text>
         <Animated.View entering={FadeInUp.delay(400).duration(300)}>

@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   segmentedTextSelected: {
-    color: colors.neutral.white,
+    color: colors.neutral.black,
     fontWeight: '600',
   },
 });

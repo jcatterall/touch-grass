@@ -48,9 +48,12 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
   return (
     <OnboardingContainer>
       <View style={{ ...styles.item, gap: spacing.xxxxl }}>
-        <Typography mode="dark" variant="heading" center>
-          How much time do you spend on your phone every day?
-        </Typography>
+        <View style={styles.header}>
+          <Typography mode="dark" variant="heading" center>
+            How much time do you spend on your phone every day?
+          </Typography>
+        </View>
+
         <View style={styles.slider}>
           <View style={styles.textContainer}>
             <Animated.Text style={[textStyles.title, animatedTextStyle]}>
@@ -88,6 +91,9 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
 };
 
 const styles = StyleSheet.create({
+  header: {
+    marginTop: spacing.xl,
+  },
   item: {
     flex: 1,
     flexDirection: 'column',

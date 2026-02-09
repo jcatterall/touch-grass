@@ -6,20 +6,36 @@ export interface DayChipProps {
   label: string;
   isSelected: boolean;
   onPress: () => void;
+  mode?: 'light' | 'dark';
 }
 
-export const DayChip = ({ label, isSelected, onPress }: DayChipProps) => {
+export const DayChip = ({
+  label,
+  isSelected,
+  onPress,
+  mode = 'light',
+}: DayChipProps) => {
   const simpleLabel = label[0];
+  const isDark = mode === 'dark';
+
   return (
     <View style={styles.container}>
       <Pressable
-        style={[styles.dayChip, isSelected && styles.dayChipSelected]}
+        style={[
+          styles.dayChip,
+          isDark && styles.dayChipDark,
+          isSelected && styles.dayChipSelected,
+        ]}
         onPress={onPress}
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       >
         <Typography
           variant="body"
-          style={[styles.dayChipText, isSelected && styles.dayChipTextSelected]}
+          style={[
+            styles.dayChipText,
+            isDark && styles.dayChipTextDark,
+            isSelected && styles.dayChipTextSelected,
+          ]}
         >
           {simpleLabel}
         </Typography>
@@ -42,6 +58,10 @@ const styles = StyleSheet.create({
     minWidth: 42,
     alignItems: 'center',
   },
+  dayChipDark: {
+    backgroundColor: colors.dark70,
+    borderColor: colors.dark50,
+  },
   dayChipSelected: {
     backgroundColor: colors.primary.blue,
     borderColor: colors.primary.blue,
@@ -51,8 +71,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.text.primary,
   },
+  dayChipTextDark: {
+    color: colors.dark.textSecondary,
+  },
   dayChipTextSelected: {
-    color: colors.neutral.white,
+    color: colors.neutral.black,
     fontWeight: '600',
   },
   label: {

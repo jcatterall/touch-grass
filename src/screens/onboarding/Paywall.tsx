@@ -222,7 +222,7 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
         >
           {isPurchasing ? 'Processing...' : 'Try free and subscribe'}
         </Button>
-        <Typography mode="dark" variant="body">
+        <Typography mode="dark" variant="body" center>
           Cancel anytime in Settings
         </Typography>
       </View>

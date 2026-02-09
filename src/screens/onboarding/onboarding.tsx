@@ -40,6 +40,7 @@ export const Onboarding = () => {
   const [stepIndex, setStepIndex] = useState(0);
   const [usage, setUsage] = useState(1);
   const [blockingPlan, setBlockingPlan] = useState<BlockingPlan | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
 
   const currentStep = STEPS[stepIndex];
   const canGoBack = stepIndex > 0;
@@ -74,7 +75,16 @@ export const Onboarding = () => {
     home: <Home onComplete={handleNext} />,
     why: <Why onComplete={handleNext} onBack={handleBack} />,
     goalsSplash: <GoalsSplash onComplete={handleNext} onBack={handleBack} />,
-    goals: <Goals onComplete={handleNext} onBack={handleBack} />,
+    goals: (
+      <Goals
+        answers={answers}
+        onComplete={currentAnswers => {
+          setAnswers(currentAnswers);
+          handleNext();
+        }}
+        onBack={handleBack}
+      />
+    ),
     planSplash: (
       <PlanSplash
         onSkip={() => handleNext(true)}

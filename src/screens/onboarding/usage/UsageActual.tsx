@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors, spacing, textStyles } from '../../../theme';
 import { Typography } from '../../../components';
-import { usageStyles } from './Usage.styles';
+import { usageStyles, bigNumberColors } from './Usage.styles';
 import { ArrowDown, ArrowUp } from 'lucide-react-native';
 
 const ANIMATION_CONFIG = {
@@ -63,14 +63,14 @@ const content = {
   less: {
     title: 'Less screen time than you thought!',
     subtitle: "Nice surprise – you're more in control than you realized.",
-    color: '#2ECC71',
+    color: bigNumberColors.green,
     Icon: ArrowDown,
   },
   more: {
     title: 'More screen time than you thought!',
     subtitle:
       "That's okay – recognizing the issue is the first step to change.",
-    color: '#FF6B6B',
+    color: bigNumberColors.red,
     Icon: ArrowUp,
   },
 };

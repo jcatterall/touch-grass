@@ -40,7 +40,13 @@ const CRITERIA_CONFIG = {
 } as const;
 
 export const Plan = ({ onComplete }: PlanProps) => {
-  const [selectedDays, setSelectedDays] = useState<DayKey[]>([]);
+  const [selectedDays, setSelectedDays] = useState<DayKey[]>([
+    'MON',
+    'TUE',
+    'WED',
+    'THU',
+    'FRI',
+  ]);
   const [durationType, setDurationType] =
     useState<DurationType>('specific_hours');
   const [fromTime, setFromTime] = useState('09:00 AM');
@@ -128,6 +134,7 @@ export const Plan = ({ onComplete }: PlanProps) => {
                 label={day.label}
                 isSelected={selectedDays.includes(day.key)}
                 onPress={() => toggleDay(day.key)}
+                mode="dark"
               />
             ))}
           </View>
@@ -294,7 +301,7 @@ const styles = StyleSheet.create({
   },
   criteriaValue: {
     fontSize: 48,
-    fontWeight: '300',
+    fontWeight: '500',
     color: colors.neutral.white,
   },
   criteriaUnit: {

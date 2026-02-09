@@ -1,6 +1,15 @@
 import { StyleSheet, TextStyle } from 'react-native';
 import { colors, spacing } from '../../../theme';
 
+/**
+ * Centralized big number colors used across usage screens
+ */
+export const bigNumberColors = {
+  green: colors.success,
+  red: colors.primary60,
+  terracotta: colors.terracotta,
+};
+
 export const usageStyles = StyleSheet.create({
   slidePage: {
     flex: 1,
@@ -42,11 +51,3 @@ export const createBigNumberStyle = (
   color,
   textAlign: 'center',
 });
-
-/**
- * Pre-defined big number colors
- */
-export const bigNumberColors = {
-  purple: colors.accent.purple,
-  green: '#2ECC71',
-} as const;

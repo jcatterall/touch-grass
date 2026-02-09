@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ArrowLeft, Search, Square, CheckSquare } from 'lucide-react-native';
+import { ArrowLeft, Search, Square, CheckSquare, X } from 'lucide-react-native';
 import { Main } from '../components/layout/Main';
 import { Button, Typography } from '../components';
 import { colors, spacing, borderRadius, textStyles } from '../theme';
@@ -141,12 +141,21 @@ export const BlocklistScreen = ({
               Blocklist
             </Typography>
           )}
-          <Pressable
-            onPress={() => setIsSearchVisible(!isSearchVisible)}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Search size={24} color={colors.neutral.white} />
-          </Pressable>
+          {isSearchVisible && searchQuery.length > 0 ? (
+            <Pressable
+              onPress={() => setSearchQuery('')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <X size={24} color={colors.neutral.white} />
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => setIsSearchVisible(!isSearchVisible)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Search size={24} color={colors.neutral.white} />
+            </Pressable>
+          )}
         </View>
 
         {loading ? (
@@ -185,7 +194,9 @@ export const BlocklistScreen = ({
 };
 
 const styles = StyleSheet.create({
-  main: {},
+  main: {
+    backgroundColor: colors.dark.cardBackground,
+  },
   container: {
     flex: 1,
     paddingHorizontal: spacing.lg,
@@ -205,7 +216,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: colors.neutral.white,
+    borderBottomColor: colors.dark.textSecondary,
     color: colors.dark.textPrimary,
     ...textStyles.body,
   },
@@ -219,7 +230,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.dark70,
   },
   appLeft: {
     flex: 1,

@@ -226,7 +226,7 @@ export const ColorSchemes = {
       background: 'transparent',
       backgroundPressed: 'transparent',
       backgroundDisabled: 'transparent',
-      text: Colors.skyBlue,
+      text: Colors.white,
       textPressed: '#A8DAEF',
       textDisabled: '#6B6B73',
     },

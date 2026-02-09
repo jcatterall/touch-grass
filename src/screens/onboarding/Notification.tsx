@@ -69,7 +69,7 @@ export const Notification = ({ onComplete }: NotificationProps) => {
 
       <View style={styles.bottom}>
         <Button size="lg" onPress={handleNotification}>
-          Block notifications
+          Grant access
         </Button>
         <Button mode="dark" variant="link" size="lg" onPress={handleContinue}>
           Maybe later

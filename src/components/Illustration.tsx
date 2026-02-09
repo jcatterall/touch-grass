@@ -23,7 +23,7 @@ export type IllustrationSource =
   | 'flag'
   | 'goals';
 
-export type ImageSize = 'sm' | 'md' | 'lg' | 'xl';
+export type ImageSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 const images: Record<IllustrationSource, ImageSourcePropType> = {
   breaking: require('../../assets/illustrations/breaking.png'),
@@ -51,6 +51,7 @@ interface ImageProps {
 
 export const Illustration = (props: ImageProps) => {
   const getHeight = () => {
+    if (props.size === 'xs') return 150;
     if (props.size === 'sm') return 275;
     if (props.size === 'md') return 300;
     if (props.size === 'lg') return 415;

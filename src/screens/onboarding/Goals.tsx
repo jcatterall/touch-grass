@@ -5,8 +5,9 @@ import { spacing } from '../../theme';
 import { Button, Select, Typography } from '../../components';
 
 export interface GoalsProps {
-  onComplete: () => void;
+  onComplete: (answers: Record<number, string>) => void;
   onBack?: () => void;
+  answers: Record<string, string>;
 }
 
 interface Details {
@@ -20,17 +21,18 @@ interface Option {
   value: string;
 }
 
-export const Goals = ({ onComplete }: GoalsProps) => {
+export const Goals = ({ onComplete, answers }: GoalsProps) => {
   const [currentPage, setCurrentPage] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [currentAnswers, setCurrentAnswers] =
+    useState<Record<number, string>>(answers);
 
   const currentStep = Steps[currentPage];
-  const selectedValue = answers[currentPage] ?? null;
+  const selectedValue = currentAnswers[currentPage] ?? null;
   const isLastPage = currentPage === Steps.length - 1;
 
   const handleContinue = () => {
     if (isLastPage) {
-      onComplete();
+      onComplete(currentAnswers);
     } else {
       setCurrentPage(prev => prev + 1);
     }
@@ -38,7 +40,7 @@ export const Goals = ({ onComplete }: GoalsProps) => {
 
   const handleSelect = (value: (string | number) | (string | number)[]) => {
     const newValue = Array.isArray(value) ? value[0] : value;
-    setAnswers(prev => ({ ...prev, [currentPage]: String(newValue) }));
+    setCurrentAnswers(prev => ({ ...prev, [currentPage]: String(newValue) }));
   };
 
   return (
@@ -93,7 +95,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   selectWrapper: {
-    marginHorizontal: spacing.md,
     marginTop: spacing.lg,
   },
 });
