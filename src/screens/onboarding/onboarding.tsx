@@ -19,6 +19,15 @@ export interface OnboardingStepProps {
   onBack?: () => void;
 }
 
+export interface OnboardingData {
+  blockingPlan: BlockingPlan | null;
+  answers: Record<string, string>;
+}
+
+interface OnboardingProps {
+  onComplete: (data: OnboardingData) => void;
+}
+
 const STEPS = [
   'home',
   'why',
@@ -36,7 +45,9 @@ const STEPS = [
 
 type OnboardingStep = (typeof STEPS)[number];
 
-export const Onboarding = () => {
+export const Onboarding = ({
+  onComplete: onOnboardingComplete,
+}: OnboardingProps) => {
   const [stepIndex, setStepIndex] = useState(0);
   const [usage, setUsage] = useState(1);
   const [blockingPlan, setBlockingPlan] = useState<BlockingPlan | null>(null);
@@ -48,24 +59,27 @@ export const Onboarding = () => {
   const currentStep = STEPS[stepIndex];
   const canGoBack = stepIndex > 0;
 
-  const handleNext = useCallback((skip: boolean = false) => {
-    if (skip) {
-      setSkippedSteps(prev => {
-        const next = new Set(prev);
-        next.add(STEPS[stepIndex + 1]);
-        return next;
-      });
-    }
-    const increment = skip === true ? 2 : 1;
-    setStepIndex(prev => {
-      const nextIndex = prev + increment;
-      if (nextIndex < STEPS.length) {
-        return nextIndex;
+  const handleNext = useCallback(
+    (skip: boolean = false) => {
+      if (skip) {
+        setSkippedSteps(prev => {
+          const next = new Set(prev);
+          next.add(STEPS[stepIndex + 1]);
+          return next;
+        });
       }
-      console.log('Onboarding Finished');
-      return prev;
-    });
-  }, [stepIndex]);
+      const increment = skip === true ? 2 : 1;
+      setStepIndex(prev => {
+        const nextIndex = prev + increment;
+        if (nextIndex < STEPS.length) {
+          return nextIndex;
+        }
+        onOnboardingComplete({ blockingPlan, answers });
+        return prev;
+      });
+    },
+    [stepIndex, onOnboardingComplete, blockingPlan, answers],
+  );
 
   const handleBack = useCallback(() => {
     if (!canGoBack) return false;
@@ -115,7 +129,6 @@ export const Onboarding = () => {
           setBlockingPlan(plan);
           handleNext();
         }}
-        onBack={handleBack}
       />
     ),
     usage: (
