@@ -10,9 +10,7 @@ export const UsageApps = ({ apps }: { apps: AppUsage[] }) => {
   if (displayApps.length === 0) {
     return (
       <View style={styles.container}>
-        <Typography mode="light" variant="title">
-          Most used
-        </Typography>
+        <Typography variant="title">Most used</Typography>
         <Typography variant="body" color="secondary">
           No app usage data available
         </Typography>
@@ -22,9 +20,7 @@ export const UsageApps = ({ apps }: { apps: AppUsage[] }) => {
 
   return (
     <View style={styles.container}>
-      <Typography mode="dark" variant="subtitle">
-        Most used apps
-      </Typography>
+      <Typography variant="subtitle">Most used apps</Typography>
       <View style={styles.appsRow}>
         {displayApps.map((app, index) => (
           <AppIcon

@@ -3,11 +3,11 @@ import { borderRadius, colors, spacing } from '../../theme';
 import Chip from '../Chip';
 import { Typography } from '../Typography';
 
-const getPickupStatus = (count: number): string => {
-  if (count < 30) return 'Low';
-  if (count < 60) return 'Normal';
-  if (count < 100) return 'High';
-  return 'Very High';
+const getPickupStatus = (count: number): { label: string; variant: 'blue' | 'orange' } => {
+  if (count < 30) return { label: 'Low', variant: 'blue' };
+  if (count < 60) return { label: 'Normal', variant: 'blue' };
+  if (count < 100) return { label: 'High', variant: 'orange' };
+  return { label: 'Very High', variant: 'orange' };
 };
 
 export const UsagePickups = ({ count }: { count: number }) => {
@@ -15,12 +15,10 @@ export const UsagePickups = ({ count }: { count: number }) => {
 
   return (
     <View style={styles.container}>
-      <Typography mode="dark" variant="subtitle">
-        Daily pickups
-      </Typography>
+      <Typography variant="subtitle">Daily pickups</Typography>
       <View style={styles.rightContent}>
         <Text style={styles.countText}>{count}x</Text>
-        <Chip label={status} variant="blue" size="sm" mode="dark" isSelected />
+        <Chip label={status.label} variant={status.variant} size="sm" isSelected />
       </View>
     </View>
   );
@@ -40,6 +38,6 @@ const styles = StyleSheet.create({
   countText: {
     fontSize: 32,
     fontWeight: '700',
-    color: colors.primary.blue,
+    color: colors.meadowGreen,
   },
 });

@@ -48,16 +48,14 @@ export const Goals = ({ onComplete, answers }: GoalsProps) => {
       <View style={{ ...styles.flex, gap: spacing.xxxxl }}>
         <View style={styles.flexReverse}>
           <Pressable onPress={handleContinue}>
-            <Typography mode="dark" variant="link">
-              Skip
-            </Typography>
+            <Typography variant="link">Skip</Typography>
           </Pressable>
         </View>
         <View style={styles.item}>
-          <Typography mode="dark" variant="heading" center>
+          <Typography variant="heading" center>
             {currentStep.title}
           </Typography>
-          <Typography mode="dark" variant="subtitle" color="secondary" center>
+          <Typography variant="subtitle" center>
             {currentStep.subTitle}
           </Typography>
 
@@ -67,7 +65,6 @@ export const Goals = ({ onComplete, answers }: GoalsProps) => {
               value={selectedValue ?? ''}
               onValueChange={handleSelect}
               variant="blue"
-              mode="dark"
             />
           </View>
         </View>

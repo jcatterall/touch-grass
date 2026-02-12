@@ -119,7 +119,7 @@ export const TimePill = ({ value, onChange }: TimePillProps) => {
   return (
     <>
       <Pressable style={styles.pill} onPress={openModal}>
-        <Clock size={18} color={colors.text.secondary} />
+        <Clock size={18} color={colors.oatmeal} />
         <Text style={styles.pillValue}>{value}</Text>
       </Pressable>
 
@@ -179,12 +179,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.neutral.white,
+    backgroundColor: colors.white,
   },
   pillValue: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.text.primary,
+    color: colors.white,
   },
   modalOverlay: {
     flex: 1,
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colors.neutral.white,
+    backgroundColor: colors.white,
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
     paddingBottom: spacing.xxl,
@@ -204,16 +204,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.neutral.gray200,
+    borderBottomColor: colors.charcoal,
   },
   modalTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: colors.text.primary,
+    color: colors.white,
   },
   cancelText: {
     fontSize: 17,
-    color: colors.text.secondary,
+    color: colors.oatmeal,
   },
   doneText: {
     fontSize: 17,
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     right: spacing.xl,
     top: ITEM_HEIGHT * 2,
     height: ITEM_HEIGHT,
-    backgroundColor: colors.neutral.gray100,
+    backgroundColor: colors.charcoal,
     borderRadius: borderRadius.md,
   },
   pickerColumn: {
@@ -251,16 +251,16 @@ const styles = StyleSheet.create({
   },
   pickerText: {
     fontSize: 20,
-    color: colors.text.tertiary,
+    color: colors.oatmeal,
   },
   pickerTextSelected: {
-    color: colors.text.primary,
+    color: colors.white,
     fontWeight: '600',
   },
   pickerSeparator: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.text.primary,
+    color: colors.white,
     marginHorizontal: spacing.xs,
   },
 });

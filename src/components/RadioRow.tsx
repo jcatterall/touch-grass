@@ -27,30 +27,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: spacing.md,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.neutral.white,
+    backgroundColor: colors.white,
   },
   radioLabel: {
     fontSize: 16,
     fontWeight: '400',
-    color: colors.text.primary,
+    color: colors.white,
   },
   radioOuter: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.neutral.gray300,
+    borderColor: colors.charcoal,
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioOuterSelected: {
-    borderColor: colors.primary.blue,
+    borderColor: colors.skyBlue,
   },
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: colors.primary.blue,
+    backgroundColor: colors.skyBlue,
   },
 });
 

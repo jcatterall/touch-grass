@@ -5,9 +5,7 @@ import { colors, spacing } from '../../theme';
 export const HomeScreen = () => {
   return (
     <View style={styles.container}>
-      <Typography mode="dark" variant="heading">
-        Home
-      </Typography>
+      <Typography variant="heading">Home</Typography>
     </View>
   );
 };
@@ -17,7 +15,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.dark.cardBackground,
+    backgroundColor: colors.background,
     padding: spacing.lg,
   },
 });

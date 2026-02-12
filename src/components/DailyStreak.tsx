@@ -26,7 +26,6 @@ const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 // Helper functions - decoupled for testing
 export const getTodayIndex = (): number => {
   const dayIndex = new Date().getDay();
-  // Convert Sunday = 0 to our Mon-Sun array index
   return dayIndex === 0 ? 6 : dayIndex - 1;
 };
 
@@ -37,20 +36,17 @@ export const getCompletedDays = (
   const todayIndex = getTodayIndex();
   const completed = new Set<string>();
 
-  // Calculate how many past days in this week are part of the streak
   const streakDaysThisWeek = Math.min(
     currentStreak - (isTodayComplete ? 1 : 0),
     todayIndex,
   );
 
-  // Mark past days as completed based on streak
   for (let i = todayIndex - streakDaysThisWeek; i < todayIndex; i++) {
     if (i >= 0) {
       completed.add(DAYS_OF_WEEK[i]);
     }
   }
 
-  // Add today if complete
   if (isTodayComplete) {
     completed.add(DAYS_OF_WEEK[todayIndex]);
   }
@@ -74,7 +70,6 @@ const DayIndicator: React.FC<DayIndicatorProps> = ({
   return (
     <View style={styles.dayWrapper}>
       <Typography
-        mode="light"
         variant="body"
         color={isCompleted ? 'primary' : 'tertiary'}
         style={styles.dayLabel}
@@ -86,7 +81,7 @@ const DayIndicator: React.FC<DayIndicatorProps> = ({
           <BadgeCheck
             size={32}
             color={colors.white}
-            fill={colors.primary60}
+            fill={colors.terracotta}
             strokeWidth={2}
           />
         ) : (
@@ -118,7 +113,7 @@ export const DailyStreak: React.FC<DailyStreakProps> = ({
           />
         ))}
       </View>
-      <Typography mode="light" variant="body" center style={styles.caption}>
+      <Typography variant="body" center style={styles.caption}>
         Build a streak, one day at a time
       </Typography>
     </View>
@@ -127,7 +122,7 @@ export const DailyStreak: React.FC<DailyStreakProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.neutral10,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: borderRadius.lg,
     padding: spacing.sm,
     ...shadows.md,
@@ -158,10 +153,10 @@ const styles = StyleSheet.create({
   dayContainerIncomplete: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: colors.neutral30,
+    borderColor: colors.oatmeal,
   },
   dayContainerToday: {
-    borderColor: colors.primary60,
+    borderColor: colors.terracotta,
     borderWidth: 2,
   },
   dayLabel: {

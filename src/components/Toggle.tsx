@@ -28,7 +28,6 @@ import {
   ToggleSizes,
   ToggleColorSchemes,
   ToggleShadow,
-  type ColorMode,
 } from '../theme/theme';
 
 const ANIMATION_CONFIG = {
@@ -41,7 +40,6 @@ export interface ToggleProps {
   onToggle: (value: boolean) => void;
   disabled?: boolean;
   label?: string;
-  mode?: ColorMode;
   accessibilityLabel?: string;
   accessibilityHint?: string;
   style?: StyleProp<ViewStyle>;
@@ -54,7 +52,6 @@ export const Toggle: React.FC<ToggleProps> = ({
   onToggle,
   disabled = false,
   label,
-  mode = 'light',
   accessibilityLabel,
   accessibilityHint,
   style,
@@ -62,7 +59,6 @@ export const Toggle: React.FC<ToggleProps> = ({
   testID,
 }) => {
   const progress = useSharedValue(isOn ? 1 : 0);
-  const colorScheme = ToggleColorSchemes[mode];
   const thumbTranslation =
     ToggleSizes.track.width - ToggleSizes.thumb.size - ToggleSizes.thumb.margin * 2;
 
@@ -71,8 +67,8 @@ export const Toggle: React.FC<ToggleProps> = ({
   }, [isOn, progress]);
 
   const animatedTrackStyle = useAnimatedStyle(() => {
-    const trackOffColor = disabled ? colorScheme.disabled.track : colorScheme.off.track;
-    const trackOnColor = disabled ? colorScheme.disabled.track : colorScheme.on.track;
+    const trackOffColor = disabled ? ToggleColorSchemes.disabled.track : ToggleColorSchemes.off.track;
+    const trackOnColor = disabled ? ToggleColorSchemes.disabled.track : ToggleColorSchemes.on.track;
     return {
       backgroundColor: interpolateColor(progress.value, [0, 1], [trackOffColor, trackOnColor]),
     };
@@ -88,14 +84,12 @@ export const Toggle: React.FC<ToggleProps> = ({
     onToggle(!isOn);
   }, [disabled, isOn, onToggle]);
 
-  const thumbBackgroundColor = disabled ? colorScheme.disabled.thumb : colorScheme.on.thumb;
+  const thumbBackgroundColor = disabled ? ToggleColorSchemes.disabled.thumb : ToggleColorSchemes.on.thumb;
 
   const labelTextStyle: TextStyle = {
     color: disabled
-      ? DisabledColors[mode].text
-      : mode === 'dark'
-        ? Colors.textDark
-        : Colors.charcoal,
+      ? DisabledColors.text
+      : Colors.textDark,
   };
 
   const toggleSwitch = (

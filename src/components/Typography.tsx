@@ -13,8 +13,7 @@ import {
 import { textStyles, textColors } from '../theme/tokens';
 
 type TextVariant = keyof typeof textStyles;
-type TextColor = keyof typeof textColors.light;
-type ColorMode = 'light' | 'dark';
+type TextColor = keyof typeof textColors;
 
 export interface TypographyProps extends Omit<RNTextProps, 'style'> {
   children: React.ReactNode;
@@ -22,8 +21,6 @@ export interface TypographyProps extends Omit<RNTextProps, 'style'> {
   variant?: TextVariant;
   /** Semantic color: primary, secondary, tertiary, disabled, inverse, link, accent, error, success */
   color?: TextColor;
-  /** Theme mode */
-  mode?: ColorMode;
   /** Center text */
   center?: boolean;
   /** Custom style overrides */
@@ -34,14 +31,13 @@ export const Typography: React.FC<TypographyProps> = ({
   children,
   variant = 'body',
   color = 'primary',
-  mode = 'dark',
   center = false,
   style,
   ...textProps
 }) => {
   const composedStyle: StyleProp<TextStyle> = [
     textStyles[variant],
-    { color: textColors[mode][color] },
+    { color: textColors[color] },
     center && { textAlign: 'center' },
     style,
   ];
@@ -53,5 +49,5 @@ export const Typography: React.FC<TypographyProps> = ({
   );
 };
 
-export type { TextVariant, TextColor, ColorMode };
+export type { TextVariant, TextColor };
 export default Typography;

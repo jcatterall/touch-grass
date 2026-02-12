@@ -28,14 +28,12 @@ import {
   type ButtonShape,
   type ButtonSize,
   type ButtonVariant,
-  type ColorMode,
 } from '../theme/theme';
 
 export interface ButtonProps {
   children: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
-  mode?: ColorMode;
   shape?: ButtonShape;
   iconLeft?: React.ReactNode;
   isLoading?: boolean;
@@ -54,7 +52,6 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   variant = 'primary',
   size = 'md',
-  mode = 'light',
   shape = 'pill',
   iconLeft,
   isLoading = false,
@@ -70,7 +67,7 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const { scaleAnim, handlePressIn, handlePressOut } = usePressAnimation();
 
-  const colorScheme = ColorSchemes[mode][variant];
+  const colorScheme = ColorSchemes[variant];
   const sizeConfig = ButtonSizes[size];
   const borderRadius = ButtonShapes[shape];
   const isDisabled = disabled || isLoading;
@@ -92,7 +89,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   const getBorderStyle = (): ViewStyle | null => {
     if (variant !== 'tertiary') return null;
-    const tertiaryScheme = ColorSchemes[mode].tertiary;
+    const tertiaryScheme = ColorSchemes.tertiary;
     return {
       borderWidth: sizeConfig.borderWidth,
       borderColor: isDisabled

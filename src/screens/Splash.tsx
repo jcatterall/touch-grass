@@ -15,7 +15,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.dark.cardBackground,
+    backgroundColor: colors.background,
   },
   emoji: {
     fontSize: 64,

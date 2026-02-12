@@ -38,6 +38,39 @@ const showAlert = (title: string, message: string) => {
   }
 };
 
+interface PackageCardProps {
+  label: string;
+  priceLabel: string;
+  isSelected: boolean;
+  showBestValue?: boolean;
+  onPress: () => void;
+}
+
+const PackageCard = ({ label, priceLabel, isSelected, showBestValue, onPress }: PackageCardProps) => {
+  const textColor = { color: isSelected ? colors.black : colors.white };
+
+  return (
+    <Pressable
+      style={[styles.packageCard, isSelected && styles.packageCardSelected]}
+      onPress={onPress}
+    >
+      {isSelected && showBestValue && (
+        <View style={styles.bestValueBadge}>
+          <Typography variant="body" style={styles.bestValueText}>
+            Best Value
+          </Typography>
+        </View>
+      )}
+      <Typography variant="subtitle" style={[styles.cardTitle, textColor]}>
+        {label}
+      </Typography>
+      <Typography variant="body" style={[styles.cardPrice, textColor]}>
+        {priceLabel}
+      </Typography>
+    </Pressable>
+  );
+};
+
 export const Paywall = ({ onComplete }: PaywallProps) => {
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
   const [selectedPackage, setSelectedPackage] =
@@ -134,7 +167,7 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
     return (
       <OnboardingContainer>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.secondary60} />
+          <ActivityIndicator size="large" color={colors.skyBlue} />
         </View>
       </OnboardingContainer>
     );
@@ -147,12 +180,10 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
     <OnboardingContainer>
       <View style={styles.header}>
         <Pressable onPress={skipClicked} hitSlop={8}>
-          <X size={24} color={colors.neutral.white} />
+          <X size={24} color={colors.white} />
         </Pressable>
         <Pressable onPress={handleRestore} disabled={isPurchasing}>
-          <Typography mode="dark" variant="link">
-            Restore Purchase
-          </Typography>
+          <Typography variant="link">Restore Purchase</Typography>
         </Pressable>
       </View>
       <View style={styles.imageContainer}>
@@ -170,108 +201,21 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
 
         <View style={styles.packagesContainer}>
           {annualPackage && (
-            <Pressable
-              style={[
-                styles.packageCard,
-                selectedPackage?.identifier === annualPackage.identifier &&
-                  styles.packageCardSelected,
-              ]}
+            <PackageCard
+              label="Annual"
+              priceLabel={`${annualPackage.product.priceString} / year ${getTrialText(annualPackage)} ${getMonthlyPrice(annualPackage)}`}
+              isSelected={selectedPackage?.identifier === annualPackage.identifier}
+              showBestValue
               onPress={() => setSelectedPackage(annualPackage)}
-            >
-              {selectedPackage?.identifier === annualPackage.identifier && (
-                <View style={styles.bestValueBadge}>
-                  <Typography
-                    mode="light"
-                    variant="body"
-                    style={styles.bestValueText}
-                  >
-                    Best Value
-                  </Typography>
-                </View>
-              )}
-              {selectedPackage?.identifier === annualPackage.identifier ? (
-                <>
-                  <Typography
-                    mode="light"
-                    variant="subtitle"
-                    style={styles.cardTitle}
-                  >
-                    Annual
-                  </Typography>
-                  <Typography
-                    mode="light"
-                    variant="body"
-                    color="secondary"
-                    style={styles.cardPrice}
-                  >
-                    {annualPackage.product.priceString} / year{' '}
-                    {getTrialText(annualPackage)}{' '}
-                    {getMonthlyPrice(annualPackage)}
-                  </Typography>
-                </>
-              ) : (
-                <>
-                  <Typography variant="subtitle" style={styles.cardTitle}>
-                    Annual
-                  </Typography>
-                  <Typography
-                    variant="body"
-                    color="secondary"
-                    style={styles.cardPrice}
-                  >
-                    {annualPackage.product.priceString} / year{' '}
-                    {getTrialText(annualPackage)}{' '}
-                    {getMonthlyPrice(annualPackage)}
-                  </Typography>
-                </>
-              )}
-            </Pressable>
+            />
           )}
-
           {monthlyPackage && (
-            <Pressable
-              style={[
-                styles.packageCard,
-                selectedPackage?.identifier === monthlyPackage.identifier &&
-                  styles.packageCardSelected,
-              ]}
+            <PackageCard
+              label="Monthly"
+              priceLabel={`${monthlyPackage.product.priceString} / month ${getTrialText(monthlyPackage)}`}
+              isSelected={selectedPackage?.identifier === monthlyPackage.identifier}
               onPress={() => setSelectedPackage(monthlyPackage)}
-            >
-              {selectedPackage?.identifier === monthlyPackage.identifier ? (
-                <>
-                  <Typography
-                    mode="light"
-                    variant="subtitle"
-                    style={styles.cardTitle}
-                  >
-                    Monthly
-                  </Typography>
-                  <Typography
-                    mode="light"
-                    variant="body"
-                    color="secondary"
-                    style={styles.cardPrice}
-                  >
-                    {monthlyPackage.product.priceString} / month{' '}
-                    {getTrialText(monthlyPackage)}
-                  </Typography>
-                </>
-              ) : (
-                <>
-                  <Typography variant="subtitle" style={styles.cardTitle}>
-                    Monthly
-                  </Typography>
-                  <Typography
-                    variant="body"
-                    color="secondary"
-                    style={styles.cardPrice}
-                  >
-                    {monthlyPackage.product.priceString} / month{' '}
-                    {getTrialText(monthlyPackage)}
-                  </Typography>
-                </>
-              )}
-            </Pressable>
+            />
           )}
         </View>
       </View>
@@ -284,7 +228,7 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
         >
           {isPurchasing ? 'Processing...' : 'Try free and subscribe'}
         </Button>
-        <Typography mode="dark" variant="body" center>
+        <Typography variant="body" center>
           Cancel anytime in Settings
         </Typography>
       </View>
@@ -319,17 +263,17 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    backgroundColor: colors.dark.cardSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   packageCardSelected: {
-    borderColor: colors.secondary60,
+    borderColor: colors.skyBlue,
     backgroundColor: colors.white,
   },
   bestValueBadge: {
     position: 'absolute',
     top: -10,
     right: spacing.sm,
-    backgroundColor: colors.primary60,
+    backgroundColor: colors.terracotta,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
     borderRadius: borderRadius.sm,

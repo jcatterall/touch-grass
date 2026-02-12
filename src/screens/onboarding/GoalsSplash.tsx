@@ -16,10 +16,10 @@ export const GoalsSplash = ({ onComplete }: GoalsSplashProps) => (
       <View style={onboardingStyles.contentCentered}>
         <Illustration source="goals" size="lg" />
         <View style={styles.heading}>
-          <Typography mode="dark" variant="title" center>
+          <Typography variant="title" center>
             Let's set you up for success
           </Typography>
-          <Typography mode="dark" variant="subtitle" center>
+          <Typography variant="subtitle" center>
             A few quick questions to build your personalised plan
           </Typography>
         </View>

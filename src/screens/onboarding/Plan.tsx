@@ -146,12 +146,12 @@ export const Plan = ({ onComplete, plan }: PlanProps) => {
   return (
     <OnboardingContainer>
       <View style={styles.container}>
-        <Typography mode="dark" variant="title">
+        <Typography variant="title">
           {plan ? 'Edit plan' : 'Your plan'}
         </Typography>
 
         <View style={[styles.section]}>
-          <Typography variant="body" color="inverse" style={styles.label}>
+          <Typography variant="body" style={styles.label}>
             Repeat
           </Typography>
           <View style={styles.row}>
@@ -161,7 +161,6 @@ export const Plan = ({ onComplete, plan }: PlanProps) => {
                 label={day.label}
                 isSelected={schedule.days.includes(day.key)}
                 onPress={() => toggleDay(day.key)}
-                mode="dark"
               />
             ))}
           </View>
@@ -169,12 +168,7 @@ export const Plan = ({ onComplete, plan }: PlanProps) => {
 
         <View style={[styles.section]}>
           <View style={styles.row}>
-            <Typography
-              mode="light"
-              variant="body"
-              color="inverse"
-              style={styles.label}
-            >
+            <Typography variant="body" style={styles.label}>
               Range
             </Typography>
             <SegmentedControl
@@ -202,7 +196,7 @@ export const Plan = ({ onComplete, plan }: PlanProps) => {
 
         <View style={{ ...styles.section }}>
           <View style={styles.row}>
-            <Typography variant="body" color="inverse" style={styles.label}>
+            <Typography variant="body" style={styles.label}>
               Criteria
             </Typography>
             <SegmentedControl
@@ -253,10 +247,10 @@ export const Plan = ({ onComplete, plan }: PlanProps) => {
               }
             />
             <View style={{ ...styles.row }}>
-              <Typography mode="dark" variant="body">
+              <Typography variant="body">
                 {config.min} {config.label}
               </Typography>
-              <Typography mode="dark" variant="body">
+              <Typography variant="body">
                 {config.max} {config.label}
               </Typography>
             </View>
@@ -302,12 +296,12 @@ const styles = StyleSheet.create({
   bigValue: {
     fontSize: 48,
     fontWeight: '500',
-    color: colors.neutral.white,
+    color: colors.white,
   },
   unitLabel: {
     fontSize: 18,
     fontWeight: '400',
-    color: colors.neutral.white,
+    color: colors.white,
   },
   slider: {
     paddingHorizontal: 0,

@@ -9,9 +9,7 @@ interface UsageTotalTimeProps {
 export const UsageTotalTime = ({ totalHours }: UsageTotalTimeProps) => {
   return (
     <View style={styles.container}>
-      <Typography mode="dark" variant="subtitle">
-        Screen time avg.
-      </Typography>
+      <Typography variant="subtitle">Screen time avg.</Typography>
       <View style={styles.rightContent}>
         <Text style={styles.countText}>{totalHours}h</Text>
       </View>
@@ -33,6 +31,6 @@ const styles = StyleSheet.create({
   countText: {
     fontSize: 32,
     fontWeight: '700',
-    color: colors.primary.blue,
+    color: colors.skyBlue,
   },
 });

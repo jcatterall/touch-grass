@@ -17,10 +17,10 @@ export const PlanSplash = ({ onComplete }: PlanSplashProps) => (
       <View style={onboardingStyles.contentCentered}>
         <Illustration source="clock" size="lg" />
         <View style={styles.heading}>
-          <Typography mode="dark" variant="title" center>
+          <Typography variant="title" center>
             Design your daily reset
           </Typography>
-          <Typography mode="dark" variant="subtitle" center>
+          <Typography variant="subtitle" center>
             Create a plan that fits your schedule and keeps you moving
           </Typography>
         </View>

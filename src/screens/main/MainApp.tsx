@@ -67,7 +67,6 @@ export const MainApp = () => {
               <View style={styles.tabContent}>
                 <Icon size={24} color={colors.white} />
                 <Typography
-                  mode="light"
                   variant="link"
                   color={isActive ? 'primary' : 'disabled'}
                 >
@@ -88,9 +87,9 @@ export const MainApp = () => {
             ]}
           >
             <Pressable onPress={() => setActiveTab(null)} hitSlop={8}>
-              <X size={24} color={colors.neutral.white} />
+              <X size={24} color={colors.white} />
             </Pressable>
-            <Typography mode="dark" variant="subtitle">
+            <Typography variant="subtitle">
               {TABS.find(t => t.key === activeTab)?.label}
             </Typography>
           </View>
@@ -132,7 +131,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
-    backgroundColor: colors.dark.cardBackground,
+    backgroundColor: colors.background,
   },
   overlayContent: {
     flex: 1,

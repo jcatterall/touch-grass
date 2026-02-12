@@ -30,7 +30,6 @@ import Animated, {
 import { Pagination, type PaginationProps } from './Pagination';
 import {
   CarouselSizes,
-  type ColorMode,
   type PaginationVariant,
 } from '../theme/theme';
 
@@ -59,7 +58,6 @@ export interface CarouselProps<T> {
   paginationVariant?: PaginationVariant;
   paginationActiveColor?: 'blue' | 'orange';
   paginationProps?: Partial<Omit<PaginationProps<T>, 'data' | 'animValue'>>;
-  mode?: ColorMode;
   onPageChange?: (index: number) => void;
   onScrollBegin?: () => void;
   onScrollEnd?: (index: number) => void;
@@ -82,7 +80,6 @@ function CarouselInner<T>(
     paginationVariant = 'dots',
     paginationActiveColor = 'blue',
     paginationProps,
-    mode = 'light',
     onPageChange,
     onScrollBegin,
     onScrollEnd,
@@ -198,7 +195,6 @@ function CarouselInner<T>(
           animValue={animValue}
           variant={paginationVariant}
           activeColor={paginationActiveColor}
-          mode={mode}
           onPageChange={handlePaginationPageChange}
           {...paginationProps}
         />

@@ -26,7 +26,6 @@ import {
   Colors,
   DisabledColors,
   Shadows,
-  type ColorMode,
 } from '../theme/theme';
 
 const THUMB_SIZE = 24;
@@ -47,7 +46,6 @@ export interface SliderProps {
   label?: string;
   showValue?: boolean;
   formatValue?: (value: number) => string;
-  mode?: ColorMode;
   accessibilityLabel?: string;
   accessibilityHint?: string;
   style?: StyleProp<ViewStyle>;
@@ -65,7 +63,6 @@ export const Slider: React.FC<SliderProps> = ({
   label,
   showValue = true,
   formatValue,
-  mode = 'light',
   accessibilityLabel,
   accessibilityHint,
   style,
@@ -78,8 +75,7 @@ export const Slider: React.FC<SliderProps> = ({
   const startX = useRef(0);
   const lastValue = useRef(value);
 
-  const colorScheme = mode === 'light' ? SliderColors.light : SliderColors.dark;
-  const sliderColors = disabled ? colorScheme.disabled : colorScheme.active;
+  const sliderColors = disabled ? SliderColors.disabled : SliderColors.active;
 
   // Convert value to position
   const valueToPosition = useCallback(
@@ -175,10 +171,8 @@ export const Slider: React.FC<SliderProps> = ({
 
   const labelTextStyle: TextStyle = {
     color: disabled
-      ? DisabledColors[mode].text
-      : mode === 'dark'
-      ? Colors.textDark
-      : Colors.charcoal,
+      ? DisabledColors.text
+      : Colors.textDark,
   };
 
   return (
@@ -241,33 +235,17 @@ export const Slider: React.FC<SliderProps> = ({
 };
 
 const SliderColors = {
-  light: {
-    active: {
-      track: '#EAEAEA',
-      fill: colors.primary.blue,
-      thumb: colors.neutral.white,
-      thumbBorder: colors.primary.blue,
-    },
-    disabled: {
-      track: '#F0F0F0',
-      fill: '#D1D1D1',
-      thumb: '#F5F5F5',
-      thumbBorder: '#D1D1D1',
-    },
+  active: {
+    track: colors.white,
+    fill: colors.skyBlue,
+    thumb: colors.white,
+    thumbBorder: colors.skyBlue,
   },
-  dark: {
-    active: {
-      track: colors.neutral.white,
-      fill: colors.primary.blue,
-      thumb: colors.neutral.white,
-      thumbBorder: colors.primary.blue,
-    },
-    disabled: {
-      track: '#3D3D47',
-      fill: '#5A5A62',
-      thumb: '#5A5A62',
-      thumbBorder: '#5A5A62',
-    },
+  disabled: {
+    track: '#3D3D47',
+    fill: '#5A5A62',
+    thumb: '#5A5A62',
+    thumbBorder: '#5A5A62',
   },
 };
 

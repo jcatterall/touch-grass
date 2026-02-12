@@ -23,7 +23,6 @@ import Animated, {
 import {
   PaginationSizes,
   PaginationColorSchemes,
-  type ColorMode,
   type PaginationVariant,
 } from '../theme/theme';
 
@@ -32,7 +31,6 @@ export interface PaginationProps<T> {
   animValue: SharedValue<number>;
   activeColor?: 'blue' | 'orange';
   variant?: PaginationVariant;
-  mode?: ColorMode;
   onPageChange?: (index: number) => void;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -53,20 +51,13 @@ const PaginationDot: React.FC<PaginationDotProps> = ({
   inactiveColor,
   variant,
 }) => {
-  const sizes = variant === 'dots' ? PaginationSizes.dot : PaginationSizes.bar;
-  const inactiveWidth =
-    variant === 'dots'
-      ? sizes.size
-      : (sizes as typeof PaginationSizes.bar).inactiveWidth;
-  const activeWidth = sizes.activeWidth;
-  const height =
-    variant === 'dots'
-      ? sizes.size
-      : (sizes as typeof PaginationSizes.bar).height;
-  const borderRadius =
-    variant === 'dots'
-      ? sizes.size / 2
-      : (sizes as typeof PaginationSizes.bar).borderRadius;
+  const isDots = variant === 'dots';
+  const dotSizes = PaginationSizes.dot;
+  const barSizes = PaginationSizes.bar;
+  const inactiveWidth = isDots ? dotSizes.size : barSizes.inactiveWidth;
+  const activeWidth = isDots ? dotSizes.activeWidth : barSizes.activeWidth;
+  const height = isDots ? dotSizes.size : barSizes.height;
+  const borderRadius = isDots ? dotSizes.size / 2 : barSizes.borderRadius;
 
   const animatedStyle = useAnimatedStyle(() => {
     const inputRange = [index - 1, index, index + 1];
@@ -107,22 +98,17 @@ export function Pagination<T>({
   animValue,
   activeColor = 'blue',
   variant = 'dots',
-  mode = 'light',
   onPageChange,
   style,
   testID,
 }: PaginationProps<T>): React.ReactElement {
-  const colorScheme = PaginationColorSchemes[mode];
-  const activeColorValue = colorScheme.active[activeColor];
-  const inactiveColorValue = colorScheme.inactive;
+  const activeColorValue = PaginationColorSchemes.active[activeColor];
+  const inactiveColorValue = PaginationColorSchemes.inactive;
   const spacing =
     variant === 'dots'
       ? PaginationSizes.dot.spacing
       : PaginationSizes.bar.spacing;
 
-  // Keep a React-visible current page in sync with the animated value without
-  // reading `animValue.value` during render. Updates come from a worklet
-  // via `useAnimatedReaction` and `runOnJS`.
   const [currentPage, setCurrentPage] = useState<number>(0);
 
   useAnimatedReaction(

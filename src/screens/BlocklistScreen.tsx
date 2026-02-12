@@ -97,7 +97,6 @@ export const BlocklistScreen = ({
         <View style={styles.appLeft}>
           <Image source={{ uri: app.icon }} style={styles.appIconImage} />
           <Typography
-            mode="dark"
             variant="subtitle"
             style={styles.appName}
             numberOfLines={1}
@@ -106,9 +105,9 @@ export const BlocklistScreen = ({
           </Typography>
         </View>
         {isSelected ? (
-          <CheckSquare size={24} color={colors.neutral.white} />
+          <CheckSquare size={24} color={colors.white} />
         ) : (
-          <Square size={24} color={colors.neutral.gray300} />
+          <Square size={24} color={colors.oatmeal} />
         )}
       </Pressable>
     );
@@ -122,7 +121,7 @@ export const BlocklistScreen = ({
             onPress={onClose}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <ArrowLeft size={24} color={colors.neutral.white} />
+            <ArrowLeft size={24} color={colors.white} />
           </Pressable>
           {isSearchVisible ? (
             <TextInput
@@ -130,14 +129,14 @@ export const BlocklistScreen = ({
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search apps..."
-              placeholderTextColor={colors.dark.textSecondary}
+              placeholderTextColor={colors.white}
               autoFocus
               onBlur={() => {
                 if (!searchQuery) setIsSearchVisible(false);
               }}
             />
           ) : (
-            <Typography mode="dark" variant="title" style={styles.title}>
+            <Typography variant="title" style={styles.title}>
               Blocklist
             </Typography>
           )}
@@ -146,24 +145,22 @@ export const BlocklistScreen = ({
               onPress={() => setSearchQuery('')}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <X size={24} color={colors.neutral.white} />
+              <X size={24} color={colors.white} />
             </Pressable>
           ) : (
             <Pressable
               onPress={() => setIsSearchVisible(!isSearchVisible)}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Search size={24} color={colors.neutral.white} />
+              <Search size={24} color={colors.white} />
             </Pressable>
           )}
         </View>
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary.blue} />
-            <Typography mode="dark" variant="body" color="secondary">
-              Loading apps...
-            </Typography>
+            <ActivityIndicator size="large" color={colors.skyBlue} />
+            <Typography variant="body">Loading apps...</Typography>
           </View>
         ) : (
           <FlatList
@@ -175,7 +172,7 @@ export const BlocklistScreen = ({
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Typography mode="dark" variant="subtitle">
+                <Typography variant="subtitle">
                   {searchQuery ? 'No apps found' : 'No apps available'}
                 </Typography>
               </View>
@@ -195,7 +192,7 @@ export const BlocklistScreen = ({
 
 const styles = StyleSheet.create({
   main: {
-    backgroundColor: colors.dark.cardBackground,
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
@@ -216,8 +213,8 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: colors.dark.textSecondary,
-    color: colors.dark.textPrimary,
+    borderBottomColor: colors.white,
+    color: colors.white,
     ...textStyles.body,
   },
   list: {

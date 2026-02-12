@@ -68,10 +68,10 @@ export const Why = ({ onComplete }: WhyProps) => {
     ({ item }: ListRenderItemInfo<CarouselItem>) => {
       return (
         <View style={styles.onboardingItem}>
-          <Typography mode="dark" variant="heading" center>
+          <Typography variant="heading" center>
             {item.title}
           </Typography>
-          <Typography mode="dark" variant="subtitle" color="secondary" center>
+          <Typography variant="subtitle" center>
             {item.subTitle}
           </Typography>
           <View style={styles.imageContainer}>

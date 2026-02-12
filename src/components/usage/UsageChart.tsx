@@ -37,7 +37,7 @@ const AnimatedBar = ({ targetHeight, index, isToday }: AnimatedBarProps) => {
 
   const animatedStyle = useAnimatedStyle(() => ({
     height: height.value,
-    backgroundColor: isToday ? colors.primary.blue : 'rgba(48, 149, 255, 0.7)',
+    backgroundColor: isToday ? colors.skyBlue : 'rgba(48, 149, 255, 0.7)',
   }));
 
   return <Animated.View style={[styles.bar, animatedStyle]} />;
@@ -83,18 +83,11 @@ export const UsageChart = ({ data }: { data: DailyUsage[] }) => {
                 />
               </View>
               <View style={styles.labelContainer}>
-                <Typography
-                  mode="dark"
-                  variant="body"
-                  color="secondary"
-                  style={styles.dayText}
-                >
+                <Typography variant="body" style={styles.dayText}>
                   {day.day}
                 </Typography>
                 <Typography
-                  mode="dark"
                   variant="body"
-                  color="secondary"
                   numberOfLines={1}
                   style={styles.timeText}
                 >
@@ -163,7 +156,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     fontWeight: '700',
-    color: colors.neutral.white,
+    color: colors.white,
     minWidth: 48,
   },
 });

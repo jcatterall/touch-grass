@@ -49,7 +49,7 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
     <OnboardingContainer>
       <View style={{ ...styles.item, gap: spacing.xxxxl }}>
         <View style={styles.header}>
-          <Typography mode="dark" variant="heading" center>
+          <Typography variant="heading" center>
             How much time do you spend on your phone every day?
           </Typography>
         </View>
@@ -62,7 +62,6 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
           </View>
           <View>
             <Slider
-              mode="light"
               min={1}
               max={12}
               value={currentUsage}
@@ -70,12 +69,8 @@ export const Usage = ({ usage = 1, onComplete, setUsage }: UsageProps) => {
               showValue={false}
             />
             <View style={styles.sliderLabels}>
-              <Typography mode="dark" variant="subtitle">
-                1
-              </Typography>
-              <Typography mode="dark" variant="subtitle">
-                12+
-              </Typography>
+              <Typography variant="subtitle">1</Typography>
+              <Typography variant="subtitle">12+</Typography>
             </View>
           </View>
         </View>

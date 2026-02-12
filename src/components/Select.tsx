@@ -12,7 +12,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { type ColorMode, type SelectVariant } from '../theme/theme';
+import { type SelectVariant } from '../theme/theme';
 import { SelectionRow, type SelectionRowProps } from './SelectionRow';
 
 export interface SelectOption {
@@ -36,7 +36,6 @@ export interface SelectProps {
   multiSelect?: boolean;
   onValueChange: (value: (string | number) | (string | number)[]) => void;
   variant?: SelectVariant;
-  mode?: ColorMode;
   hapticEnabled?: boolean;
   itemGap?: number;
   renderItem?: (props: CustomRenderItemProps) => React.ReactElement;
@@ -53,7 +52,6 @@ export const Select: React.FC<SelectProps> = ({
   multiSelect = false,
   onValueChange,
   variant = 'blue',
-  mode = 'light',
   hapticEnabled = true,
   itemGap = 12,
   renderItem: customRenderItem,
@@ -99,7 +97,6 @@ export const Select: React.FC<SelectProps> = ({
         isSelected: itemIsSelected,
         multiSelect,
         variant,
-        mode,
         disabled: itemDisabled,
         hapticEnabled,
         testID: testID ? `${testID}-item-${index}` : undefined,
@@ -118,7 +115,7 @@ export const Select: React.FC<SelectProps> = ({
 
       return <SelectionRow {...defaultRowProps} onPress={handleSelect} />;
     },
-    [selectedValues, disabled, multiSelect, variant, mode, hapticEnabled, testID, customRenderItem, handleSelect],
+    [selectedValues, disabled, multiSelect, variant, hapticEnabled, testID, customRenderItem, handleSelect],
   );
 
   const ItemSeparator = useCallback(() => <View style={{ height: itemGap }} />, [itemGap]);

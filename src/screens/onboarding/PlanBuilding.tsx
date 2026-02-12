@@ -41,11 +41,11 @@ export const PlanBuilding = ({ onComplete }: PlanBuildingProps) => {
 
   useEffect(() => {
     progress.value = withSequence(
-      withTiming(0.75, { duration: 7000, easing: Easing.out(Easing.quad) }),
-      withTiming(0.97, { duration: 7000, easing: Easing.out(Easing.exp) }),
-      withTiming(1, { duration: 500, easing: Easing.out(Easing.quad) }),
+      withTiming(0.75, { duration: 5600, easing: Easing.out(Easing.quad) }),
+      withTiming(0.97, { duration: 5600, easing: Easing.out(Easing.exp) }),
+      withTiming(1, { duration: 400, easing: Easing.out(Easing.quad) }),
     );
-    const t = setTimeout(onComplete, 16000);
+    const t = setTimeout(onComplete, 12800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -64,7 +64,7 @@ export const PlanBuilding = ({ onComplete }: PlanBuildingProps) => {
               cx={HALF}
               cy={HALF}
               r={R}
-              stroke={colors.neutral20}
+              stroke={colors.white}
               strokeWidth={STROKE}
               fill="none"
             />
@@ -73,7 +73,7 @@ export const PlanBuilding = ({ onComplete }: PlanBuildingProps) => {
                 cx={HALF}
                 cy={HALF}
                 r={R}
-                stroke={colors.primary60}
+                stroke={colors.terracotta}
                 strokeWidth={STROKE}
                 fill="none"
                 strokeLinecap="round"
@@ -87,7 +87,7 @@ export const PlanBuilding = ({ onComplete }: PlanBuildingProps) => {
           </View>
         </View>
 
-        <Typography mode="dark" variant="heading" style={styles.title}>
+        <Typography variant="heading" style={styles.title}>
           Creating Your Plan
         </Typography>
 
@@ -95,15 +95,15 @@ export const PlanBuilding = ({ onComplete }: PlanBuildingProps) => {
           {STEPS.map((label, i) => (
             <Animated.View
               key={i}
-              entering={FadeIn.delay(i * 3000 + 1000).duration(500)}
+              entering={FadeIn.delay(i * 2400 + 800).duration(400)}
               style={styles.row}
             >
               <CircleCheck
                 size={20}
-                color={colors.neutral.white}
-                stroke={colors.neutral.white}
+                color={colors.white}
+                stroke={colors.white}
               />
-              <Typography mode="dark" variant="body" style={styles.label}>
+              <Typography variant="body" style={styles.label}>
                 {label}
               </Typography>
             </Animated.View>

@@ -60,7 +60,7 @@ export const SegmentedControl = ({
 const styles = StyleSheet.create({
   segmentedContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.neutral.gray200,
+    backgroundColor: colors.charcoal,
     borderRadius: borderRadius.pill,
     padding: 2,
     alignSelf: 'flex-start',
@@ -80,18 +80,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   segmentedOptionSelected: {
-    backgroundColor: colors.primary.blue,
+    backgroundColor: colors.skyBlue,
   },
   segmentedText: {
     fontSize: 15,
     fontWeight: '500',
-    color: colors.text.secondary,
+    color: colors.oatmeal,
   },
   segmentedTextSm: {
     fontSize: 13,
   },
   segmentedTextSelected: {
-    color: colors.neutral.black,
+    color: colors.black,
     fontWeight: '600',
   },
 });

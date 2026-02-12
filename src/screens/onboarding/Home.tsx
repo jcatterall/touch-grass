@@ -19,10 +19,10 @@ export const Home = ({ onComplete }: PlanProps) => {
         <Illustration source="flag" size="lg" />
       </View>
       <View style={styles.center}>
-        <Typography mode="dark" variant="heading" center>
+        <Typography variant="heading" center>
           Less scrolling. More living.
         </Typography>
-        <Typography mode="dark" variant="subtitle" center>
+        <Typography variant="subtitle" center>
           Break free from screen addiction by making you earn your app time with
           real movement.
         </Typography>
@@ -31,7 +31,7 @@ export const Home = ({ onComplete }: PlanProps) => {
       <View style={styles.spacer} />
 
       <View style={styles.bottom}>
-        <Typography mode="dark" variant="body" color="secondary" center>
+        <Typography variant="body" center>
           Takes less than 2 minutes to set up
         </Typography>
         <Button size="lg" onPress={handleContinue}>

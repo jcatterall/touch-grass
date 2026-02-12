@@ -14,11 +14,11 @@ import { Typography } from '../../../components';
 import { usageStyles, bigNumberColors } from './Usage.styles';
 import { ArrowDown, ArrowUp } from 'lucide-react-native';
 
-const ANIMATION_CONFIG = {
-  duration: 500,
-  easing: Easing.bezier(0.4, 0.0, 0.2, 1),
-};
+const BAR_GROW_DURATION = 600;
+const BAR_GROW_EASING = Easing.bezier(0.4, 0.0, 0.2, 1);
 const BAR_HEIGHT = 100;
+const BAR_BASE_DELAY = 400;
+const BAR_STAGGER = 200;
 
 interface AnimatedBarProps {
   heightPercent: number;
@@ -33,15 +33,20 @@ const AnimatedComparisonBar = ({
   backgroundColor,
   borderTopColor,
 }: AnimatedBarProps) => {
+  const clampedPercent = Math.max(heightPercent, 15);
+  const targetHeight = (clampedPercent / 100) * BAR_HEIGHT;
   const height = useSharedValue(0);
 
   useEffect(() => {
-    const targetHeight = (heightPercent / 100) * BAR_HEIGHT;
+    height.value = 0;
     height.value = withDelay(
-      index * 150,
-      withTiming(targetHeight, ANIMATION_CONFIG),
+      BAR_BASE_DELAY + index * BAR_STAGGER,
+      withTiming(targetHeight, {
+        duration: BAR_GROW_DURATION,
+        easing: BAR_GROW_EASING,
+      }),
     );
-  }, [heightPercent, index, height]);
+  }, [targetHeight, index, height]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     height: height.value,
@@ -88,10 +93,10 @@ export const UsageActual = ({ usage, average }: UsageActualProps) => {
       style={usageStyles.slidePage}
     >
       <View style={usageStyles.slideHeader}>
-        <Typography mode="dark" variant="heading" center>
+        <Typography variant="heading" center>
           {title}
         </Typography>
-        <Typography mode="dark" variant="subtitle" color="secondary" center>
+        <Typography variant="subtitle" center>
           {subtitle}
         </Typography>
       </View>
@@ -103,7 +108,7 @@ export const UsageActual = ({ usage, average }: UsageActualProps) => {
         <View style={[styles.iconCircle, { backgroundColor: color }]}>
           <Icon stroke={colors.white} size={32} />
         </View>
-        <Typography mode="dark" style={textStyles.heading}>
+        <Typography style={textStyles.heading}>
           {formatTime(average.hours, average.minutes)}
         </Typography>
         <Text style={[styles.percentText, { color }]}>
@@ -117,8 +122,8 @@ export const UsageActual = ({ usage, average }: UsageActualProps) => {
             <AnimatedComparisonBar
               heightPercent={(usage / max) * 100}
               index={0}
-              backgroundColor={colors.dark50}
-              borderTopColor={colors.white}
+              backgroundColor={colors.meadowGreen}
+              borderTopColor={colors.meadowGreen}
             />
           </View>
           <View style={styles.barWrapper}>
@@ -135,20 +140,14 @@ export const UsageActual = ({ usage, average }: UsageActualProps) => {
           style={styles.labelsRow}
         >
           <View>
-            <Typography mode="dark" variant="subtitle">
-              {usage}h 0m
-            </Typography>
-            <Typography mode="dark" variant="body" color="secondary">
-              Your guess
-            </Typography>
+            <Typography variant="subtitle">{usage}h 0m</Typography>
+            <Typography variant="body">Your guess</Typography>
           </View>
           <View style={styles.labelRight}>
-            <Typography mode="dark" variant="subtitle" style={{ color }}>
+            <Typography variant="subtitle" style={{ color }}>
               {formatTime(average.hours, average.minutes)}
             </Typography>
-            <Typography mode="dark" variant="body" color="secondary">
-              Last week avg.
-            </Typography>
+            <Typography variant="body">Last week avg.</Typography>
           </View>
         </Animated.View>
       </View>
@@ -171,7 +170,7 @@ const styles = StyleSheet.create({
   barWrapper: {
     flex: 1,
     height: 100,
-    backgroundColor: colors.dark70,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 8,
     justifyContent: 'flex-end',
     overflow: 'hidden',
@@ -179,7 +178,7 @@ const styles = StyleSheet.create({
   bar: {
     width: '100%',
     borderRadius: 8,
-    backgroundColor: colors.dark50,
+    backgroundColor: colors.skyBlue,
     borderTopWidth: 3,
   },
   labelsRow: { flexDirection: 'row', justifyContent: 'space-between' },

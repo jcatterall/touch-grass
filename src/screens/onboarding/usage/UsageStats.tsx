@@ -25,15 +25,13 @@ export const UsageStatsPage = ({
 }: UsageStatsProps) => (
   <View style={styles.content}>
     <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
-      <Typography mode="dark" variant="subtitle" color="primary">
+      <Typography variant="subtitle" color="primary">
         Your current screen time
       </Typography>
-      <Typography mode="dark" variant="heading">
+      <Typography variant="heading">
         {average.hours}h {average.minutes}m
       </Typography>
-      <Typography mode="dark" variant="body" color="secondary">
-        Last week avg.
-      </Typography>
+      <Typography variant="body">Last week avg.</Typography>
     </Animated.View>
     <Animated.View entering={FadeInUp.delay(0).duration(400)}>
       <UsageChart data={weeklyData} />

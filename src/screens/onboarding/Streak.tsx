@@ -14,7 +14,7 @@ export const Streak = ({ onComplete }: StreakProps) => (
   <OnboardingContainer>
     <View style={[onboardingStyles.marginTopXxxl, onboardingStyles.gapXxl]}>
       <Illustration source="calendar" size="xs" />
-      <Typography mode="dark" variant="heading" center>
+      <Typography variant="heading" center>
         Create a consistent daily routine
       </Typography>
       <DailyStreak currentStreak={1} isTodayComplete={true} />

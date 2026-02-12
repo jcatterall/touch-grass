@@ -25,7 +25,6 @@ import {
   DisabledColors,
   type ChipSize,
   type ChipVariant,
-  type ColorMode,
 } from '../theme/theme';
 
 export interface ChipProps {
@@ -33,7 +32,6 @@ export interface ChipProps {
   isSelected?: boolean;
   variant?: ChipVariant;
   size?: ChipSize;
-  mode?: ColorMode;
   leftIcon?: React.ReactNode;
   disabled?: boolean;
   hapticEnabled?: boolean;
@@ -50,7 +48,6 @@ export const Chip: React.FC<ChipProps> = ({
   isSelected = false,
   variant = 'blue',
   size = 'sm',
-  mode = 'light',
   leftIcon,
   disabled = false,
   hapticEnabled = true,
@@ -63,22 +60,22 @@ export const Chip: React.FC<ChipProps> = ({
 }) => {
   const { scaleAnim, handlePressIn, handlePressOut } = usePressAnimation();
 
-  const variantScheme = ChipColorSchemes[mode][variant];
+  const variantScheme = ChipColorSchemes[variant];
   const colorScheme = isSelected ? variantScheme.selected : variantScheme.unselected;
   const sizeConfig = ChipSizes[size];
   const hasBorder = variant === 'outline';
 
   const getBackgroundColor = (pressed: boolean): string => {
-    if (disabled) return DisabledColors[mode].background;
+    if (disabled) return DisabledColors.background;
     return pressed ? colorScheme.backgroundPressed : colorScheme.background;
   };
 
-  const textColor = disabled ? DisabledColors[mode].text : colorScheme.text;
+  const textColor = disabled ? DisabledColors.text : colorScheme.text;
 
   const getBorderStyle = (): ViewStyle | null => {
     if (!hasBorder) return null;
     const borderColor = disabled
-      ? DisabledColors[mode].border
+      ? DisabledColors.border
       : (colorScheme as { borderColor?: string }).borderColor ?? 'transparent';
     return { borderWidth: Borders.width.normal, borderColor };
   };

@@ -6,7 +6,7 @@ import { colors, spacing } from '../../../theme';
  */
 export const bigNumberColors = {
   green: colors.success,
-  red: colors.primary60,
+  red: colors.terracotta,
   terracotta: colors.terracotta,
 };
 

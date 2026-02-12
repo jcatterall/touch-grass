@@ -10,6 +10,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Typography } from '../../../components';
+import { colors } from '../../../theme';
 import {
   usageStyles,
   createBigNumberStyle,
@@ -54,11 +55,11 @@ export const UsageYearly = ({ average, yearsIn30 }: UsageYearlyProps) => {
       style={usageStyles.slidePage}
     >
       <View style={usageStyles.slideHeader}>
-        <Typography mode="dark" variant="title">
+        <Typography variant="title" style={{ color: colors.terracotta }}>
           {average.hours}h {average.minutes}m a day
         </Typography>
-        <Typography mode="dark" variant="heading" center>
-          In 30 years that adds up to
+        <Typography variant="heading" center>
+          In <Typography variant="heading" style={{ color: colors.terracotta }}>30 years</Typography> that adds up to
         </Typography>
       </View>
       <View style={usageStyles.centerContent}>
@@ -66,14 +67,10 @@ export const UsageYearly = ({ average, yearsIn30 }: UsageYearlyProps) => {
           {yearsIn30}
         </Animated.Text>
         <Animated.View entering={FadeInUp.delay(400).duration(300)}>
-          <Typography mode="dark" variant="heading">
-            YEARS
-          </Typography>
+          <Typography variant="heading">YEARS</Typography>
         </Animated.View>
         <Animated.View entering={FadeInUp.delay(500).duration(300)}>
-          <Typography mode="dark" variant="subtitle" color="secondary">
-            spent on your phone
-          </Typography>
+          <Typography variant="subtitle">spent on your phone</Typography>
         </Animated.View>
       </View>
     </Animated.View>

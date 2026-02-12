@@ -1,6 +1,6 @@
 /**
- * Headspace Design System - Theme Tokens
- * Production-ready design tokens for Button and Chip components
+ * Design System - Theme Tokens
+ * Production-ready design tokens for components (dark-mode only)
  */
 
 // =============================================================================
@@ -23,7 +23,6 @@ export const Colors = {
   black: '#000000',
 
   // Text Colors
-  textLight: '#2F2F2F',
   textDark: '#F5F5DC',
 
   // Danger/Error
@@ -118,118 +117,63 @@ export const Shadows = {
 } as const;
 
 // =============================================================================
-// DISABLED STATE COLORS (Consistent across components)
+// DISABLED STATE COLORS
 // =============================================================================
 
 export const DisabledColors = {
-  light: {
-    background: '#F0F0F0',
-    text: '#A0A0A0',
-    border: '#D1D1D1',
-    indicator: '#E0E0E0',
-  },
-  dark: {
-    background: '#2A2A32',
-    text: '#5A5A62',
-    border: '#3D3D47',
-    indicator: '#3D3D47',
-  },
+  background: '#2A2A32',
+  text: '#5A5A62',
+  border: '#3D3D47',
+  indicator: '#3D3D47',
 } as const;
 
 // =============================================================================
-// LIGHT & DARK MODE COLOR SCHEMES
+// COLOR SCHEMES (dark-mode only)
 // =============================================================================
 
 export const ColorSchemes = {
-  light: {
-    // Primary Button (Solid)
-    primary: {
-      background: Colors.skyBlue,
-      backgroundPressed: Colors.skyBluePressed,
-      backgroundDisabled: Colors.disabledBackground,
-      text: Colors.black,
-      textDisabled: Colors.disabled,
-    },
-    // Secondary Button (Toned/Filled Subtle)
-    secondary: {
-      background: 'rgba(79, 121, 66, 0.12)',
-      backgroundPressed: 'rgba(79, 121, 66, 0.20)',
-      backgroundDisabled: Colors.disabledBackground,
-      text: Colors.meadowGreen,
-      textDisabled: Colors.disabled,
-    },
-    // Tertiary Button (Outline/Ghost)
-    tertiary: {
-      background: 'transparent',
-      backgroundPressed: 'rgba(79, 121, 66, 0.08)',
-      backgroundDisabled: 'transparent',
-      borderColor: Colors.meadowGreen,
-      borderColorDisabled: Colors.disabled,
-      text: Colors.meadowGreen,
-      textDisabled: Colors.disabled,
-    },
-    // Danger Button
-    danger: {
-      background: Colors.danger,
-      backgroundPressed: Colors.dangerDark,
-      backgroundDisabled: Colors.disabledBackground,
-      text: Colors.white,
-      textDisabled: Colors.disabled,
-    },
-    // Link Button (text-only, no background)
-    link: {
-      background: 'transparent',
-      backgroundPressed: 'transparent',
-      backgroundDisabled: 'transparent',
-      text: Colors.meadowGreen,
-      textPressed: Colors.meadowGreenPressed,
-      textDisabled: Colors.disabled,
-    },
+  // Primary Button (Solid)
+  primary: {
+    background: Colors.skyBlue,
+    backgroundPressed: Colors.skyBluePressed,
+    backgroundDisabled: '#3D3D47',
+    text: Colors.black,
+    textDisabled: '#6B6B73',
   },
-  dark: {
-    // Primary Button (Solid)
-    primary: {
-      background: Colors.skyBlue,
-      backgroundPressed: Colors.skyBluePressed,
-      backgroundDisabled: '#3D3D47',
-      text: Colors.black,
-      textDisabled: '#6B6B73',
-    },
-    // Secondary Button (Toned/Filled Subtle)
-    secondary: {
-      background: '#4D4C4C',
-      backgroundPressed: 'rgba(79, 121, 66, 0.35)',
-      backgroundDisabled: '#3D3D47',
-      text: '#FFFFFF',
-      textDisabled: '#6B6B73',
-    },
-    // Tertiary Button (Outline/Ghost)
-    tertiary: {
-      background: 'transparent',
-      backgroundPressed: 'rgba(135, 206, 235, 0.15)',
-      backgroundDisabled: 'transparent',
-      borderColor: Colors.skyBlue,
-      borderColorDisabled: '#4D4D57',
-      text: Colors.skyBlue,
-      textDisabled: '#6B6B73',
-    },
-    // Danger Button
-    danger: {
-      background: Colors.danger,
-      backgroundPressed: Colors.dangerDark,
-      backgroundDisabled: '#3D3D47',
-      text: Colors.white,
-      textDisabled: '#6B6B73',
-    },
-    // Link Button (text-only, no background)
-    link: {
-      background: 'transparent',
-      backgroundPressed: 'transparent',
-      backgroundDisabled: 'transparent',
-      text: Colors.white,
-      textPressed: '#A8DAEF',
-      textDisabled: '#6B6B73',
-    },
+  // Secondary Button (Toned/Filled Subtle)
+  secondary: {
+    background: '#4D4C4C',
+    backgroundPressed: 'rgba(79, 121, 66, 0.35)',
+    backgroundDisabled: '#3D3D47',
+    text: '#FFFFFF',
+    textDisabled: '#6B6B73',
+  },
+  // Tertiary Button (Outline/Ghost)
+  tertiary: {
+    background: 'transparent',
+    backgroundPressed: 'rgba(135, 206, 235, 0.15)',
+    backgroundDisabled: 'transparent',
+    borderColor: Colors.skyBlue,
+    borderColorDisabled: '#4D4D57',
+    text: Colors.skyBlue,
+    textDisabled: '#6B6B73',
+  },
+  // Danger Button
+  danger: {
+    background: Colors.danger,
+    backgroundPressed: Colors.dangerDark,
+    backgroundDisabled: '#3D3D47',
+    text: Colors.white,
+    textDisabled: '#6B6B73',
+  },
+  // Link Button (text-only, no background)
+  link: {
+    background: 'transparent',
+    backgroundPressed: 'transparent',
+    backgroundDisabled: 'transparent',
+    text: Colors.white,
+    textPressed: '#A8DAEF',
+    textDisabled: '#6B6B73',
   },
 } as const;
 
@@ -326,94 +270,49 @@ export const ChipSizes = {
 } as const;
 
 // =============================================================================
-// CHIP COLOR SCHEMES
+// CHIP COLOR SCHEMES (dark-mode only)
 // =============================================================================
 
 export const ChipColorSchemes = {
-  light: {
-    // Blue variant (Meadow Green when selected)
-    blue: {
-      selected: {
-        background: Colors.meadowGreen,
-        backgroundPressed: Colors.meadowGreenPressed,
-        text: Colors.white,
-      },
-      unselected: {
-        background: '#F7F7F7',
-        backgroundPressed: '#EBEBEB',
-        text: Colors.charcoal,
-      },
+  // Blue variant
+  blue: {
+    selected: {
+      background: Colors.meadowGreen,
+      backgroundPressed: Colors.meadowGreenPressed,
+      text: Colors.white,
     },
-    // Orange variant (Terracotta when selected)
-    orange: {
-      selected: {
-        background: Colors.terracotta,
-        backgroundPressed: Colors.terracottaPressed,
-        text: Colors.white,
-      },
-      unselected: {
-        background: '#F7F7F7',
-        backgroundPressed: '#EBEBEB',
-        text: Colors.charcoal,
-      },
-    },
-    // Outline variant (bordered style)
-    outline: {
-      selected: {
-        background: 'rgba(79, 121, 66, 0.08)',
-        backgroundPressed: 'rgba(79, 121, 66, 0.15)',
-        text: Colors.meadowGreen,
-        borderColor: Colors.meadowGreen,
-      },
-      unselected: {
-        background: 'transparent',
-        backgroundPressed: 'rgba(0, 0, 0, 0.04)',
-        text: Colors.charcoal,
-        borderColor: '#D1D1D1',
-      },
+    unselected: {
+      background: 'rgba(255, 255, 255, 0.08)',
+      backgroundPressed: 'rgba(255, 255, 255, 0.12)',
+      text: Colors.oatmeal,
     },
   },
-  dark: {
-    // Blue variant
-    blue: {
-      selected: {
-        background: Colors.meadowGreen,
-        backgroundPressed: Colors.meadowGreenPressed,
-        text: Colors.white,
-      },
-      unselected: {
-        background: 'rgba(255, 255, 255, 0.08)',
-        backgroundPressed: 'rgba(255, 255, 255, 0.12)',
-        text: Colors.oatmeal,
-      },
+  // Orange variant
+  orange: {
+    selected: {
+      background: Colors.terracotta,
+      backgroundPressed: Colors.terracottaPressed,
+      text: Colors.white,
     },
-    // Orange variant
-    orange: {
-      selected: {
-        background: Colors.terracotta,
-        backgroundPressed: Colors.terracottaPressed,
-        text: Colors.white,
-      },
-      unselected: {
-        background: 'rgba(255, 255, 255, 0.08)',
-        backgroundPressed: 'rgba(255, 255, 255, 0.12)',
-        text: Colors.oatmeal,
-      },
+    unselected: {
+      background: 'rgba(255, 255, 255, 0.08)',
+      backgroundPressed: 'rgba(255, 255, 255, 0.12)',
+      text: Colors.oatmeal,
     },
-    // Outline variant
-    outline: {
-      selected: {
-        background: 'rgba(135, 206, 235, 0.20)',
-        backgroundPressed: 'rgba(135, 206, 235, 0.30)',
-        text: Colors.skyBlue,
-        borderColor: Colors.skyBlue,
-      },
-      unselected: {
-        background: 'transparent',
-        backgroundPressed: 'rgba(255, 255, 255, 0.08)',
-        text: '#B0B0B0',
-        borderColor: '#4D4D57',
-      },
+  },
+  // Outline variant
+  outline: {
+    selected: {
+      background: 'rgba(135, 206, 235, 0.20)',
+      backgroundPressed: 'rgba(135, 206, 235, 0.30)',
+      text: Colors.skyBlue,
+      borderColor: Colors.skyBlue,
+    },
+    unselected: {
+      background: 'transparent',
+      backgroundPressed: 'rgba(255, 255, 255, 0.08)',
+      text: '#B0B0B0',
+      borderColor: '#4D4D57',
     },
   },
 } as const;
@@ -430,7 +329,6 @@ export type ButtonVariant =
   | 'link';
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 export type ButtonShape = 'pill' | 'rounded';
-export type ColorMode = 'light' | 'dark';
 
 // Chip Types
 export type ChipVariant = 'blue' | 'orange' | 'outline';
@@ -440,7 +338,7 @@ export type ChipSize = 'sm' | 'md';
 export type SelectVariant = 'blue' | 'orange';
 
 // =============================================================================
-// TOGGLE SIZES & TOKENS (Headspace Style)
+// TOGGLE SIZES & TOKENS
 // =============================================================================
 
 export const ToggleSizes = {
@@ -456,33 +354,17 @@ export const ToggleSizes = {
 } as const;
 
 export const ToggleColorSchemes = {
-  light: {
-    on: {
-      track: Colors.meadowGreen,
-      thumb: '#FFFFFF',
-    },
-    off: {
-      track: '#EAEAEA',
-      thumb: '#FFFFFF',
-    },
-    disabled: {
-      track: '#D1D1D1',
-      thumb: '#F5F5F5',
-    },
+  on: {
+    track: Colors.meadowGreen,
+    thumb: '#FFFFFF',
   },
-  dark: {
-    on: {
-      track: Colors.meadowGreen,
-      thumb: '#FFFFFF',
-    },
-    off: {
-      track: '#4A4A54',
-      thumb: '#E0E0E0',
-    },
-    disabled: {
-      track: '#3D3D47',
-      thumb: '#5A5A62',
-    },
+  off: {
+    track: '#4A4A54',
+    thumb: '#E0E0E0',
+  },
+  disabled: {
+    track: '#3D3D47',
+    thumb: '#5A5A62',
   },
 } as const;
 
@@ -510,90 +392,50 @@ export const SelectSizes = {
 } as const;
 
 // =============================================================================
-// SELECT COLOR SCHEMES
+// SELECT COLOR SCHEMES (dark-mode only)
 // =============================================================================
 
 export const SelectColorSchemes = {
-  light: {
-    blue: {
-      selected: {
-        background: 'rgba(79, 121, 66, 0.08)',
-        backgroundPressed: 'rgba(79, 121, 66, 0.15)',
-        borderColor: Colors.meadowGreen,
-        text: Colors.charcoal,
-        indicator: Colors.meadowGreen,
-        checkIcon: Colors.white,
-      },
-      unselected: {
-        background: '#F7F7F7',
-        backgroundPressed: '#EBEBEB',
-        borderColor: 'transparent',
-        text: Colors.charcoal,
-        indicator: '#D1D1D1',
-        checkIcon: 'transparent',
-      },
+  blue: {
+    selected: {
+      background: 'rgba(135, 206, 235, 0.20)',
+      backgroundPressed: 'rgba(135, 206, 235, 0.30)',
+      borderColor: Colors.skyBlue,
+      text: '#FFFFFF',
+      indicator: Colors.skyBlue,
+      checkIcon: Colors.charcoal,
     },
-    orange: {
-      selected: {
-        background: 'rgba(226, 114, 91, 0.08)',
-        backgroundPressed: 'rgba(226, 114, 91, 0.15)',
-        borderColor: Colors.terracotta,
-        text: Colors.charcoal,
-        indicator: Colors.terracotta,
-        checkIcon: Colors.white,
-      },
-      unselected: {
-        background: '#F7F7F7',
-        backgroundPressed: '#EBEBEB',
-        borderColor: 'transparent',
-        text: Colors.charcoal,
-        indicator: '#D1D1D1',
-        checkIcon: 'transparent',
-      },
+    unselected: {
+      background: 'rgba(255, 255, 255, 0.08)',
+      backgroundPressed: 'rgba(255, 255, 255, 0.12)',
+      borderColor: 'rgba(255, 255, 255, 0.12)',
+      text: '#E0E0E0',
+      indicator: '#6B6B73',
+      checkIcon: 'transparent',
     },
   },
-  dark: {
-    blue: {
-      selected: {
-        background: 'rgba(135, 206, 235, 0.20)',
-        backgroundPressed: 'rgba(135, 206, 235, 0.30)',
-        borderColor: Colors.skyBlue,
-        text: '#FFFFFF',
-        indicator: Colors.skyBlue,
-        checkIcon: Colors.charcoal,
-      },
-      unselected: {
-        background: 'rgba(255, 255, 255, 0.08)',
-        backgroundPressed: 'rgba(255, 255, 255, 0.12)',
-        borderColor: 'rgba(255, 255, 255, 0.12)',
-        text: '#E0E0E0',
-        indicator: '#6B6B73',
-        checkIcon: 'transparent',
-      },
+  orange: {
+    selected: {
+      background: 'rgba(226, 114, 91, 0.25)',
+      backgroundPressed: 'rgba(226, 114, 91, 0.35)',
+      borderColor: Colors.terracotta,
+      text: '#FFFFFF',
+      indicator: Colors.terracotta,
+      checkIcon: Colors.white,
     },
-    orange: {
-      selected: {
-        background: 'rgba(226, 114, 91, 0.25)',
-        backgroundPressed: 'rgba(226, 114, 91, 0.35)',
-        borderColor: Colors.terracotta,
-        text: '#FFFFFF',
-        indicator: Colors.terracotta,
-        checkIcon: Colors.white,
-      },
-      unselected: {
-        background: 'rgba(255, 255, 255, 0.08)',
-        backgroundPressed: 'rgba(255, 255, 255, 0.12)',
-        borderColor: 'rgba(255, 255, 255, 0.12)',
-        text: '#E0E0E0',
-        indicator: '#6B6B73',
-        checkIcon: 'transparent',
-      },
+    unselected: {
+      background: 'rgba(255, 255, 255, 0.08)',
+      backgroundPressed: 'rgba(255, 255, 255, 0.12)',
+      borderColor: 'rgba(255, 255, 255, 0.12)',
+      text: '#E0E0E0',
+      indicator: '#6B6B73',
+      checkIcon: 'transparent',
     },
   },
 } as const;
 
 // =============================================================================
-// TOOLTIP TOKENS (Headspace Style)
+// TOOLTIP TOKENS
 // =============================================================================
 
 export const TooltipSizes = {
@@ -606,31 +448,19 @@ export const TooltipSizes = {
   fontWeight: '500' as const,
   maxWidth: 240,
   arrow: {
-    size: 8, // Triangle height
-    offset: 12, // Distance from edge for arrow positioning
+    size: 8,
+    offset: 12,
   },
 } as const;
 
 export const TooltipColorSchemes = {
-  light: {
-    charcoal: {
-      background: Colors.charcoal, // #2D2E36
-      text: Colors.white,
-    },
-    navy: {
-      background: '#1F1F33',
-      text: Colors.white,
-    },
+  charcoal: {
+    background: '#3D3D47',
+    text: Colors.white,
   },
-  dark: {
-    charcoal: {
-      background: '#3D3D47',
-      text: Colors.white,
-    },
-    navy: {
-      background: '#2A2A44',
-      text: Colors.white,
-    },
+  navy: {
+    background: '#2A2A44',
+    text: Colors.white,
   },
 } as const;
 
@@ -651,13 +481,13 @@ export type TooltipPosition = 'top' | 'bottom' | 'left' | 'right';
 export type PaginationVariant = 'dots' | 'bars';
 
 // =============================================================================
-// PAGINATION TOKENS (Headspace Style)
+// PAGINATION TOKENS
 // =============================================================================
 
 export const PaginationSizes = {
   dot: {
     size: 8,
-    activeWidth: 24, // Expanded pill width for active state
+    activeWidth: 24,
     spacing: 8,
   },
   bar: {
@@ -670,19 +500,10 @@ export const PaginationSizes = {
 } as const;
 
 export const PaginationColorSchemes = {
-  light: {
-    inactive: '#EAEAEA',
-    active: {
-      blue: Colors.skyBlue,
-      orange: Colors.terracotta,
-    },
-  },
-  dark: {
-    inactive: '#4A4A54',
-    active: {
-      blue: Colors.skyBlue,
-      orange: Colors.terracotta,
-    },
+  inactive: '#4A4A54',
+  active: {
+    blue: Colors.skyBlue,
+    orange: Colors.terracotta,
   },
 } as const;
 

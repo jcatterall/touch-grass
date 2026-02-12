@@ -23,7 +23,7 @@ export const AppIcon = ({ name, icon, label }: AppIconProps) => {
             style={appStyles.iconImage}
           />
         ) : (
-          <Typography mode="dark" variant="subtitle">
+          <Typography variant="subtitle">
             {name.charAt(0).toUpperCase()}
           </Typography>
         )}
@@ -31,7 +31,7 @@ export const AppIcon = ({ name, icon, label }: AppIconProps) => {
 
       {/* Label moved outside the container */}
       {label && (
-        <Typography mode="dark" variant="link" style={appStyles.label}>
+        <Typography variant="link" style={appStyles.label}>
           {label}
         </Typography>
       )}

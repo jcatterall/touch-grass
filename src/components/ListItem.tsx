@@ -13,10 +13,10 @@ export const ListItem = ({ value }: ListItemProps) => {
       <CircleCheck
         size={24}
         color={colors.white}
-        fill={colors.primary60}
+        fill={colors.terracotta}
         strokeWidth={2}
       />
-      <Typography mode="dark" variant="subtitle">
+      <Typography variant="subtitle">
         {value}
       </Typography>
     </View>

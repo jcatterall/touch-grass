@@ -30,7 +30,6 @@ import {
   TooltipSizes,
   TooltipColorSchemes,
   TooltipAnimation,
-  type ColorMode,
   type TooltipVariant,
   type TooltipPosition,
 } from '../theme/theme';
@@ -59,7 +58,6 @@ export interface TooltipProps {
   onClose: () => void;
   children: ReactNode;
   variant?: TooltipVariant;
-  mode?: ColorMode;
   tooltipStyle?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
   anchorAccessibilityHint?: string;
@@ -129,7 +127,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
   onClose,
   children,
   variant = 'charcoal',
-  mode = 'light',
   tooltipStyle,
   accessibilityLabel,
   anchorAccessibilityHint,
@@ -141,7 +138,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   const scale = useSharedValue(TooltipAnimation.initialScale);
   const opacity = useSharedValue(0);
-  const colorScheme = TooltipColorSchemes[mode][variant];
+  const colorScheme = TooltipColorSchemes[variant];
 
   const measureAnchor = useCallback(() => {
     anchorRef.current?.measureInWindow((x, y, width, height) => {

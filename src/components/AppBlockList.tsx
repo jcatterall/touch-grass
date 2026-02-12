@@ -24,18 +24,13 @@ export const AppBlockList = ({ apps, onEdit }: AppBlockListProps) => {
     <View>
       {hasApps && (
         <View style={styles.header}>
-          <Typography
-            mode="light"
-            variant="body"
-            color="inverse"
-            style={styles.sectionLabel}
-          >
+          <Typography variant="body" style={styles.sectionLabel}>
             Blocked Apps
           </Typography>
           <Button
             onPress={onEdit}
             variant="link"
-            textStyle={{ color: colors.neutral.white }}
+            textStyle={{ color: colors.white }}
           >
             Edit
           </Button>
@@ -49,9 +44,7 @@ export const AppBlockList = ({ apps, onEdit }: AppBlockListProps) => {
             ))}
             {hasRemaining && (
               <View style={styles.moreApps}>
-                <Typography mode="dark" variant="subtitle">
-                  {remainingCount}+
-                </Typography>
+                <Typography variant="subtitle">{remainingCount}+</Typography>
               </View>
             )}
           </View>
@@ -61,7 +54,7 @@ export const AppBlockList = ({ apps, onEdit }: AppBlockListProps) => {
           <Illustration source="chest" size="xxs" />
 
           <View>
-            <Button mode="dark" variant="secondary" onPress={onEdit}>
+            <Button variant="secondary" onPress={onEdit}>
               Choose blocked apps
             </Button>
           </View>

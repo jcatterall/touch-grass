@@ -59,13 +59,11 @@ export const UsageComparison = ({
             isReduced ? styles.barReduced : styles.barNormal,
           ]}
         >
-          <Typography mode="dark" style={styles.barValue} numberOfLines={1}>
+          <Typography style={styles.barValue} numberOfLines={1}>
             {suffix}
           </Typography>
         </Animated.View>
-        <Typography mode="dark" color="secondary" style={styles.barLabel}>
-          {label}
-        </Typography>
+        <Typography style={styles.barLabel}>{label}</Typography>
       </View>
     </View>
   );
@@ -80,7 +78,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.dark.cardBackground,
+    backgroundColor: colors.background,
     borderRadius: 8,
     overflow: 'hidden',
   },
@@ -97,12 +95,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#3478F6',
   },
   barValue: {
-    color: colors.dark.textPrimary,
+    color: colors.white,
     fontWeight: '700',
     fontSize: 16,
   },
   barLabel: {
-    color: colors.dark.textSecondary,
+    color: colors.white,
     fontSize: 14,
     marginLeft: spacing.sm,
     flex: 1,

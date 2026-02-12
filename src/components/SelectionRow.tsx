@@ -22,7 +22,6 @@ import {
   DisabledColors,
   SelectColorSchemes,
   SelectSizes,
-  type ColorMode,
   type SelectVariant,
 } from '../theme/theme';
 
@@ -59,7 +58,6 @@ export interface SelectionRowProps {
   isSelected: boolean;
   multiSelect?: boolean;
   variant?: SelectVariant;
-  mode?: ColorMode;
   disabled?: boolean;
   hapticEnabled?: boolean;
   onPress?: (value: string | number) => void;
@@ -75,7 +73,6 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
   isSelected,
   multiSelect = false,
   variant = 'blue',
-  mode = 'light',
   disabled = false,
   hapticEnabled = true,
   onPress,
@@ -86,17 +83,17 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
 }) => {
   const { scaleAnim, handlePressIn, handlePressOut } = usePressAnimation();
 
-  const variantScheme = SelectColorSchemes[mode][variant];
+  const variantScheme = SelectColorSchemes[variant];
   const colorScheme = isSelected
     ? variantScheme.selected
     : variantScheme.unselected;
 
   const getBackgroundColor = (pressed: boolean): string => {
-    if (disabled) return DisabledColors[mode].background;
+    if (disabled) return DisabledColors.background;
     return pressed ? colorScheme.backgroundPressed : colorScheme.background;
   };
 
-  const textColor = disabled ? DisabledColors[mode].text : colorScheme.text;
+  const textColor = disabled ? DisabledColors.text : colorScheme.text;
   const borderColor = disabled
     ? 'transparent'
     : isSelected
@@ -142,9 +139,9 @@ export const SelectionRow: React.FC<SelectionRowProps> = ({
     if (disabled) {
       return {
         ...baseStyle,
-        backgroundColor: DisabledColors[mode].indicator,
+        backgroundColor: DisabledColors.indicator,
         borderWidth: multiSelect && !isSelected ? Borders.width.medium : 0,
-        borderColor: DisabledColors[mode].border,
+        borderColor: DisabledColors.border,
       };
     }
 

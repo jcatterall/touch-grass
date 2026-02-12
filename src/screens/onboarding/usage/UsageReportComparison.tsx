@@ -26,10 +26,10 @@ export const UsageReportComparison = ({
 }: UsageReportComparisonProps) => (
   <Animated.View entering={FadeIn.duration(300)} style={{ ...styles.content }}>
     <View style={usageStyles.slideHeader}>
-      <Typography mode="dark" variant="heading" center>
+      <Typography variant="heading" center>
         We've got your back.{'\n'}Here's what's possible.
       </Typography>
-      <Typography mode="dark" variant="subtitle" color="secondary" center>
+      <Typography variant="subtitle" center>
         This is estimated based on our research
       </Typography>
     </View>
@@ -38,9 +38,7 @@ export const UsageReportComparison = ({
         entering={FadeInUp.delay(100).duration(400)}
         style={usageStyles.comparisonSection}
       >
-        <Typography mode="dark" variant="subtitle">
-          Time on phone
-        </Typography>
+        <Typography variant="subtitle">Time on phone</Typography>
         <View style={usageStyles.barsGroup}>
           <UsageComparison
             label="You"
@@ -63,9 +61,7 @@ export const UsageReportComparison = ({
         entering={FadeInUp.delay(300).duration(400)}
         style={usageStyles.comparisonSection}
       >
-        <Typography mode="dark" variant="subtitle">
-          Daily pickups
-        </Typography>
+        <Typography variant="subtitle">Daily pickups</Typography>
         <View style={usageStyles.barsGroup}>
           <UsageComparison
             label="You"

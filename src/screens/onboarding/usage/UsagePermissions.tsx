@@ -61,12 +61,12 @@ export const UsagePermissions = ({
             <View style={styles.imageContainer}>
               <Illustration source="clock" size="lg" />
             </View>
-            <Typography mode="dark" variant="title" center>
+            <Typography variant="title" center>
               Now, let's uncover your actual screen time
             </Typography>
           </View>
 
-          <Typography mode="dark" variant="subtitle" color="secondary" center>
+          <Typography variant="subtitle" center>
             If you give us the usage access permission, we'll show you how well
             you're staying focused
           </Typography>
@@ -78,7 +78,7 @@ export const UsagePermissions = ({
           Give permission
         </Button>
         <Pressable onPress={handleSkip}>
-          <Typography mode="dark" variant="body" color="secondary" center>
+          <Typography variant="body" center>
             Continue without report
           </Typography>
         </Pressable>

@@ -57,10 +57,10 @@ export const Notification = ({ onComplete }: NotificationProps) => {
         <View style={styles.item}>
           <Illustration source="shield" size="md" />
           <View style={styles.heading}>
-            <Typography mode="dark" variant="title" center>
+            <Typography variant="title" center>
               Stay focused, not distracted
             </Typography>
-            <Typography mode="dark" variant="subtitle" color="secondary" center>
+            <Typography variant="subtitle" center>
               Allow notification access so TouchGrass can mute alerts from
               blocked apps during your active plans
             </Typography>
@@ -72,7 +72,7 @@ export const Notification = ({ onComplete }: NotificationProps) => {
         <Button size="lg" onPress={handleNotification}>
           Continue
         </Button>
-        <Button mode="dark" variant="link" size="lg" onPress={handleContinue}>
+        <Button variant="link" size="lg" onPress={handleContinue}>
           Maybe later
         </Button>
       </View>

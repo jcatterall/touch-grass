@@ -42,10 +42,10 @@ export const UsageFirstWeek = () => {
       style={usageStyles.slidePage}
     >
       <View style={usageStyles.slideHeader}>
-        <Typography mode="dark" variant="heading" center>
+        <Typography variant="heading" center>
           Change starts faster than you think.
         </Typography>
-        <Typography mode="dark" variant="subtitle" color="secondary" center>
+        <Typography variant="subtitle" center>
           TouchGrass can help cut down the time on your phone by up to 32% in
           the first week of use.
         </Typography>

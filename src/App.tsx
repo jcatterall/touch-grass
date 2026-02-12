@@ -29,7 +29,7 @@ function App() {
     const loadData = storage.getOnboardingComplete();
 
     Promise.all([minDelay, loadData]).then(([, complete]) => {
-      setOnboardingComplete(complete);
+      setOnboardingComplete(false);
       setIsLoading(false);
     });
   }, []);
@@ -60,7 +60,7 @@ function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.cardBackground,
+    backgroundColor: colors.background,
   },
 });
 
