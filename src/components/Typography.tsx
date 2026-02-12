@@ -34,7 +34,7 @@ export const Typography: React.FC<TypographyProps> = ({
   children,
   variant = 'body',
   color = 'primary',
-  mode = 'light',
+  mode = 'dark',
   center = false,
   style,
   ...textProps

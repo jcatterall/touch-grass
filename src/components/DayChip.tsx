@@ -30,6 +30,7 @@ export const DayChip = ({
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
       >
         <Typography
+          mode="light"
           variant="body"
           style={[
             styles.dayChipText,
@@ -53,14 +54,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.pill,
     backgroundColor: colors.neutral.white,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.neutral.gray200,
     minWidth: 42,
     alignItems: 'center',
   },
   dayChipDark: {
-    backgroundColor: colors.dark70,
-    borderColor: colors.dark50,
+    backgroundColor: colors.dark.cardSecondary,
+    borderColor: colors.dark80,
   },
   dayChipSelected: {
     backgroundColor: colors.primary.blue,
@@ -69,10 +70,10 @@ const styles = StyleSheet.create({
   dayChipText: {
     fontSize: 15,
     fontWeight: '500',
-    color: colors.text.primary,
+    color: colors.neutral.white,
   },
   dayChipTextDark: {
-    color: colors.dark.textSecondary,
+    color: colors.neutral.white,
   },
   dayChipTextSelected: {
     color: colors.neutral.black,

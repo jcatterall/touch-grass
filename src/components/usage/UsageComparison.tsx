@@ -63,7 +63,7 @@ export const UsageComparison = ({
             {suffix}
           </Typography>
         </Animated.View>
-        <Typography mode="dark" style={styles.barLabel}>
+        <Typography mode="dark" color="secondary" style={styles.barLabel}>
           {label}
         </Typography>
       </View>

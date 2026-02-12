@@ -118,7 +118,7 @@ export const DailyStreak: React.FC<DailyStreakProps> = ({
           />
         ))}
       </View>
-      <Typography variant="body" center style={styles.caption}>
+      <Typography mode="light" variant="body" center style={styles.caption}>
         Build a streak, one day at a time
       </Typography>
     </View>

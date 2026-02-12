@@ -11,7 +11,7 @@ export const ListItem = ({ value }: ListItemProps) => {
   return (
     <View style={styles.container}>
       <CircleCheck
-        size={28}
+        size={24}
         color={colors.white}
         fill={colors.primary60}
         strokeWidth={2}

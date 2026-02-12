@@ -1,3 +1,7 @@
+## Notes
+- Week 1 retention: 30-40%
+
+
 Looking at these illustrations, here's the style breakdown and a Midjourney prompt template:
 
 Style Analysis

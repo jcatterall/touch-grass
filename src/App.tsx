@@ -34,13 +34,10 @@ function App() {
     });
   }, []);
 
-  const handleOnboardingComplete = useCallback(
-    async (data: OnboardingData) => {
-      await storage.saveOnboardingData(data);
-      setOnboardingComplete(true);
-    },
-    [],
-  );
+  const handleOnboardingComplete = useCallback(async (data: OnboardingData) => {
+    await storage.saveOnboardingData(data);
+    setOnboardingComplete(true);
+  }, []);
 
   if (isLoading) {
     return <Splash />;

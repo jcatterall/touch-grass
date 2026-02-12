@@ -27,7 +27,7 @@ const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web') {
     console.warn(`${title}: ${message}`);
   } else {
-    // Delay alert slightly to ensure activity is attached
+    // Delay alert slightly to ensure activity is atta<che>d
     setTimeout(() => {
       try {
         Alert.alert(title, message);
@@ -173,24 +173,58 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
             <Pressable
               style={[
                 styles.packageCard,
-                styles.packageCardAnnual,
                 selectedPackage?.identifier === annualPackage.identifier &&
                   styles.packageCardSelected,
               ]}
               onPress={() => setSelectedPackage(annualPackage)}
             >
-              <View style={styles.bestValueBadge}>
-                <Typography variant="body" style={styles.bestValueText}>
-                  Best Value
-                </Typography>
-              </View>
-              <Typography variant="subtitle" color="inverse">
-                Annual
-              </Typography>
-              <Typography variant="body" color="inverse">
-                {annualPackage.product.priceString} / year{' '}
-                {getTrialText(annualPackage)} {getMonthlyPrice(annualPackage)}
-              </Typography>
+              {selectedPackage?.identifier === annualPackage.identifier && (
+                <View style={styles.bestValueBadge}>
+                  <Typography
+                    mode="light"
+                    variant="body"
+                    style={styles.bestValueText}
+                  >
+                    Best Value
+                  </Typography>
+                </View>
+              )}
+              {selectedPackage?.identifier === annualPackage.identifier ? (
+                <>
+                  <Typography
+                    mode="light"
+                    variant="subtitle"
+                    style={styles.cardTitle}
+                  >
+                    Annual
+                  </Typography>
+                  <Typography
+                    mode="light"
+                    variant="body"
+                    color="secondary"
+                    style={styles.cardPrice}
+                  >
+                    {annualPackage.product.priceString} / year{' '}
+                    {getTrialText(annualPackage)}{' '}
+                    {getMonthlyPrice(annualPackage)}
+                  </Typography>
+                </>
+              ) : (
+                <>
+                  <Typography variant="subtitle" style={styles.cardTitle}>
+                    Annual
+                  </Typography>
+                  <Typography
+                    variant="body"
+                    color="secondary"
+                    style={styles.cardPrice}
+                  >
+                    {annualPackage.product.priceString} / year{' '}
+                    {getTrialText(annualPackage)}{' '}
+                    {getMonthlyPrice(annualPackage)}
+                  </Typography>
+                </>
+              )}
             </Pressable>
           )}
 
@@ -198,26 +232,40 @@ export const Paywall = ({ onComplete }: PaywallProps) => {
             <Pressable
               style={[
                 styles.packageCard,
-                styles.packageCardMonthly,
                 selectedPackage?.identifier === monthlyPackage.identifier &&
-                  styles.packageCardMonthlySelected,
+                  styles.packageCardSelected,
               ]}
               onPress={() => setSelectedPackage(monthlyPackage)}
             >
               {selectedPackage?.identifier === monthlyPackage.identifier ? (
                 <>
-                  <Typography variant="subtitle">Monthly</Typography>
-                  <Typography variant="body" color="secondary">
+                  <Typography
+                    mode="light"
+                    variant="subtitle"
+                    style={styles.cardTitle}
+                  >
+                    Monthly
+                  </Typography>
+                  <Typography
+                    mode="light"
+                    variant="body"
+                    color="secondary"
+                    style={styles.cardPrice}
+                  >
                     {monthlyPackage.product.priceString} / month{' '}
                     {getTrialText(monthlyPackage)}
                   </Typography>
                 </>
               ) : (
                 <>
-                  <Typography variant="subtitle" color="inverse">
+                  <Typography variant="subtitle" style={styles.cardTitle}>
                     Monthly
                   </Typography>
-                  <Typography variant="body" color="inverse">
+                  <Typography
+                    variant="body"
+                    color="secondary"
+                    style={styles.cardPrice}
+                  >
                     {monthlyPackage.product.priceString} / month{' '}
                     {getTrialText(monthlyPackage)}
                   </Typography>
@@ -269,20 +317,11 @@ const styles = StyleSheet.create({
   packageCard: {
     borderRadius: borderRadius.md,
     padding: spacing.md,
-    borderWidth: 3,
-    borderColor: 'transparent',
-  },
-  packageCardAnnual: {
-    backgroundColor: colors.dark60,
-  },
-  packageCardMonthly: {
-    backgroundColor: colors.dark60,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: colors.dark.cardSecondary,
   },
   packageCardSelected: {
-    borderColor: colors.white,
-    backgroundColor: colors.primary60,
-  },
-  packageCardMonthlySelected: {
     borderColor: colors.secondary60,
     backgroundColor: colors.white,
   },
@@ -290,13 +329,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -10,
     right: spacing.sm,
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary60,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
     borderRadius: borderRadius.sm,
   },
   bestValueText: {
-    color: colors.primary60,
+    color: colors.white,
+  },
+  cardTitle: {
+    fontWeight: '600',
+  },
+  cardPrice: {
+    fontWeight: '500',
   },
   bottom: {
     gap: spacing.sm,

@@ -197,7 +197,7 @@ export const ColorSchemes = {
     },
     // Secondary Button (Toned/Filled Subtle)
     secondary: {
-      background: 'rgba(79, 121, 66, 0.25)',
+      background: '#4D4C4C',
       backgroundPressed: 'rgba(79, 121, 66, 0.35)',
       backgroundDisabled: '#3D3D47',
       text: '#FFFFFF',

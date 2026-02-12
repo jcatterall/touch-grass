@@ -95,13 +95,14 @@ const colors = {
   },
   neutral: {
     white: '#FFFFFF',
-    black: '#1A1A1A',
+    black: '#010001',
     gray100: '#F5F5F5',
     gray200: '#E8E8E8',
     gray300: '#D1D1D1',
   },
   dark: {
-    cardBackground: '#1A1F3D',
+    cardBackground: '#1B1b1A',
+    cardSecondary: '#2A2A2B',
     textPrimary: '#FFFFFF',
     textSecondary: '#B8BDD4',
     textTertiary: '#6B7194',
@@ -267,7 +268,7 @@ const textColors = {
   },
   dark: {
     primary: colors.white,
-    secondary: colors.dark10,
+    secondary: colors.white,
     tertiary: colors.dark20,
     disabled: colors.dark30,
     inverse: colors.neutral100,

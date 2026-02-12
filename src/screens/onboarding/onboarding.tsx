@@ -13,6 +13,7 @@ import { Notification } from './Notification';
 import { UsageReport } from './usage/UsageReport';
 import { UsagePermissions } from './usage/UsagePermissions';
 import { BlockingPlan } from '../../types';
+import { PlanBuilding } from './PlanBuilding';
 
 export interface OnboardingStepProps {
   onComplete: () => void;
@@ -38,6 +39,7 @@ const STEPS = [
   'goals',
   'planSplash',
   'plan',
+  'planBuilding',
   'streak',
   'paywall',
   'notification',
@@ -131,6 +133,7 @@ export const Onboarding = ({
         }}
       />
     ),
+    planBuilding: <PlanBuilding onComplete={handleNext} />,
     usage: (
       <Usage
         usage={usage}

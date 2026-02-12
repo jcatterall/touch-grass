@@ -150,7 +150,7 @@ export const Plan = ({ onComplete, plan }: PlanProps) => {
           {plan ? 'Edit plan' : 'Your plan'}
         </Typography>
 
-        <View style={styles.section}>
+        <View style={[styles.section]}>
           <Typography variant="body" color="inverse" style={styles.label}>
             Repeat
           </Typography>
@@ -167,9 +167,14 @@ export const Plan = ({ onComplete, plan }: PlanProps) => {
           </View>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section]}>
           <View style={styles.row}>
-            <Typography variant="body" color="inverse" style={styles.label}>
+            <Typography
+              mode="light"
+              variant="body"
+              color="inverse"
+              style={styles.label}
+            >
               Range
             </Typography>
             <SegmentedControl
@@ -184,18 +189,18 @@ export const Plan = ({ onComplete, plan }: PlanProps) => {
             />
           </View>
           {schedule.durationType === 'specific_hours' && (
-            <View style={styles.subSection}>
+            <>
               <TimeRangeSlider
                 startTime={schedule.from}
                 endTime={schedule.to}
                 onStartTimeChange={v => setSchedule(p => ({ ...p, from: v }))}
                 onEndTimeChange={v => setSchedule(p => ({ ...p, to: v }))}
               />
-            </View>
+            </>
           )}
         </View>
 
-        <View style={styles.section}>
+        <View style={{ ...styles.section }}>
           <View style={styles.row}>
             <Typography variant="body" color="inverse" style={styles.label}>
               Criteria
@@ -212,7 +217,7 @@ export const Plan = ({ onComplete, plan }: PlanProps) => {
             />
           </View>
 
-          <View style={[styles.row, styles.subSection]}>
+          <View style={[styles.row]}>
             <View style={styles.valueGroup}>
               <Text style={styles.bigValue}>
                 {criteria.type === 'distance'
@@ -247,7 +252,7 @@ export const Plan = ({ onComplete, plan }: PlanProps) => {
                 }))
               }
             />
-            <View style={styles.row}>
+            <View style={{ ...styles.row }}>
               <Typography mode="dark" variant="body">
                 {config.min} {config.label}
               </Typography>
@@ -280,14 +285,12 @@ const styles = StyleSheet.create({
   section: {
     gap: spacing.sm,
   },
-  subSection: {
-    marginTop: spacing.xs,
-  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+
   label: {
     letterSpacing: 1,
   },

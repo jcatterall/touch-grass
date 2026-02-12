@@ -108,7 +108,7 @@ export const BlocklistScreen = ({
         {isSelected ? (
           <CheckSquare size={24} color={colors.neutral.white} />
         ) : (
-          <Square size={24} color={colors.dark.textTertiary} />
+          <Square size={24} color={colors.neutral.gray300} />
         )}
       </Pressable>
     );
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.dark70,
+    borderBottomColor: colors.white,
   },
   appLeft: {
     flex: 1,

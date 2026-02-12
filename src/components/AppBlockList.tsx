@@ -25,6 +25,7 @@ export const AppBlockList = ({ apps, onEdit }: AppBlockListProps) => {
       {hasApps && (
         <View style={styles.header}>
           <Typography
+            mode="light"
             variant="body"
             color="inverse"
             style={styles.sectionLabel}
