@@ -1,1 +1,2 @@
-export { triggerHaptic } from './haptics';
+export * from './haptics';
+export * from './guid';

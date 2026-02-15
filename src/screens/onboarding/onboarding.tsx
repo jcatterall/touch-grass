@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, ReactNode } from 'react';
 import { BackHandler } from 'react-native';
 import { Why } from './Why';
 import { Goals } from './Goals';
-import { Plan } from './Plan';
+import { PlanSetup } from './PlanSetup';
 import { Usage } from './usage/Usage';
 import { Home } from './Home';
 import { GoalsSplash } from './GoalsSplash';
@@ -21,7 +21,7 @@ export interface OnboardingStepProps {
 }
 
 export interface OnboardingData {
-  blockingPlan: BlockingPlan | null;
+  blockingPlans: BlockingPlan[];
   answers: Record<string, string>;
 }
 
@@ -52,7 +52,7 @@ export const Onboarding = ({
 }: OnboardingProps) => {
   const [stepIndex, setStepIndex] = useState(0);
   const [usage, setUsage] = useState(1);
-  const [blockingPlan, setBlockingPlan] = useState<BlockingPlan | null>(null);
+  const [blockingPlans, setBlockingPlans] = useState<BlockingPlan[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [skippedSteps, setSkippedSteps] = useState<Set<OnboardingStep>>(
     new Set(),
@@ -76,11 +76,11 @@ export const Onboarding = ({
         if (nextIndex < STEPS.length) {
           return nextIndex;
         }
-        onOnboardingComplete({ blockingPlan, answers });
+        onOnboardingComplete({ blockingPlans, answers });
         return prev;
       });
     },
-    [stepIndex, onOnboardingComplete, blockingPlan, answers],
+    [stepIndex, onOnboardingComplete, blockingPlans, answers],
   );
 
   const handleBack = useCallback(() => {
@@ -125,10 +125,10 @@ export const Onboarding = ({
       />
     ),
     plan: (
-      <Plan
-        plan={blockingPlan}
+      <PlanSetup
+        plan={blockingPlans[0] ?? null}
         onComplete={plan => {
-          setBlockingPlan(plan);
+          setBlockingPlans(plan ? [plan] : []);
           handleNext();
         }}
       />

@@ -29,7 +29,7 @@ function App() {
     const loadData = storage.getOnboardingComplete();
 
     Promise.all([minDelay, loadData]).then(([, complete]) => {
-      setOnboardingComplete(false);
+      setOnboardingComplete(complete);
       setIsLoading(false);
     });
   }, []);

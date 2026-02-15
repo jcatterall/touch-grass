@@ -1,7 +1,7 @@
 // Plan
 export type DayKey = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 export type DurationType = 'entire_day' | 'specific_hours';
-export type CriteriaType = 'distance' | 'time';
+export type CriteriaType = 'permanent' | 'distance' | 'time';
 export type DistanceUnit = 'km' | 'mi';
 
 export const DAYS: { key: DayKey; label: string }[] = [
@@ -24,12 +24,14 @@ export interface BlockedApp {
 }
 
 export interface BlockingPlan {
+  id: string;
   days: DayKey[];
   duration:
     | { type: 'entire_day' }
     | { type: 'specific_hours'; from: string; to: string };
   criteria:
     | { type: 'distance'; value: number; unit: DistanceUnit }
-    | { type: 'time'; value: number };
+    | { type: 'time'; value: number }
+    | { type: 'permanent' };
   blockedApps: BlockedApp[];
 }

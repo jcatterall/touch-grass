@@ -161,6 +161,12 @@ const textStyles = {
     fontSize: fontSizes.xs,
     lineHeight: lineHeights.xs,
   },
+  caption: {
+    fontFamily: FontFamily.regular,
+    fontWeight: '400' as const,
+    fontSize: fontSizes.xxs,
+    lineHeight: lineHeights.xxs,
+  },
   link: {
     fontFamily: FontFamily.medium,
     fontWeight: '500' as const,
