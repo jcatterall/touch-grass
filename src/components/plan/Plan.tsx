@@ -5,15 +5,13 @@ import { PlanCriteria } from './PlanCriteria';
 import type { CriteriaState } from './PlanCriteria';
 import { PlanDays } from './PlanDays';
 import { PlanDayRange } from './PlanDayRange';
-import { type AppItem } from '../../screens/BlocklistScreen';
+import BlocklistScreen, { type AppItem } from '../../screens/BlocklistScreen';
 import { spacing } from '../../theme';
 import { DayKey, DurationType, DistanceUnit, BlockingPlan } from '../../types';
 import { generateUUID } from '../../utils';
 
 export interface PlanProps {
   plan: BlockingPlan | null;
-  blockedApps: AppItem[];
-  onEditApps: () => void;
   onPlanChange: (plan: BlockingPlan | null) => void;
 }
 
@@ -24,6 +22,7 @@ function buildPlan(
   durationType: DurationType,
   from: string,
   to: string,
+  id?: string,
 ): BlockingPlan | null {
   if (blockedApps.length === 0 || criteria.type === null || days.length === 0) {
     return null;
@@ -41,7 +40,7 @@ function buildPlan(
       : { type: 'permanent' };
 
   return {
-    id: generateUUID(),
+    id: id || generateUUID(),
     days,
     duration:
       durationType === 'entire_day'
@@ -56,12 +55,12 @@ function buildPlan(
   };
 }
 
-export const Plan = ({
-  plan,
-  blockedApps,
-  onEditApps,
-  onPlanChange,
-}: PlanProps) => {
+export const Plan = ({ plan, onPlanChange }: PlanProps) => {
+  const [showBlocklist, setShowBlocklist] = useState(false);
+  const [blockedApps, setBlockedApps] = useState<AppItem[]>(
+    (plan?.blockedApps as unknown as AppItem[]) ?? [],
+  );
+
   const [days, setDays] = useState<DayKey[]>(
     plan?.days ?? ['MON', 'TUE', 'WED', 'THU', 'FRI'],
   );
@@ -92,13 +91,35 @@ export const Plan = ({
 
   useEffect(() => {
     onPlanChange(
-      buildPlan(blockedApps, criteria, days, durationType, from, to),
+      buildPlan(blockedApps, criteria, days, durationType, from, to, plan?.id),
     );
-  }, [blockedApps, criteria, days, durationType, from, to, onPlanChange]);
+  }, [
+    blockedApps,
+    criteria,
+    days,
+    durationType,
+    from,
+    to,
+    onPlanChange,
+    plan?.id,
+  ]);
+
+  if (showBlocklist) {
+    return (
+      <BlocklistScreen
+        selectedApps={blockedApps}
+        onSave={apps => {
+          setBlockedApps(apps);
+          setShowBlocklist(false);
+        }}
+        onClose={() => setShowBlocklist(false)}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <PlanBlockList apps={blockedApps} onEdit={onEditApps} />
+      <PlanBlockList apps={blockedApps} onEdit={() => setShowBlocklist(true)} />
       <PlanCriteria criteria={criteria} onCriteriaChange={setCriteria} />
       <PlanDays days={days} onDaysChange={setDays} />
       <PlanDayRange

@@ -51,5 +51,11 @@ export {
 } from './plan/PlanDayRange';
 export { Plan, type PlanProps } from './plan/Plan';
 export { AppIcon, type AppIconProps } from './AppIcon';
+export {
+  OverlayMenu,
+  type OverlayMenuProps,
+  type OverlayMenuItem,
+} from './OverlayMenu';
+export { ConfirmModal, type ConfirmModalProps } from './ConfirmModal';
 export { TimePill, type TimePillProps } from './TimePill';
 export { TimeRangeSlider, type TimeRangeSliderProps } from './TimeRangeSlider';

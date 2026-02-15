@@ -139,13 +139,13 @@ const animation = {
 const textStyles = {
   heading: {
     fontFamily: FontFamily.bold,
-    fontWeight: '700' as const,
+    fontWeight: '600' as const,
     fontSize: fontSizes.lg,
     lineHeight: lineHeights.lg,
   },
   title: {
     fontFamily: FontFamily.bold,
-    fontWeight: '700' as const,
+    fontWeight: '600' as const,
     fontSize: fontSizes.md,
     lineHeight: lineHeights.md,
   },

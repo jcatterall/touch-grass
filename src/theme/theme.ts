@@ -143,9 +143,9 @@ export const ColorSchemes = {
   // Secondary Button (Toned/Filled Subtle)
   secondary: {
     background: '#4D4C4C',
-    backgroundPressed: 'rgba(79, 121, 66, 0.35)',
+    backgroundPressed: '#3D3D47',
     backgroundDisabled: '#3D3D47',
-    text: '#FFFFFF',
+    text: Colors.white,
     textDisabled: '#6B6B73',
   },
   // Tertiary Button (Outline/Ghost)

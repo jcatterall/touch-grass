@@ -9,12 +9,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ArrowLeft, Search, Square, CheckSquare, X } from 'lucide-react-native';
-import { Main } from '../components/layout/Main';
+import { Search, Square, CheckSquare, X } from 'lucide-react-native';
 import { Button, Typography } from '../components';
 import { colors, spacing, borderRadius, textStyles } from '../theme';
 import { triggerHaptic } from '../utils/haptics';
 import { getAllInstalledApps } from '../native/AppListModule';
+import { NestedScreen } from '../components/layout/NestedScreen';
 
 export interface AppItem {
   id: string;
@@ -124,101 +124,91 @@ export const BlocklistScreen = ({
       </Pressable>
     );
   };
-
-  return (
-    <Main style={styles.main}>
-      <View style={styles.container}>
-        <View style={styles.header}>
+  const search = () => {
+    return (
+      <View style={styles.searchContainer}>
+        {isSearchVisible ? (
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search apps..."
+            placeholderTextColor={colors.white}
+            autoFocus
+            onBlur={() => {
+              if (!searchQuery) setIsSearchVisible(false);
+            }}
+          />
+        ) : (
+          <Typography variant="title" style={styles.title}>
+            Blocklist
+          </Typography>
+        )}
+        {isSearchVisible && searchQuery.length > 0 ? (
           <Pressable
-            onPress={onClose}
+            onPress={() => setSearchQuery('')}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <ArrowLeft size={24} color={colors.white} />
+            <X size={24} color={colors.white} />
           </Pressable>
-          {isSearchVisible ? (
-            <TextInput
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search apps..."
-              placeholderTextColor={colors.white}
-              autoFocus
-              onBlur={() => {
-                if (!searchQuery) setIsSearchVisible(false);
-              }}
-            />
-          ) : (
-            <Typography variant="title" style={styles.title}>
-              Blocklist
-            </Typography>
-          )}
-          {isSearchVisible && searchQuery.length > 0 ? (
-            <Pressable
-              onPress={() => setSearchQuery('')}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <X size={24} color={colors.white} />
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={() => setIsSearchVisible(!isSearchVisible)}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <Search size={24} color={colors.white} />
-            </Pressable>
-          )}
-        </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.skyBlue} />
-            <Typography variant="body">Loading apps...</Typography>
-          </View>
         ) : (
-          <FlatList
-            data={filteredApps}
-            renderItem={renderAppItem}
-            keyExtractor={item => item.id}
-            style={styles.list}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Typography variant="subtitle">
-                  {searchQuery ? 'No apps found' : 'No apps available'}
-                </Typography>
-              </View>
-            }
-          />
+          <Pressable
+            onPress={() => setIsSearchVisible(!isSearchVisible)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Search size={24} color={colors.white} />
+          </Pressable>
         )}
-
-        <View style={styles.footer}>
-          <Button size="lg" onPress={handleSave}>
-            Save
-          </Button>
-        </View>
       </View>
-    </Main>
+    );
+  };
+
+  const saveButton = () => {
+    return (
+      <Button size="lg" onPress={handleSave}>
+        Save
+      </Button>
+    );
+  };
+
+  return (
+    <NestedScreen onClose={onClose} header={search} footer={saveButton}>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.skyBlue} />
+          <Typography variant="body">Loading apps...</Typography>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredApps}
+          renderItem={renderAppItem}
+          keyExtractor={item => item.id}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Typography variant="subtitle">
+                {searchQuery ? 'No apps found' : 'No apps available'}
+              </Typography>
+            </View>
+          }
+        />
+      )}
+    </NestedScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  main: {
-    backgroundColor: colors.background,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-  },
   title: {
     flex: 1,
     marginLeft: spacing.md,
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   searchInput: {
     flex: 1,
@@ -256,9 +246,6 @@ const styles = StyleSheet.create({
   },
   appName: {
     flex: 1,
-  },
-  footer: {
-    paddingVertical: spacing.md,
   },
   loadingContainer: {
     flex: 1,

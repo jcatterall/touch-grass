@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { OnboardingData } from './screens';
 import { BlockingPlan } from './types';
+import { generateUUID } from './utils/guid';
 
 const KEYS = {
   ONBOARDING_COMPLETE: 'onboarding_complete',
@@ -8,16 +9,41 @@ const KEYS = {
   GOAL_ANSWERS: 'goal_answers',
 } as const;
 
+async function getStoredPlans(): Promise<BlockingPlan[]> {
+  const raw = await AsyncStorage.getItem(KEYS.BLOCKING_PLANS);
+  return raw ? JSON.parse(raw) : [];
+}
+
+async function savePlans(plans: BlockingPlan[]): Promise<void> {
+  await AsyncStorage.setItem(KEYS.BLOCKING_PLANS, JSON.stringify(plans));
+}
+
 export const storage = {
   async getOnboardingComplete(): Promise<boolean> {
     const value = await AsyncStorage.getItem(KEYS.ONBOARDING_COMPLETE);
     return value === 'true';
   },
 
-  async getPlans(): Promise<BlockingPlan[] | null> {
-    const plans = await AsyncStorage.getItem(KEYS.BLOCKING_PLANS);
-    const blockingPlans = plans ? JSON.parse(plans) : [];
-    return blockingPlans;
+  async getPlans(): Promise<BlockingPlan[]> {
+    return getStoredPlans();
+  },
+
+  async createPlan(plan: Omit<BlockingPlan, 'id'>): Promise<void> {
+    const plans = await getStoredPlans();
+    const newPlan: BlockingPlan = { ...plan, id: generateUUID() };
+    await savePlans([...plans, newPlan]);
+  },
+
+  async updatePlan(updatedPlan: BlockingPlan): Promise<void> {
+    const plans = await getStoredPlans();
+    await savePlans(
+      plans.map(p => (p.id === updatedPlan.id ? updatedPlan : p)),
+    );
+  },
+
+  async deletePlan(planId: string): Promise<void> {
+    const plans = await getStoredPlans();
+    await savePlans(plans.filter(p => p.id !== planId));
   },
 
   async getOnboardingData(): Promise<OnboardingData | null> {

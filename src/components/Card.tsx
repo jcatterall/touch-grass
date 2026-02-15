@@ -10,6 +10,7 @@ export interface CardProps {
   onClose?: () => void;
   variant?: CardVariant;
   style?: ViewStyle;
+  hideChevron?: boolean;
 }
 
 export const Card = ({
@@ -18,6 +19,7 @@ export const Card = ({
   onClose,
   variant = 'primary',
   style,
+  hideChevron = false,
 }: CardProps) => {
   const content = (
     <View
@@ -29,7 +31,9 @@ export const Card = ({
           <X size={18} color={colors.white} />
         </Pressable>
       )}
-      {!onClose && onPress && <ChevronRight size={20} color={colors.white} />}
+      {!onClose && onPress && !hideChevron && (
+        <ChevronRight size={20} color={colors.white} />
+      )}
     </View>
   );
 

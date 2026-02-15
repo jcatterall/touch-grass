@@ -8,18 +8,27 @@ interface MainScreenProps {
   onClose: () => void;
   label: string;
   children?: React.ReactNode;
+  header?: React.ReactNode;
 }
 
-export const MainScreen = ({ onClose, label, children }: MainScreenProps) => {
+export const MainScreen = ({
+  onClose,
+  label,
+  children,
+  header,
+}: MainScreenProps) => {
   const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.xs }]}>
       <View style={[styles.overlayHeader]}>
-        <Pressable onPress={onClose} hitSlop={8}>
-          <X size={24} color={colors.white} />
-        </Pressable>
-        <Typography variant="subtitle">{label}</Typography>
+        <View style={styles.navigationContainer}>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <X size={24} color={colors.white} />
+          </Pressable>
+          <Typography variant="subtitle">{label}</Typography>
+        </View>
+        {header && header}
       </View>
       {children}
     </View>
@@ -36,6 +45,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
+    paddingVertical: spacing.md,
+    justifyContent: 'space-between',
+  },
+  navigationContainer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
 });
