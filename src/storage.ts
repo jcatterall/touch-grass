@@ -1,7 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 import type { OnboardingData } from './screens';
 import { BlockingPlan } from './types';
 import { generateUUID } from './utils/guid';
+
+export const PLANS_CHANGED_EVENT = 'plans_changed';
 
 const KEYS = {
   ONBOARDING_COMPLETE: 'onboarding_complete',
@@ -16,6 +19,7 @@ async function getStoredPlans(): Promise<BlockingPlan[]> {
 
 async function savePlans(plans: BlockingPlan[]): Promise<void> {
   await AsyncStorage.setItem(KEYS.BLOCKING_PLANS, JSON.stringify(plans));
+  DeviceEventEmitter.emit(PLANS_CHANGED_EVENT);
 }
 
 export const storage = {
@@ -37,7 +41,9 @@ export const storage = {
   async updatePlan(updatedPlan: BlockingPlan): Promise<void> {
     const plans = await getStoredPlans();
     await savePlans(
-      plans.map(p => (p.id === updatedPlan.id ? updatedPlan : p)),
+      plans.map(p =>
+        p.id === updatedPlan.id ? { ...updatedPlan, active: true } : p,
+      ),
     );
   },
 

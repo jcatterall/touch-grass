@@ -5,6 +5,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
       android:name=".MainApplication"
@@ -27,5 +33,19 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+      <service
+          android:name=".TrackingService"
+          android:foregroundServiceType="location"
+          android:exported="false" />
+      <service
+          android:name=".ActivityHeadlessTaskService"
+          android:exported="false" />
+      <receiver
+          android:name=".ActivityTransitionReceiver"
+          android:exported="false">
+          <intent-filter>
+              <action android:name="com.touchgrass.ACTIVITY_TRANSITION" />
+          </intent-filter>
+      </receiver>
     </application>
 </manifest>
