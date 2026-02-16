@@ -25,6 +25,7 @@ const colors = {
   black: '#010001',
   background: '#1B1b1A',
   backgroundSecondary: '#2A2A2B',
+  backgroundTertiary: '#818181',
 
   // Semantic
   error: '#E7002A',

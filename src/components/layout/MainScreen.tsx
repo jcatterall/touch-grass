@@ -37,6 +37,7 @@ export const MainScreen = ({
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
     backgroundColor: colors.background,

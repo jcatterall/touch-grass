@@ -25,6 +25,7 @@ export interface BlockedApp {
 
 export interface BlockingPlan {
   id: string;
+  active: boolean;
   days: DayKey[];
   duration:
     | { type: 'entire_day' }

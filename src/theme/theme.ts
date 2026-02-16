@@ -246,76 +246,6 @@ export const Animation = {
   },
 } as const;
 
-// =============================================================================
-// CHIP SIZES
-// =============================================================================
-
-export const ChipSizes = {
-  sm: {
-    height: 32,
-    paddingHorizontal: 16,
-    fontSize: 13,
-    fontWeight: '500' as const,
-    iconSize: 14,
-    gap: 6,
-  },
-  md: {
-    height: 40,
-    paddingHorizontal: 20,
-    fontSize: 15,
-    fontWeight: '500' as const,
-    iconSize: 16,
-    gap: 8,
-  },
-} as const;
-
-// =============================================================================
-// CHIP COLOR SCHEMES (dark-mode only)
-// =============================================================================
-
-export const ChipColorSchemes = {
-  // Blue variant
-  blue: {
-    selected: {
-      background: Colors.meadowGreen,
-      backgroundPressed: Colors.meadowGreenPressed,
-      text: Colors.white,
-    },
-    unselected: {
-      background: 'rgba(255, 255, 255, 0.08)',
-      backgroundPressed: 'rgba(255, 255, 255, 0.12)',
-      text: Colors.oatmeal,
-    },
-  },
-  // Orange variant
-  orange: {
-    selected: {
-      background: Colors.terracotta,
-      backgroundPressed: Colors.terracottaPressed,
-      text: Colors.white,
-    },
-    unselected: {
-      background: 'rgba(255, 255, 255, 0.08)',
-      backgroundPressed: 'rgba(255, 255, 255, 0.12)',
-      text: Colors.oatmeal,
-    },
-  },
-  // Outline variant
-  outline: {
-    selected: {
-      background: 'rgba(135, 206, 235, 0.20)',
-      backgroundPressed: 'rgba(135, 206, 235, 0.30)',
-      text: Colors.skyBlue,
-      borderColor: Colors.skyBlue,
-    },
-    unselected: {
-      background: 'transparent',
-      backgroundPressed: 'rgba(255, 255, 255, 0.08)',
-      text: '#B0B0B0',
-      borderColor: '#4D4D57',
-    },
-  },
-} as const;
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -330,9 +260,6 @@ export type ButtonVariant =
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 export type ButtonShape = 'pill' | 'rounded';
 
-// Chip Types
-export type ChipVariant = 'blue' | 'orange' | 'outline';
-export type ChipSize = 'sm' | 'md';
 
 // Select Types
 export type SelectVariant = 'blue' | 'orange';
@@ -537,11 +464,7 @@ export const Theme = {
   sizes: ButtonSizes,
   typography: ButtonTypography,
   animation: Animation,
-  chip: {
-    sizes: ChipSizes,
-    colorSchemes: ChipColorSchemes,
-  },
-  select: {
+select: {
     sizes: SelectSizes,
     colorSchemes: SelectColorSchemes,
   },

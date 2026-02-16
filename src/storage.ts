@@ -25,12 +25,12 @@ export const storage = {
   },
 
   async getPlans(): Promise<BlockingPlan[]> {
-    return getStoredPlans();
+    return (await getStoredPlans()).sort(x => (x.active ? -1 : 1));
   },
 
   async createPlan(plan: Omit<BlockingPlan, 'id'>): Promise<void> {
     const plans = await getStoredPlans();
-    const newPlan: BlockingPlan = { ...plan, id: generateUUID() };
+    const newPlan: BlockingPlan = { ...plan, id: generateUUID(), active: true };
     await savePlans([...plans, newPlan]);
   },
 
@@ -39,6 +39,26 @@ export const storage = {
     await savePlans(
       plans.map(p => (p.id === updatedPlan.id ? updatedPlan : p)),
     );
+  },
+
+  async duplicatePlan(planId: string): Promise<void> {
+    const plans = await getStoredPlans();
+    const source = plans.find(p => p.id === planId);
+    if (!source) return;
+    const duplicate: BlockingPlan = {
+      ...source,
+      id: generateUUID(),
+      active: true,
+    };
+    await savePlans([...plans, duplicate]);
+  },
+
+  async togglePlanActive(planId: string): Promise<void> {
+    const plans = await getStoredPlans();
+    const plan = plans.find(p => p.id === planId);
+    if (!plan) return;
+    plan.active = !plan.active;
+    await savePlans(plans);
   },
 
   async deletePlan(planId: string): Promise<void> {

@@ -1,11 +1,13 @@
 import { useCallback, useRef } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { Typography } from './Typography';
 import { borderRadius, colors, spacing } from '../theme';
 
 export interface OverlayMenuItem {
   label: string;
   onPress: () => void;
+  icon?: LucideIcon;
   destructive?: boolean;
 }
 
@@ -58,13 +60,15 @@ export const OverlayMenu = ({ visible, onClose, items }: OverlayMenuProps) => {
               ]}
               onPress={() => selectItem(item.onPress)}
             >
-              <Typography
-                variant="subtitle"
-                color={item.destructive ? 'error' : 'primary'}
-                style={{ textAlign: 'center' }}
-              >
-                {item.label}
-              </Typography>
+              <View style={styles.menuItemContent}>
+                {item.icon && <item.icon size={18} color={colors.white} />}
+                <Typography
+                  variant="subtitle"
+                  style={!item.icon && styles.textCenter}
+                >
+                  {item.label}
+                </Typography>
+              </View>
             </Pressable>
           ))}
         </View>
@@ -96,5 +100,14 @@ const styles = StyleSheet.create({
   },
   menuItemPressed: {
     opacity: 0.6,
+  },
+  menuItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  textCenter: {
+    textAlign: 'center' as const,
   },
 });

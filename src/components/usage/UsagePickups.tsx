@@ -1,13 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { borderRadius, colors, spacing } from '../../theme';
-import Chip from '../Chip';
+import Chip, { type ChipColor } from '../Chip';
 import { Typography } from '../Typography';
 
-const getPickupStatus = (count: number): { label: string; variant: 'blue' | 'orange' } => {
-  if (count < 30) return { label: 'Low', variant: 'blue' };
-  if (count < 60) return { label: 'Normal', variant: 'blue' };
-  if (count < 100) return { label: 'High', variant: 'orange' };
-  return { label: 'Very High', variant: 'orange' };
+const getPickupStatus = (count: number): { label: string; color: ChipColor } => {
+  if (count < 30) return { label: 'Low', color: 'green' };
+  if (count < 60) return { label: 'Normal', color: 'blue' };
+  if (count < 100) return { label: 'High', color: 'red' };
+  return { label: 'Very High', color: 'red' };
 };
 
 export const UsagePickups = ({ count }: { count: number }) => {
@@ -18,7 +18,7 @@ export const UsagePickups = ({ count }: { count: number }) => {
       <Typography variant="subtitle">Daily pickups</Typography>
       <View style={styles.rightContent}>
         <Text style={styles.countText}>{count}x</Text>
-        <Chip label={status.label} variant={status.variant} size="sm" isSelected />
+        <Chip label={status.label} color={status.color} />
       </View>
     </View>
   );
