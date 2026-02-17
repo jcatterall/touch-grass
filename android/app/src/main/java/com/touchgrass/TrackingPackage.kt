@@ -9,7 +9,9 @@ class TrackingPackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
         return listOf(
             ActivityRecognitionModule(reactContext),
-            TrackingModule(reactContext)
+            TrackingModule(reactContext),
+            BuildConfigModule(reactContext),
+            AppBlockerModule(reactContext)
         )
     }
 

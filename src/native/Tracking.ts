@@ -59,4 +59,19 @@ export const Tracking = {
     if (!emitter) return null;
     return emitter.addListener('onGoalReached', callback);
   },
+
+  onTrackingStarted(callback: () => void): EmitterSubscription | null {
+    if (!emitter) return null;
+    return emitter.addListener('onTrackingStarted', callback);
+  },
+
+  async getUnsavedSession(): Promise<{
+    date: string;
+    distanceMeters: number;
+    elapsedSeconds: number;
+    goalsReached: boolean;
+  } | null> {
+    if (!isAvailable) return null;
+    return TrackingModule.getUnsavedSession();
+  },
 };

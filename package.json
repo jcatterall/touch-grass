@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
-    "build:apk": "cd android && gradlew assembleDebug && cd ..",
+    "build:apk": "cd android && gradlew assembleRelease && cd ..",
+    "clean": "cd android && gradlew clean && cd ..",
     "ios": "react-native run-ios",
     "lint": "eslint .",
-    "start": "react-native start",
+    "start": "react-native start --reset-cache",
     "test": "jest"
   },
   "dependencies": {

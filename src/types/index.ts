@@ -36,3 +36,11 @@ export interface BlockingPlan {
     | { type: 'permanent' };
   blockedApps: BlockedApp[];
 }
+
+// Daily activity log
+export interface DailyActivity {
+  date: string; // YYYY-MM-DD
+  distanceMeters: number;
+  elapsedSeconds: number;
+  goalsReached: boolean;
+}

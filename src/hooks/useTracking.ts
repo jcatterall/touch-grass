@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DeviceEventEmitter, EmitterSubscription } from 'react-native';
 import { storage, PLANS_CHANGED_EVENT } from '../storage';
 import { BlockingPlan, DayKey } from '../types';
 import {
   ActivityRecognition,
-  ActivityTransitionEvent,
+  ActivityDetectedEvent,
 } from '../native/ActivityRecognition';
 import { Tracking, TrackingProgress } from '../native/Tracking';
 import { TrackingPermissions } from '../native/Permissions';
+import { AppBlocker } from '../native/AppBlocker';
 
 const DAY_MAP: Record<number, DayKey> = {
   0: 'SUN',
@@ -19,11 +20,11 @@ const DAY_MAP: Record<number, DayKey> = {
   6: 'SAT',
 };
 
-function getTodayKey(): DayKey {
+export function getTodayKey(): DayKey {
   return DAY_MAP[new Date().getDay()];
 }
 
-function isWithinDuration(plan: BlockingPlan): boolean {
+export function isWithinDuration(plan: BlockingPlan): boolean {
   if (plan.duration.type === 'entire_day') return true;
 
   const now = new Date();
@@ -38,57 +39,175 @@ function isWithinDuration(plan: BlockingPlan): boolean {
   return currentMinutes >= fromMinutes && currentMinutes <= toMinutes;
 }
 
-function findActivePlanForToday(
+export function findActivePlansForToday(
   plans: BlockingPlan[],
-): BlockingPlan | null {
+): BlockingPlan[] {
   const today = getTodayKey();
-
-  return (
-    plans.find(
-      plan =>
-        plan.active &&
-        plan.days.includes(today) &&
-        isWithinDuration(plan) &&
-        (plan.criteria.type === 'distance' || plan.criteria.type === 'time'),
-    ) ?? null
+  return plans.filter(
+    plan =>
+      plan.active &&
+      plan.days.includes(today) &&
+      isWithinDuration(plan) &&
+      plan.criteria.type !== 'permanent',
   );
+}
+
+export function findBlockingPlansForToday(
+  plans: BlockingPlan[],
+): BlockingPlan[] {
+  const today = getTodayKey();
+  return plans.filter(
+    plan =>
+      plan.active &&
+      plan.days.includes(today) &&
+      isWithinDuration(plan) &&
+      plan.blockedApps.length > 0,
+  );
+}
+
+export interface AggregatedGoals {
+  totalDistanceMeters: number;
+  totalTimeSeconds: number;
+  hasDistanceGoal: boolean;
+  hasTimeGoal: boolean;
+}
+
+function aggregateGoals(plans: BlockingPlan[]): AggregatedGoals {
+  let totalDistanceMeters = 0;
+  let totalTimeSeconds = 0;
+
+  for (const plan of plans) {
+    if (plan.criteria.type === 'distance') {
+      const meters =
+        plan.criteria.unit === 'mi'
+          ? plan.criteria.value * 1609.34
+          : plan.criteria.value * 1000;
+      totalDistanceMeters += meters;
+    } else if (plan.criteria.type === 'time') {
+      totalTimeSeconds += plan.criteria.value * 60;
+    }
+  }
+
+  return {
+    totalDistanceMeters,
+    totalTimeSeconds,
+    hasDistanceGoal: totalDistanceMeters > 0,
+    hasTimeGoal: totalTimeSeconds > 0,
+  };
+}
+
+function checkAllGoalsReached(
+  goals: AggregatedGoals,
+  progress: TrackingProgress,
+): boolean {
+  if (!goals.hasDistanceGoal && !goals.hasTimeGoal) return false;
+  const distanceMet =
+    !goals.hasDistanceGoal ||
+    progress.distanceMeters >= goals.totalDistanceMeters;
+  const timeMet =
+    !goals.hasTimeGoal || progress.elapsedSeconds >= goals.totalTimeSeconds;
+  return distanceMet && timeMet;
+}
+
+export type TrackingMode = 'idle' | 'manual' | 'auto';
+
+export interface DebugInfo {
+  lastTransition: string;
+  actRecogRegistered: boolean;
+  nativeServiceRunning: boolean;
+  sessionDistance: number;
+  sessionTime: number;
+  baselineDistance: number;
+  baselineTime: number;
+  startTrackingBlocked: string | null;
 }
 
 export interface TrackingState {
   isTracking: boolean;
+  trackingMode: TrackingMode;
   progress: TrackingProgress;
-  activePlan: BlockingPlan | null;
+  activePlans: BlockingPlan[];
+  goals: AggregatedGoals;
+  allGoalsReached: boolean;
   permissionsGranted: boolean;
+  backgroundTrackingEnabled: boolean;
+  debugInfo: DebugInfo;
   startManual: () => Promise<void>;
   stop: () => Promise<void>;
+  toggleBackgroundTracking: () => Promise<void>;
 }
 
 export function useTracking(): TrackingState {
   const [isTracking, setIsTracking] = useState(false);
-  const [progress, setProgress] = useState<TrackingProgress>({
+  const [trackingMode, setTrackingMode] = useState<TrackingMode>('idle');
+
+  // dailyBaseline holds the accumulated activity from previous sessions today
+  const [dailyBaseline, setDailyBaseline] = useState<TrackingProgress>({
     distanceMeters: 0,
     elapsedSeconds: 0,
     goalReached: false,
   });
-  const [activePlan, setActivePlan] = useState<BlockingPlan | null>(null);
-  const [permissionsGranted, setPermissionsGranted] = useState(false);
 
-  const subscriptions = useRef<EmitterSubscription[]>([]);
+  // sessionProgress holds the current active session's progress
+  const [sessionProgress, setSessionProgress] = useState<TrackingProgress>({
+    distanceMeters: 0,
+    elapsedSeconds: 0,
+    goalReached: false,
+  });
+
+  const [activePlans, setActivePlans] = useState<BlockingPlan[]>([]);
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [backgroundTrackingEnabled, setBackgroundTrackingEnabled] =
+    useState(false);
+
+  const [debugLastTransition, setDebugLastTransition] = useState('none');
+  const [debugActRecogRegistered, setDebugActRecogRegistered] = useState(false);
+  const [debugNativeRunning, setDebugNativeRunning] = useState(false);
+  const [debugStartBlocked, setDebugStartBlocked] = useState<string | null>(
+    null,
+  );
+
+  const progressSub = useRef<EmitterSubscription | null>(null);
+  const transitionSub = useRef<EmitterSubscription | null>(null);
   const trackingStarted = useRef(false);
 
-  // Load active plan
+  // Time interpolation: store the last native update so we can tick every second
+  const lastNativeUpdate = useRef<{
+    elapsedSeconds: number;
+    distanceMeters: number;
+    goalReached: boolean;
+    timestamp: number;
+  } | null>(null);
+
+  const goals = useMemo(() => aggregateGoals(activePlans), [activePlans]);
+
+  // Combined progress = daily baseline + current session
+  const progress = useMemo<TrackingProgress>(
+    () => ({
+      distanceMeters:
+        dailyBaseline.distanceMeters + sessionProgress.distanceMeters,
+      elapsedSeconds:
+        dailyBaseline.elapsedSeconds + sessionProgress.elapsedSeconds,
+      goalReached: sessionProgress.goalReached,
+    }),
+    [dailyBaseline, sessionProgress],
+  );
+
+  const allGoalsReached = useMemo(
+    () => checkAllGoalsReached(goals, progress),
+    [goals, progress],
+  );
+
+  // Load active plans
   useEffect(() => {
     const load = async () => {
       const plans = await storage.getPlans();
-      const plan = findActivePlanForToday(plans);
-      setActivePlan(plan);
+      const active = findActivePlansForToday(plans);
+      setActivePlans(active);
     };
     load();
 
-    // Re-load immediately when plans change
     const sub = DeviceEventEmitter.addListener(PLANS_CHANGED_EVENT, load);
-
-    // Re-check every minute for time-window changes
     const interval = setInterval(load, 60_000);
     return () => {
       sub.remove();
@@ -96,100 +215,365 @@ export function useTracking(): TrackingState {
     };
   }, []);
 
-  // Check permissions on mount
+  // Sync blocker service with current plan/progress state
+  useEffect(() => {
+    const syncBlocker = async () => {
+      const plans = await storage.getPlans();
+      const blockingPlans = findBlockingPlansForToday(plans);
+
+      if (blockingPlans.length === 0) {
+        await AppBlocker.stopBlocker();
+        return;
+      }
+
+      const blockedPackages = [
+        ...new Set(blockingPlans.flatMap(p => p.blockedApps.map(a => a.id))),
+      ];
+      const hasPermanent = blockingPlans.some(
+        p => p.criteria.type === 'permanent',
+      );
+
+      await AppBlocker.updateBlockerConfig(
+        blockedPackages,
+        allGoalsReached,
+        hasPermanent,
+      );
+      await AppBlocker.startBlocker();
+    };
+
+    syncBlocker();
+  }, [activePlans, allGoalsReached]);
+
+  // Check permissions + load background tracking state on mount
   useEffect(() => {
     TrackingPermissions.checkAll().then(setPermissionsGranted);
+    storage.getBackgroundTrackingEnabled().then(setBackgroundTrackingEnabled);
   }, []);
 
-  // Start tracking for a given plan
-  const startTrackingForPlan = useCallback(
-    async (plan: BlockingPlan) => {
-      if (trackingStarted.current) return;
+  // On mount: load today's baseline, recover unsaved sessions, restore active tracking
+  useEffect(() => {
+    const recover = async () => {
+      // 1. Load today's stored activity as the baseline
+      const todayActivity = await storage.getTodayActivity();
+      const baseline: TrackingProgress = {
+        distanceMeters: todayActivity.distanceMeters,
+        elapsedSeconds: todayActivity.elapsedSeconds,
+        goalReached: todayActivity.goalsReached,
+      };
+
+      // 2. Persist any completed background session from SharedPreferences
+      const unsaved = await Tracking.getUnsavedSession();
+      if (unsaved) {
+        await storage.saveDailyActivity(
+          unsaved.distanceMeters,
+          unsaved.elapsedSeconds,
+          unsaved.goalsReached,
+        );
+        baseline.distanceMeters += unsaved.distanceMeters;
+        baseline.elapsedSeconds += unsaved.elapsedSeconds;
+        baseline.goalReached = baseline.goalReached || unsaved.goalsReached;
+      }
+
+      setDailyBaseline(baseline);
+
+      // 3. Check if the native service is still running
+      const current = await Tracking.getProgress();
+      if (current.distanceMeters > 0 || current.elapsedSeconds > 0) {
+        setSessionProgress(current);
+        setIsTracking(true);
+        setTrackingMode('auto'); // assume auto if recovered from background
+        trackingStarted.current = true;
+        lastNativeUpdate.current = {
+          elapsedSeconds: current.elapsedSeconds,
+          distanceMeters: current.distanceMeters,
+          goalReached: current.goalReached,
+          timestamp: Date.now(),
+        };
+      }
+    };
+    recover();
+  }, []);
+
+  // Subscribe to progress events once on mount
+  useEffect(() => {
+    progressSub.current = Tracking.onProgress(p => {
+      lastNativeUpdate.current = {
+        elapsedSeconds: p.elapsedSeconds,
+        distanceMeters: p.distanceMeters,
+        goalReached: p.goalReached,
+        timestamp: Date.now(),
+      };
+      setSessionProgress(p);
+    });
+    return () => {
+      progressSub.current?.remove();
+      progressSub.current = null;
+    };
+  }, []);
+
+  // Listen for native tracking start events (e.g., from headless task)
+  useEffect(() => {
+    const sub = Tracking.onTrackingStarted(() => {
+      // trackingStarted ref prevents this from running if start was initiated by the UI
+      if (!trackingStarted.current) {
+        console.log('[useTracking] Received native onTrackingStarted event, syncing UI.');
+        trackingStarted.current = true;
+        lastNativeUpdate.current = {
+          elapsedSeconds: 0,
+          distanceMeters: 0,
+          goalReached: false,
+          timestamp: Date.now(),
+        };
+        setSessionProgress({
+          distanceMeters: 0,
+          elapsedSeconds: 0,
+          goalReached: false,
+        });
+        setIsTracking(true);
+        setTrackingMode('auto');
+        setDebugNativeRunning(true);
+      }
+    });
+
+    return () => sub?.remove();
+  }, []);
+
+
+  // 1-second interval to interpolate elapsed time between native updates.
+  // Always runs when tracking so the time display ticks smoothly.
+  useEffect(() => {
+    if (!isTracking) return;
+
+    const timer = setInterval(() => {
+      const last = lastNativeUpdate.current;
+      if (!last) return;
+
+      const elapsed = (Date.now() - last.timestamp) / 1000;
+      if (elapsed < 1) return;
+
+      setSessionProgress(prev => ({
+        ...prev,
+        elapsedSeconds: last.elapsedSeconds + elapsed,
+      }));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isTracking]);
+
+  // Start tracking — uses a large goal for the native service
+  // so JS handles the aggregated goal-reached logic
+  const startTracking = useCallback(
+    async (mode: TrackingMode) => {
+      if (trackingStarted.current) {
+        setDebugStartBlocked('trackingStarted.current=true');
+        return;
+      }
+      if (activePlans.length === 0) {
+        setDebugStartBlocked('activePlans.length=0');
+        return;
+      }
 
       const hasPerms = await TrackingPermissions.checkAll();
       if (!hasPerms) {
         const granted = await TrackingPermissions.requestAll();
         setPermissionsGranted(granted);
-        if (!granted) return;
+        if (!granted) {
+          setDebugStartBlocked('permissions denied');
+          return;
+        }
       }
 
-      const { criteria } = plan;
-      if (criteria.type === 'permanent') return;
-
-      const goalType = criteria.type;
-      const goalValue = criteria.value;
-      const goalUnit = criteria.type === 'distance' ? criteria.unit : 'min';
-
-      await Tracking.startTracking(goalType, goalValue, goalUnit);
+      setDebugStartBlocked(null);
+      await Tracking.startTracking('distance', 999, 'km');
 
       trackingStarted.current = true;
+      // Seed immediately so the 1-second interpolation timer starts ticking
+      // without waiting for the first native GPS callback
+      lastNativeUpdate.current = {
+        elapsedSeconds: 0,
+        distanceMeters: 0,
+        goalReached: false,
+        timestamp: Date.now(),
+      };
+      setSessionProgress({
+        distanceMeters: 0,
+        elapsedSeconds: 0,
+        goalReached: false,
+      });
       setIsTracking(true);
-
-      // Subscribe to progress updates
-      const progressSub = Tracking.onProgress(p => {
-        setProgress(p);
-      });
-      if (progressSub) subscriptions.current.push(progressSub);
-
-      const goalSub = Tracking.onGoalReached(() => {
-        setProgress(prev => ({ ...prev, goalReached: true }));
-        setIsTracking(false);
-        trackingStarted.current = false;
-      });
-      if (goalSub) subscriptions.current.push(goalSub);
+      setTrackingMode(mode);
+      setDebugNativeRunning(true);
     },
-    [],
+    [activePlans],
   );
+
+  // Persist current session to daily log and update baseline
+  const saveAndResetSession = useCallback(async () => {
+    if (
+      sessionProgress.distanceMeters === 0 &&
+      sessionProgress.elapsedSeconds === 0
+    )
+      return;
+
+    await storage.saveDailyActivity(
+      sessionProgress.distanceMeters,
+      sessionProgress.elapsedSeconds,
+      allGoalsReached,
+    );
+
+    // Move session progress into baseline so UI stays cumulative
+    setDailyBaseline(prev => ({
+      distanceMeters: prev.distanceMeters + sessionProgress.distanceMeters,
+      elapsedSeconds: prev.elapsedSeconds + sessionProgress.elapsedSeconds,
+      goalReached: prev.goalReached || allGoalsReached,
+    }));
+    setSessionProgress({
+      distanceMeters: 0,
+      elapsedSeconds: 0,
+      goalReached: false,
+    });
+  }, [sessionProgress, allGoalsReached]);
+
+  // Auto-stop when all goals reached
+  useEffect(() => {
+    if (allGoalsReached && isTracking) {
+      Tracking.stopTracking();
+      setIsTracking(false);
+      setTrackingMode('idle');
+      trackingStarted.current = false;
+      lastNativeUpdate.current = null;
+      saveAndResetSession();
+    }
+  }, [allGoalsReached, isTracking, saveAndResetSession]);
 
   // Stop tracking
   const stop = useCallback(async () => {
+    // Snap to the last native values before stopping — the interpolated
+    // JS time drifts slightly, so use the ground-truth from the service
+    const nativeProgress = await Tracking.getProgress();
+    if (nativeProgress.distanceMeters > 0 || nativeProgress.elapsedSeconds > 0) {
+      setSessionProgress(nativeProgress);
+    }
+
     await Tracking.stopTracking();
     setIsTracking(false);
+    setTrackingMode('idle');
     trackingStarted.current = false;
-    subscriptions.current.forEach(s => s.remove());
-    subscriptions.current = [];
-  }, []);
+    lastNativeUpdate.current = null;
+    setDebugNativeRunning(false);
+
+    // Save using the snapped native values
+    const dist = nativeProgress.distanceMeters || sessionProgress.distanceMeters;
+    const time = nativeProgress.elapsedSeconds || sessionProgress.elapsedSeconds;
+    if (dist > 0 || time > 0) {
+      await storage.saveDailyActivity(dist, time, allGoalsReached);
+      setDailyBaseline(prev => ({
+        distanceMeters: prev.distanceMeters + dist,
+        elapsedSeconds: prev.elapsedSeconds + time,
+        goalReached: prev.goalReached || allGoalsReached,
+      }));
+      setSessionProgress({
+        distanceMeters: 0,
+        elapsedSeconds: 0,
+        goalReached: false,
+      });
+    }
+  }, [sessionProgress, allGoalsReached]);
 
   // Manual start
   const startManual = useCallback(async () => {
-    if (!activePlan) return;
-    await startTrackingForPlan(activePlan);
-  }, [activePlan, startTrackingForPlan]);
+    await startTracking('manual');
+  }, [startTracking]);
 
-  // Set up activity recognition for passive detection
+  // Toggle background tracking
+  const toggleBackgroundTracking = useCallback(async () => {
+    if (backgroundTrackingEnabled) {
+      // Turning off
+      await ActivityRecognition.stop().catch(() => {});
+      await storage.setBackgroundTrackingEnabled(false);
+      setBackgroundTrackingEnabled(false);
+    } else {
+      // Turning on — request permissions first
+      const granted = await TrackingPermissions.requestAll();
+      setPermissionsGranted(granted);
+      if (!granted) return;
+
+      await ActivityRecognition.start().catch(() => {});
+      await storage.setBackgroundTrackingEnabled(true);
+      setBackgroundTrackingEnabled(true);
+    }
+  }, [backgroundTrackingEnabled]);
+
+  // Set up activity recognition for passive detection when background tracking is enabled.
+  // Uses polling-based detection — receives periodic updates with confidence scores.
   useEffect(() => {
-    if (!activePlan) return;
+    if (!backgroundTrackingEnabled || activePlans.length === 0) {
+      setDebugActRecogRegistered(false);
+      return;
+    }
 
-    const handleTransition = (event: ActivityTransitionEvent) => {
+    const handleActivity = (event: ActivityDetectedEvent) => {
+      const ts = new Date().toLocaleTimeString();
+      setDebugLastTransition(
+        `${event.activity} ${event.confidence}% @ ${ts}`,
+      );
+
+      // Start auto-tracking when a trackable activity is detected with confidence
       if (
-        (event.activity === 'WALKING' || event.activity === 'RUNNING') &&
-        event.transition === 'ENTER'
+        event.activity === 'WALKING' ||
+        event.activity === 'RUNNING' ||
+        event.activity === 'CYCLING'
       ) {
-        startTrackingForPlan(activePlan);
-      } else if (event.transition === 'EXIT' && !progress.goalReached) {
-        // Don't stop if goal almost reached — let it continue
-        // Only stop if very early (< 10% progress)
+        startTracking('auto');
       }
     };
 
-    const transitionSub = ActivityRecognition.onTransition(handleTransition);
-    if (transitionSub) subscriptions.current.push(transitionSub);
-
-    ActivityRecognition.start().catch(() => {});
+    transitionSub.current =
+      ActivityRecognition.onActivityDetected(handleActivity);
+    ActivityRecognition.start()
+      .then(() => setDebugActRecogRegistered(true))
+      .catch(() => setDebugActRecogRegistered(false));
 
     return () => {
-      ActivityRecognition.stop().catch(() => {});
-      subscriptions.current.forEach(s => s.remove());
-      subscriptions.current = [];
+      transitionSub.current?.remove();
+      transitionSub.current = null;
+      setDebugActRecogRegistered(false);
     };
-  }, [activePlan, startTrackingForPlan, progress.goalReached]);
+  }, [backgroundTrackingEnabled, activePlans, startTracking]);
+
+  const debugInfo = useMemo<DebugInfo>(
+    () => ({
+      lastTransition: debugLastTransition,
+      actRecogRegistered: debugActRecogRegistered,
+      nativeServiceRunning: debugNativeRunning,
+      sessionDistance: sessionProgress.distanceMeters,
+      sessionTime: sessionProgress.elapsedSeconds,
+      baselineDistance: dailyBaseline.distanceMeters,
+      baselineTime: dailyBaseline.elapsedSeconds,
+      startTrackingBlocked: debugStartBlocked,
+    }),
+    [
+      debugLastTransition,
+      debugActRecogRegistered,
+      debugNativeRunning,
+      sessionProgress,
+      dailyBaseline,
+      debugStartBlocked,
+    ],
+  );
 
   return {
     isTracking,
+    trackingMode,
     progress,
-    activePlan,
+    activePlans,
+    goals,
+    allGoalsReached,
     permissionsGranted,
+    backgroundTrackingEnabled,
+    debugInfo,
     startManual,
     stop,
+    toggleBackgroundTracking,
   };
 }

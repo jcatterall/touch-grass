@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import type { OnboardingData } from './screens';
-import { BlockingPlan } from './types';
+import { BlockingPlan, DailyActivity } from './types';
 import { generateUUID } from './utils/guid';
 
 export const PLANS_CHANGED_EVENT = 'plans_changed';
@@ -10,6 +10,8 @@ const KEYS = {
   ONBOARDING_COMPLETE: 'onboarding_complete',
   BLOCKING_PLANS: 'blocking_plans',
   GOAL_ANSWERS: 'goal_answers',
+  DAILY_ACTIVITY: 'daily_activity',
+  BACKGROUND_TRACKING: 'background_tracking_enabled',
 } as const;
 
 async function getStoredPlans(): Promise<BlockingPlan[]> {
@@ -88,5 +90,56 @@ export const storage = {
       [KEYS.BLOCKING_PLANS, JSON.stringify(data.blockingPlans)],
       [KEYS.GOAL_ANSWERS, JSON.stringify(data.answers)],
     ]);
+  },
+
+  async getDailyActivities(): Promise<DailyActivity[]> {
+    const raw = await AsyncStorage.getItem(KEYS.DAILY_ACTIVITY);
+    return raw ? JSON.parse(raw) : [];
+  },
+
+  /**
+   * Upsert today's activity entry. Accumulates distance/time across
+   * multiple tracking sessions in the same day.
+   */
+  async saveDailyActivity(
+    distanceMeters: number,
+    elapsedSeconds: number,
+    goalsReached: boolean,
+  ): Promise<void> {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const activities = await this.getDailyActivities();
+
+    const idx = activities.findIndex(a => a.date === today);
+    if (idx >= 0) {
+      activities[idx].distanceMeters += distanceMeters;
+      activities[idx].elapsedSeconds += elapsedSeconds;
+      activities[idx].goalsReached = activities[idx].goalsReached || goalsReached;
+    } else {
+      activities.push({ date: today, distanceMeters, elapsedSeconds, goalsReached });
+    }
+
+    await AsyncStorage.setItem(KEYS.DAILY_ACTIVITY, JSON.stringify(activities));
+  },
+
+  async getTodayActivity(): Promise<DailyActivity> {
+    const today = new Date().toISOString().slice(0, 10);
+    const activities = await this.getDailyActivities();
+    return (
+      activities.find(a => a.date === today) ?? {
+        date: today,
+        distanceMeters: 0,
+        elapsedSeconds: 0,
+        goalsReached: false,
+      }
+    );
+  },
+
+  async getBackgroundTrackingEnabled(): Promise<boolean> {
+    const value = await AsyncStorage.getItem(KEYS.BACKGROUND_TRACKING);
+    return value === 'true';
+  },
+
+  async setBackgroundTrackingEnabled(enabled: boolean): Promise<void> {
+    await AsyncStorage.setItem(KEYS.BACKGROUND_TRACKING, String(enabled));
   },
 };

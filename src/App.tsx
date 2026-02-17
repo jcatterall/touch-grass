@@ -1,4 +1,4 @@
-import { Platform, StatusBar, StyleSheet, View } from 'react-native';
+import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Onboarding, MainApp, Splash } from './screens';
 import type { OnboardingData } from './screens';
@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import { colors } from './theme';
 import { storage } from './storage';
+import { BuildConfig } from './native/BuildConfig';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -13,15 +14,7 @@ function App() {
 
   useEffect(() => {
     Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
-
-    const iosApiKey = 'test_FCQVhIlJnsAXsRUEPKrOkgMZjDN';
-    const androidApiKey = 'test_FCQVhIlJnsAXsRUEPKrOkgMZjDN';
-
-    if (Platform.OS === 'ios') {
-      Purchases.configure({ apiKey: iosApiKey });
-    } else if (Platform.OS === 'android') {
-      Purchases.configure({ apiKey: androidApiKey });
-    }
+    Purchases.configure({ apiKey: BuildConfig.REVENUECAT_API_KEY });
   }, []);
 
   useEffect(() => {

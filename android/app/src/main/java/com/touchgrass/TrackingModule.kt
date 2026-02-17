@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import android.util.Log
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -24,6 +25,7 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             val binder = service as TrackingService.TrackingBinder
             trackingService = binder.getService()
             bound = true
+            Log.d(TAG, "Service connected")
 
             trackingService?.setProgressListener { distance, elapsed, goalReached ->
                 val params = Arguments.createMap().apply {
@@ -42,6 +44,7 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
+            Log.d(TAG, "Service disconnected")
             trackingService = null
             bound = false
         }
@@ -49,6 +52,12 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
 
     @ReactMethod
     fun startTracking(goalType: String, goalValue: Double, goalUnit: String, promise: Promise) {
+        if (bound && trackingService != null) {
+            Log.d(TAG, "Already tracking, ignoring duplicate start")
+            promise.resolve(true)
+            return
+        }
+
         try {
             val context = reactApplicationContext
             val intent = Intent(context, TrackingService::class.java).apply {
@@ -57,11 +66,16 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                 putExtra(TrackingService.EXTRA_GOAL_UNIT, goalUnit)
             }
 
+            Log.d(TAG, "Starting tracking: type=$goalType value=$goalValue unit=$goalUnit")
             context.startForegroundService(intent)
             context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
 
+            // Notify JS that tracking has started, so the UI can sync
+            sendEvent("onTrackingStarted", Arguments.createMap())
+
             promise.resolve(true)
         } catch (e: Exception) {
+            Log.e(TAG, "Failed to start tracking", e)
             promise.reject("ERROR", e.message)
         }
     }
@@ -69,12 +83,20 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     @ReactMethod
     fun stopTracking(promise: Promise) {
         try {
+            Log.d(TAG, "Stopping tracking")
             val context = reactApplicationContext
             val intent = Intent(context, TrackingService::class.java)
             context.stopService(intent)
             unbindService()
+
+            // Clear SharedPreferences so onDestroy's save doesn't get
+            // double-counted — JS handles persistence via saveAndResetSession
+            context.getSharedPreferences("touchgrass_tracking_prefs", Context.MODE_PRIVATE)
+                .edit().clear().apply()
+
             promise.resolve(true)
         } catch (e: Exception) {
+            Log.e(TAG, "Failed to stop tracking", e)
             promise.reject("ERROR", e.message)
         }
     }
@@ -103,6 +125,42 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         }
     }
 
+    /**
+     * Returns any unsaved session data from SharedPreferences (written by
+     * TrackingService.onDestroy when the service ran without JS) and clears it.
+     * Returns null fields if nothing is pending.
+     */
+    @ReactMethod
+    fun getUnsavedSession(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences(
+                "touchgrass_tracking_prefs", Context.MODE_PRIVATE
+            )
+            val date = prefs.getString("unsaved_date", null)
+            if (date == null) {
+                promise.resolve(null)
+                return
+            }
+
+            val result = Arguments.createMap().apply {
+                putString("date", date)
+                putDouble("distanceMeters",
+                    java.lang.Double.longBitsToDouble(prefs.getLong("unsaved_distance", 0L)))
+                putDouble("elapsedSeconds", prefs.getLong("unsaved_elapsed", 0L).toDouble())
+                putBoolean("goalsReached", prefs.getBoolean("unsaved_goal_reached", false))
+            }
+
+            // Clear after reading
+            prefs.edit().clear().apply()
+            Log.d(TAG, "Retrieved and cleared unsaved session for $date")
+
+            promise.resolve(result)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get unsaved session", e)
+            promise.reject("ERROR", e.message)
+        }
+    }
+
     @ReactMethod
     fun addListener(eventName: String) {
         // Required for NativeEventEmitter
@@ -119,15 +177,26 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                 trackingService?.setProgressListener(null)
                 trackingService?.setGoalReachedListener(null)
                 reactApplicationContext.unbindService(connection)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w(TAG, "Error unbinding service", e)
+            }
             trackingService = null
             bound = false
         }
     }
 
     private fun sendEvent(eventName: String, params: com.facebook.react.bridge.WritableMap) {
-        reactApplicationContext
-            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-            .emit(eventName, params)
+        try {
+            if (!reactApplicationContext.hasActiveReactInstance()) return
+            reactApplicationContext
+                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                .emit(eventName, params)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to send event $eventName", e)
+        }
+    }
+
+    companion object {
+        private const val TAG = "TrackingModule"
     }
 }

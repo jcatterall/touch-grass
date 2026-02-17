@@ -10,12 +10,11 @@ const { ActivityRecognitionModule } = NativeModules;
 const isAvailable =
   Platform.OS === 'android' && ActivityRecognitionModule != null;
 
-export type ActivityType = 'WALKING' | 'RUNNING' | 'STILL';
-export type TransitionType = 'ENTER' | 'EXIT';
+export type ActivityType = 'WALKING' | 'RUNNING' | 'CYCLING' | 'STILL';
 
-export interface ActivityTransitionEvent {
+export interface ActivityDetectedEvent {
   activity: ActivityType;
-  transition: TransitionType;
+  confidence: number;
 }
 
 const emitter = isAvailable
@@ -42,10 +41,22 @@ export const ActivityRecognition = {
     return ActivityRecognitionModule.stop();
   },
 
-  onTransition(
-    callback: (event: ActivityTransitionEvent) => void,
+  /**
+   * For debug builds, allows triggering a fake activity update to test the receiver logic.
+   */
+  async triggerTest(activityType: ActivityType): Promise<boolean> {
+    if (__DEV__ && isAvailable) {
+      console.log(`Triggering test activity: ${activityType}`);
+      return ActivityRecognitionModule.triggerTest(activityType);
+    }
+    console.warn('triggerTest is only available in debug builds on Android.');
+    return false;
+  },
+
+  onActivityDetected(
+    callback: (event: ActivityDetectedEvent) => void,
   ): EmitterSubscription | null {
     if (!emitter) return null;
-    return emitter.addListener('onActivityTransition', callback);
+    return emitter.addListener('onActivityDetected', callback);
   },
 };

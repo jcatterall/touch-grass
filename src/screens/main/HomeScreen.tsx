@@ -1,78 +1,143 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Footprints, Play, Square } from 'lucide-react-native';
+import { useState, useEffect } from 'react';
+import {
+  AppState,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import {
+  Footprints,
+  LeafyGreen,
+  Play,
+  Shield,
+  Square,
+} from 'lucide-react-native';
 import { Typography } from '../../components';
 import { ProgressRing } from '../../components/ProgressRing';
-import { useTracking } from '../../hooks/useTracking';
-import { TrackingPermissions } from '../../native/Permissions';
-import { ActivityRecognition } from '../../native/ActivityRecognition';
+import { useTracking, AggregatedGoals } from '../../hooks/useTracking';
+import { TrackingProgress } from '../../native/Tracking';
+import { AppBlocker } from '../../native/AppBlocker';
 import { colors, spacing } from '../../theme';
+import { ActivityRecognition } from '../../native/ActivityRecognition';
 
-function getProgressFraction(
-  activePlan: ReturnType<typeof useTracking>['activePlan'],
-  progress: ReturnType<typeof useTracking>['progress'],
+function getOverallFraction(
+  goals: AggregatedGoals,
+  progress: TrackingProgress,
 ): number {
-  if (!activePlan) return 0;
-  const { criteria } = activePlan;
+  const fractions: number[] = [];
 
-  if (criteria.type === 'distance') {
-    const goalMeters =
-      criteria.unit === 'mi'
-        ? criteria.value * 1609.34
-        : criteria.value * 1000;
-    return Math.min(progress.distanceMeters / goalMeters, 1);
+  if (goals.hasDistanceGoal) {
+    fractions.push(
+      Math.min(progress.distanceMeters / goals.totalDistanceMeters, 1),
+    );
   }
-  if (criteria.type === 'time') {
-    const goalSeconds = criteria.value * 60;
-    return Math.min(progress.elapsedSeconds / goalSeconds, 1);
+  if (goals.hasTimeGoal) {
+    fractions.push(
+      Math.min(progress.elapsedSeconds / goals.totalTimeSeconds, 1),
+    );
   }
-  return 0;
+
+  if (fractions.length === 0) return 0;
+  return fractions.reduce((a, b) => a + b, 0) / fractions.length;
 }
 
-function getProgressText(
-  activePlan: ReturnType<typeof useTracking>['activePlan'],
-  progress: ReturnType<typeof useTracking>['progress'],
-): string {
-  if (!activePlan) return '';
-  const { criteria } = activePlan;
+function formatDistance(meters: number, totalMeters: number): string {
+  const formatValue = (m: number) =>
+    m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`;
+  return `${formatValue(meters)} / ${formatValue(totalMeters)}`;
+}
 
-  if (criteria.type === 'distance') {
-    const distKm = progress.distanceMeters / 1000;
-    if (criteria.unit === 'mi') {
-      const distMi = progress.distanceMeters / 1609.34;
-      return `${distMi.toFixed(1)}mi / ${criteria.value}mi`;
-    }
-    return `${distKm.toFixed(1)}km / ${criteria.value}km`;
-  }
-  if (criteria.type === 'time') {
-    const elapsedMin = Math.floor(progress.elapsedSeconds / 60);
-    return `${elapsedMin}min / ${criteria.value}min`;
-  }
-  return '';
+function formatTime(seconds: number, totalSeconds: number): string {
+  const formatValue = (s: number) => {
+    if (s < 60) return `${Math.round(s)}s`;
+    const min = Math.floor(s / 60);
+    const sec = Math.round(s % 60);
+    return sec > 0 && s < 3600 ? `${min}m ${sec}s` : `${min}min`;
+  };
+  return `${formatValue(seconds)} / ${formatValue(totalSeconds)}`;
 }
 
 export const HomeScreen = () => {
-  const { isTracking, progress, activePlan, permissionsGranted, startManual, stop } =
-    useTracking();
+  const [isTesting, setIsTesting] = useState(false);
 
-  const fraction = getProgressFraction(activePlan, progress);
-  const progressText = getProgressText(activePlan, progress);
+  const triggerTest = () => {
+    const currentTesting = !isTesting;
+    setIsTesting(currentTesting);
+    ActivityRecognition.triggerTest(currentTesting ? 'WALKING' : 'STILL');
+  };
 
-  const statusText = !activePlan
+  const {
+    isTracking,
+    trackingMode,
+    progress,
+    activePlans,
+    goals,
+    allGoalsReached,
+    permissionsGranted,
+    backgroundTrackingEnabled,
+    debugInfo,
+    startManual,
+    stop,
+    toggleBackgroundTracking,
+  } = useTracking();
+
+  const fraction = getOverallFraction(goals, progress);
+  const hasPlans = activePlans.length > 0;
+
+  const isAutoTracking = isTracking && trackingMode === 'auto';
+  const showPlayButton = hasPlans && !allGoalsReached && !isAutoTracking;
+
+  const statusText = !hasPlans
     ? 'No active plan for today'
-    : progress.goalReached
-      ? 'Goal reached! Apps unlocked'
-      : isTracking
-        ? "Keep going! You're making progress"
-        : 'Start walking to earn screen time';
+    : allGoalsReached
+    ? 'Goal reached! Apps unlocked'
+    : isAutoTracking
+    ? 'Activity detected, automatically tracking'
+    : isTracking
+    ? "Keep going! You're making progress"
+    : 'Start walking to earn screen time';
+
+  const footprintActive = backgroundTrackingEnabled && permissionsGranted;
+
+  const [usageStatsPermission, setUsageStatsPermission] = useState(false);
+
+  useEffect(() => {
+    AppBlocker.hasUsageStatsPermission().then(setUsageStatsPermission);
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        AppBlocker.hasUsageStatsPermission().then(setUsageStatsPermission);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  const requestBlockerPermissions = async () => {
+    if (!usageStatsPermission) {
+      await AppBlocker.requestUsageStatsPermission();
+    }
+  };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} style={styles.scroll}>
       <ProgressRing progress={fraction} size={220} strokeWidth={14} />
 
-      {activePlan && (
-        <Typography variant="title" style={styles.progressText}>
-          {progressText}
-        </Typography>
+      {hasPlans && (
+        <View style={styles.progressInfo}>
+          {goals.hasDistanceGoal && (
+            <Typography variant="title" style={styles.progressText}>
+              {formatDistance(
+                progress.distanceMeters,
+                goals.totalDistanceMeters,
+              )}
+            </Typography>
+          )}
+          {goals.hasTimeGoal && (
+            <Typography variant="title" style={styles.progressText}>
+              {formatTime(progress.elapsedSeconds, goals.totalTimeSeconds)}
+            </Typography>
+          )}
+        </View>
       )}
 
       <Typography variant="body" style={styles.statusText}>
@@ -80,11 +145,12 @@ export const HomeScreen = () => {
       </Typography>
 
       <View style={styles.buttonRow}>
-        {activePlan && !progress.goalReached && (
+        {showPlayButton && (
           <Pressable
             style={styles.actionButton}
             onPress={isTracking ? stop : startManual}
-            hitSlop={12}>
+            hitSlop={12}
+          >
             {isTracking ? (
               <Square size={20} color={colors.white} fill={colors.white} />
             ) : (
@@ -95,34 +161,99 @@ export const HomeScreen = () => {
         <Pressable
           style={[
             styles.actionButton,
-            !permissionsGranted && styles.actionButtonHighlight,
+            footprintActive
+              ? styles.actionButtonActive
+              : styles.actionButtonHighlight,
           ]}
-          onPress={async () => {
-            const granted = await TrackingPermissions.requestAll();
-            if (granted) {
-              await ActivityRecognition.start();
-            }
-          }}
-          hitSlop={12}>
+          onPress={toggleBackgroundTracking}
+          hitSlop={12}
+        >
           <Footprints size={20} color={colors.white} />
         </Pressable>
+        <Pressable
+          style={[styles.actionButton]}
+          onPress={triggerTest}
+          hitSlop={12}
+        >
+          {isTesting ? (
+            <LeafyGreen size={20} color={colors.terracotta} />
+          ) : (
+            <LeafyGreen size={20} color={colors.white} />
+          )}
+        </Pressable>
+
+        {!usageStatsPermission && (
+          <Pressable
+            style={[styles.actionButton, styles.actionButtonHighlight]}
+            onPress={requestBlockerPermissions}
+            hitSlop={12}
+          >
+            <Shield size={20} color={colors.white} />
+          </Pressable>
+        )}
       </View>
-    </View>
+
+      <View style={styles.debugPanel}>
+        <Typography variant="body" style={styles.debugTitle}>
+          DEBUG
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          mode: {trackingMode} | isTracking: {String(isTracking)}
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          bgEnabled: {String(backgroundTrackingEnabled)} | perms:{' '}
+          {String(permissionsGranted)}
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          actRecog registered: {String(debugInfo.actRecogRegistered)}
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          nativeService running: {String(debugInfo.nativeServiceRunning)}
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          lastActivity: {debugInfo.lastTransition}
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          session: {debugInfo.sessionDistance.toFixed(1)}m /{' '}
+          {debugInfo.sessionTime.toFixed(0)}s
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          baseline: {debugInfo.baselineDistance.toFixed(1)}m /{' '}
+          {debugInfo.baselineTime.toFixed(0)}s
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          plans: {activePlans.length} | goalsReached: {String(allGoalsReached)}
+        </Typography>
+        {debugInfo.startTrackingBlocked && (
+          <Typography variant="body" style={styles.debugWarn}>
+            startTracking blocked: {debugInfo.startTrackingBlocked}
+          </Typography>
+        )}
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  scroll: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  container: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.background,
     padding: spacing.lg,
     gap: spacing.lg,
   },
+  progressInfo: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
   progressText: {
     color: colors.white,
-    marginTop: spacing.md,
   },
   statusText: {
     color: colors.backgroundTertiary,
@@ -141,7 +272,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  actionButtonActive: {
+    backgroundColor: colors.meadowGreen,
+  },
   actionButtonHighlight: {
     backgroundColor: colors.terracotta,
+  },
+  debugPanel: {
+    width: '100%',
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    gap: 2,
+  },
+  debugTitle: {
+    color: colors.terracotta,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  debugText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 10,
+    fontFamily: 'monospace',
+  },
+  debugWarn: {
+    color: colors.terracotta,
+    fontSize: 10,
+    fontFamily: 'monospace',
+    marginTop: 4,
   },
 });

@@ -2,6 +2,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
@@ -11,6 +12,8 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
       android:name=".MainApplication"
@@ -39,12 +42,17 @@
           android:exported="false" />
       <service
           android:name=".ActivityHeadlessTaskService"
+          android:foregroundServiceType="shortService"
+          android:exported="false" />
+      <service
+          android:name=".AppBlockerService"
+          android:foregroundServiceType="specialUse"
           android:exported="false" />
       <receiver
-          android:name=".ActivityTransitionReceiver"
+          android:name=".ActivityUpdateReceiver"
           android:exported="false">
           <intent-filter>
-              <action android:name="com.touchgrass.ACTIVITY_TRANSITION" />
+              <action android:name="com.touchgrass.ACTIVITY_UPDATE" />
           </intent-filter>
       </receiver>
     </application>

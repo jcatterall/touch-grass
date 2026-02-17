@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
+import { AppState, BackHandler, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChartNoAxesColumn, Crown, Home, Notebook } from 'lucide-react-native';
 import { colors, spacing } from '../../theme';
@@ -7,6 +7,8 @@ import { HomeScreen } from './HomeScreen';
 import { MetricsScreen } from './MetricsScreen';
 import { PaywallScreen } from './PaywallScreen';
 import { PlanList } from './PlanList';
+import { BlockingScreen } from './BlockingScreen';
+import { AppBlocker } from '../../native/AppBlocker';
 
 type Overlay = 'plan' | 'metrics' | 'paywall';
 
@@ -17,8 +19,43 @@ const TABS: { key: Overlay; icon: typeof Home }[] = [
 
 export const MainApp = () => {
   const [activeOverlay, setActiveOverlay] = useState<Overlay | null>(null);
+  const [blockedPackage, setBlockedPackage] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const close = () => setActiveOverlay(null);
+
+  // Poll for blocked app state when the app is in the foreground
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const startPolling = () => {
+      // Check immediately, then every 1s
+      AppBlocker.getCurrentlyBlockedApp().then(setBlockedPackage);
+      interval = setInterval(() => {
+        AppBlocker.getCurrentlyBlockedApp().then(setBlockedPackage);
+      }, 1000);
+    };
+
+    const stopPolling = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    startPolling();
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    });
+
+    return () => {
+      stopPolling();
+      sub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeOverlay) return;
@@ -74,6 +111,12 @@ export const MainApp = () => {
           <View style={[styles.overlayContent]}>{renderOverlay()}</View>
         </View>
       )}
+
+      {blockedPackage && (
+        <View style={[StyleSheet.absoluteFill, styles.overlay, styles.blockerOverlay]}>
+          <BlockingScreen blockedPackage={blockedPackage} />
+        </View>
+      )}
     </View>
   );
 };
@@ -102,5 +145,8 @@ const styles = StyleSheet.create({
 
   overlayContent: {
     flex: 1,
+  },
+  blockerOverlay: {
+    zIndex: 20,
   },
 });

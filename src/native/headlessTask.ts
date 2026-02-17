@@ -1,74 +1,62 @@
 import { AppRegistry } from 'react-native';
 import { storage } from '../storage';
-import { BlockingPlan, DayKey } from '../types';
+import { findActivePlansForToday } from '../hooks/useTracking';
 import { Tracking } from './Tracking';
 import { TrackingPermissions } from './Permissions';
-
-const DAY_MAP: Record<number, DayKey> = {
-  0: 'SUN',
-  1: 'MON',
-  2: 'TUE',
-  3: 'WED',
-  4: 'THU',
-  5: 'FRI',
-  6: 'SAT',
-};
-
-function findActivePlanForToday(plans: BlockingPlan[]): BlockingPlan | null {
-  const today = DAY_MAP[new Date().getDay()];
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-  return (
-    plans.find(plan => {
-      if (!plan.active) return false;
-      if (!plan.days.includes(today)) return false;
-      if (plan.criteria.type === 'permanent') return false;
-
-      if (plan.duration.type === 'specific_hours') {
-        const [fromH, fromM] = plan.duration.from.split(':').map(Number);
-        const [toH, toM] = plan.duration.to.split(':').map(Number);
-        const fromMinutes = fromH * 60 + fromM;
-        const toMinutes = toH * 60 + toM;
-        if (currentMinutes < fromMinutes || currentMinutes > toMinutes) {
-          return false;
-        }
-      }
-
-      return true;
-    }) ?? null
-  );
-}
 
 interface TaskData {
   activity: string;
   transition: string;
 }
 
+// NOTE: console.log messages in a headless task are visible in Logcat
 async function activityTask(data: TaskData): Promise<void> {
   const { activity, transition } = data;
+  console.log(
+    `[HeadlessTask] Received activity: ${activity}, transition: ${transition}`,
+  );
 
-  // Only start tracking on ENTER transitions for walking/running
-  if (transition !== 'ENTER') return;
-  if (activity !== 'WALKING' && activity !== 'RUNNING') return;
+  if (transition !== 'ENTER') {
+    console.log('[HeadlessTask] Ignoring non-ENTER transition.');
+    return;
+  }
+  if (activity !== 'WALKING' && activity !== 'RUNNING' && activity !== 'CYCLING') {
+    console.log(`[HeadlessTask] Ignoring ignorable activity: ${activity}.`);
+    return;
+  }
 
-  // Check permissions first
+  console.log('[HeadlessTask] Checking permissions...');
   const hasPerms = await TrackingPermissions.checkAll();
-  if (!hasPerms) return;
+  if (!hasPerms) {
+    console.error(
+      '[HeadlessTask] FAILED: Permissions check failed. Aborting.',
+    );
+    return;
+  }
+  console.log('[HeadlessTask] Permissions check passed.');
 
-  // Find an active plan for today
+  console.log('[HeadlessTask] Loading plans from storage...');
   const plans = await storage.getPlans();
-  const plan = findActivePlanForToday(plans);
-  if (!plan) return;
+  console.log(`[HeadlessTask] Found ${plans.length} total plans.`);
 
-  const { criteria } = plan;
-  if (criteria.type === 'permanent') return;
+  const activePlans = findActivePlansForToday(plans);
+  if (activePlans.length === 0) {
+    console.error(
+      '[HeadlessTask] FAILED: No active plans for today. Aborting.',
+    );
+    return;
+  }
+  console.log(
+    `[HeadlessTask] Found ${activePlans.length} active plans for today.`,
+  );
 
-  const goalType = criteria.type;
-  const goalValue = criteria.value;
-  const goalUnit = criteria.type === 'distance' ? criteria.unit : 'min';
-
-  await Tracking.startTracking(goalType, goalValue, goalUnit);
+  try {
+    console.log('[HeadlessTask] Calling Tracking.startTracking...');
+    await Tracking.startTracking('distance', 999, 'km');
+    console.log('[HeadlessTask] SUCCEEDED: Tracking.startTracking called.');
+  } catch (e) {
+    console.error('[HeadlessTask] FAILED: Tracking.startTracking threw an error.', e);
+  }
 }
 
 AppRegistry.registerHeadlessTask(
