@@ -208,41 +208,67 @@ export function useTracking(): TrackingState {
     load();
 
     const sub = DeviceEventEmitter.addListener(PLANS_CHANGED_EVENT, load);
-    const interval = setInterval(load, 60_000);
+    const interval = setInterval(load, 300_000);
     return () => {
       sub.remove();
       clearInterval(interval);
     };
   }, []);
 
-  // Sync blocker service with current plan/progress state
+  // Sync blocker service with current plan/progress state.
+  // Only block apps from plans whose individual goal is NOT yet met.
+  // Runs on a 15-second interval rather than on every progress tick
+  // to avoid excessive native bridge calls and storage reads.
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
+
   useEffect(() => {
     const syncBlocker = async () => {
       const plans = await storage.getPlans();
       const blockingPlans = findBlockingPlansForToday(plans);
+      const currentProgress = progressRef.current;
 
       if (blockingPlans.length === 0) {
         await AppBlocker.stopBlocker();
         return;
       }
 
+      // Filter to plans whose goal is not yet reached
+      const unmetPlans = blockingPlans.filter(plan => {
+        if (plan.criteria.type === 'permanent') return true;
+        if (plan.criteria.type === 'distance') {
+          const goalMeters =
+            plan.criteria.unit === 'mi'
+              ? plan.criteria.value * 1609.34
+              : plan.criteria.value * 1000;
+          return currentProgress.distanceMeters < goalMeters;
+        }
+        if (plan.criteria.type === 'time') {
+          return currentProgress.elapsedSeconds < plan.criteria.value * 60;
+        }
+        return false;
+      });
+
+      if (unmetPlans.length === 0) {
+        await AppBlocker.updateBlockerConfig([], true, false);
+        return;
+      }
+
       const blockedPackages = [
-        ...new Set(blockingPlans.flatMap(p => p.blockedApps.map(a => a.id))),
+        ...new Set(unmetPlans.flatMap(p => p.blockedApps.map(a => a.id))),
       ];
-      const hasPermanent = blockingPlans.some(
+      const hasPermanent = unmetPlans.some(
         p => p.criteria.type === 'permanent',
       );
 
-      await AppBlocker.updateBlockerConfig(
-        blockedPackages,
-        allGoalsReached,
-        hasPermanent,
-      );
+      await AppBlocker.updateBlockerConfig(blockedPackages, false, hasPermanent);
       await AppBlocker.startBlocker();
     };
 
     syncBlocker();
-  }, [activePlans, allGoalsReached]);
+    const interval = setInterval(syncBlocker, 15_000);
+    return () => clearInterval(interval);
+  }, [activePlans]);
 
   // Check permissions + load background tracking state on mount
   useEffect(() => {

@@ -58,6 +58,7 @@ class TrackingService : Service() {
 
     private var onProgressUpdate: ((Double, Long, Boolean) -> Unit)? = null
     private var onGoalReachedCallback: (() -> Unit)? = null
+    private var lastNotificationUpdateMs: Long = 0
 
     private val binder = TrackingBinder()
 
@@ -109,9 +110,9 @@ class TrackingService : Service() {
     }
 
     private fun startLocationUpdates() {
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10_000L)
-            .setMinUpdateIntervalMillis(5_000L)
-            .setMinUpdateDistanceMeters(3f)
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 15_000L)
+            .setMinUpdateIntervalMillis(10_000L)
+            .setMinUpdateDistanceMeters(5f)
             .build()
 
         locationCallback = object : LocationCallback() {
@@ -160,7 +161,13 @@ class TrackingService : Service() {
             else -> false
         }
 
-        updateNotification()
+        // Throttle notification updates to every 15s to reduce overhead
+        val now = System.currentTimeMillis()
+        if (now - lastNotificationUpdateMs >= 15_000 || goalReached) {
+            lastNotificationUpdateMs = now
+            updateNotification()
+        }
+
         onProgressUpdate?.invoke(distanceMeters, elapsedSeconds, goalReached)
 
         if (goalReached) {

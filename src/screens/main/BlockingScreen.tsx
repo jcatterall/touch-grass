@@ -1,11 +1,17 @@
-import { useEffect, useMemo } from 'react';
-import { BackHandler, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { AppState, BackHandler, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TreePine } from 'lucide-react-native';
+import { TreePine, X } from 'lucide-react-native';
+import { AppBlocker } from '../../native/AppBlocker';
 import { Typography } from '../../components';
 import { ProgressRing } from '../../components/ProgressRing';
-import { useTracking, AggregatedGoals } from '../../hooks/useTracking';
-import { TrackingProgress } from '../../native/Tracking';
+import {
+  findBlockingPlansForToday,
+  AggregatedGoals,
+} from '../../hooks/useTracking';
+import { Tracking, TrackingProgress } from '../../native/Tracking';
+import { storage } from '../../storage';
+import { BlockingPlan } from '../../types';
 import { colors, spacing } from '../../theme';
 
 const MESSAGES = [
@@ -17,6 +23,38 @@ const MESSAGES = [
   'Go explore the world!',
   'The outdoors miss you!',
 ];
+
+function aggregateUnmetGoals(
+  plans: BlockingPlan[],
+  progress: TrackingProgress,
+): AggregatedGoals {
+  let totalDistanceMeters = 0;
+  let totalTimeSeconds = 0;
+
+  for (const plan of plans) {
+    if (plan.criteria.type === 'distance') {
+      const meters =
+        plan.criteria.unit === 'mi'
+          ? plan.criteria.value * 1609.34
+          : plan.criteria.value * 1000;
+      if (progress.distanceMeters < meters) {
+        totalDistanceMeters += meters;
+      }
+    } else if (plan.criteria.type === 'time') {
+      const seconds = plan.criteria.value * 60;
+      if (progress.elapsedSeconds < seconds) {
+        totalTimeSeconds += seconds;
+      }
+    }
+  }
+
+  return {
+    totalDistanceMeters,
+    totalTimeSeconds,
+    hasDistanceGoal: totalDistanceMeters > 0,
+    hasTimeGoal: totalTimeSeconds > 0,
+  };
+}
 
 function getOverallFraction(
   goals: AggregatedGoals,
@@ -56,19 +94,75 @@ interface BlockingScreenProps {
 
 export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
   const insets = useSafeAreaInsets();
-  const { progress, goals, allGoalsReached } = useTracking();
-  const fraction = getOverallFraction(goals, progress);
+  const [progress, setProgress] = useState<TrackingProgress>({
+    distanceMeters: 0,
+    elapsedSeconds: 0,
+    goalReached: false,
+  });
+  const [goals, setGoals] = useState<AggregatedGoals>({
+    totalDistanceMeters: 0,
+    totalTimeSeconds: 0,
+    hasDistanceGoal: false,
+    hasTimeGoal: false,
+  });
 
   const message = useMemo(
     () => MESSAGES[Math.floor(Math.random() * MESSAGES.length)],
     [],
   );
 
+  const dismiss = useCallback(() => {
+    AppBlocker.setImmersiveMode(false);
+    AppBlocker.dismissBlockingScreen();
+  }, []);
+
+  // Hide navigation bar to prevent swipe-up gesture to Recents
+  useEffect(() => {
+    AppBlocker.setImmersiveMode(true);
+    return () => { AppBlocker.setImmersiveMode(false); };
+  }, []);
+
   // Block the Android back button
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
     return () => sub.remove();
   }, []);
+
+  // Read-only: load progress and goals from storage + native service
+  const loadState = useCallback(async () => {
+    const [todayActivity, sessionProgress, plans] = await Promise.all([
+      storage.getTodayActivity(),
+      Tracking.getProgress(),
+      storage.getPlans(),
+    ]);
+
+    const combined: TrackingProgress = {
+      distanceMeters:
+        todayActivity.distanceMeters + sessionProgress.distanceMeters,
+      elapsedSeconds:
+        todayActivity.elapsedSeconds + sessionProgress.elapsedSeconds,
+      goalReached: sessionProgress.goalReached,
+    };
+
+    setProgress(combined);
+
+    const blockingPlans = findBlockingPlansForToday(plans);
+    setGoals(aggregateUnmetGoals(blockingPlans, combined));
+  }, []);
+
+  useEffect(() => {
+    loadState();
+    const interval = setInterval(loadState, 2000);
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') loadState();
+    });
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+    };
+  }, [loadState]);
+
+  const fraction = getOverallFraction(goals, progress);
 
   const remainingDistance = goals.hasDistanceGoal
     ? Math.max(goals.totalDistanceMeters - progress.distanceMeters, 0)
@@ -77,23 +171,33 @@ export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
     ? Math.max(goals.totalTimeSeconds - progress.elapsedSeconds, 0)
     : 0;
 
+  const allMet = remainingDistance === 0 && remainingTime === 0 &&
+    (goals.hasDistanceGoal || goals.hasTimeGoal);
+
   return (
     <View
       style={[
         styles.container,
-        { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.xl },
+        {
+          paddingTop: insets.top + spacing.xl,
+          paddingBottom: insets.bottom + spacing.xl,
+        },
       ]}
     >
+      <Pressable style={[styles.closeX, { top: insets.top }]} onPress={dismiss} hitSlop={16}>
+        <X size={24} color={colors.backgroundTertiary} />
+      </Pressable>
+
       <View style={styles.iconContainer}>
         <TreePine size={48} color={colors.meadowGreen} />
       </View>
 
       <Typography variant="heading" style={styles.title}>
-        {allGoalsReached ? 'Goal Reached!' : 'App Blocked'}
+        {allMet ? 'Goal Reached!' : 'App Blocked'}
       </Typography>
 
       <Typography variant="body" style={styles.message}>
-        {allGoalsReached ? 'Congratulations! You made it!' : message}
+        {allMet ? 'Congratulations! You made it!' : message}
       </Typography>
 
       <ProgressRing progress={fraction} size={160} strokeWidth={12} />
@@ -121,24 +225,24 @@ export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
             </Typography>
           </View>
         )}
-        {!allGoalsReached && (remainingDistance > 0 || remainingTime > 0) && (
+        {!allMet && (remainingDistance > 0 || remainingTime > 0) && (
           <>
             <View style={styles.divider} />
             <Typography variant="body" style={styles.remaining}>
-              {goals.hasDistanceGoal && `${formatDistance(remainingDistance)} `}
-              {goals.hasDistanceGoal && goals.hasTimeGoal && '& '}
-              {goals.hasTimeGoal && `${formatTime(remainingTime)} `}
+              {remainingDistance > 0 && `${formatDistance(remainingDistance)} `}
+              {remainingDistance > 0 && remainingTime > 0 && '& '}
+              {remainingTime > 0 && `${formatTime(remainingTime)} `}
               remaining
             </Typography>
           </>
         )}
       </View>
 
-      {!allGoalsReached && (
-        <Typography variant="caption" style={styles.hint}>
-          Complete your goals to unlock this app
+      <Pressable style={styles.closeButton} onPress={dismiss}>
+        <Typography variant="body" style={styles.closeButtonText}>
+          Close
         </Typography>
-      )}
+      </Pressable>
     </View>
   );
 };
@@ -196,6 +300,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   hint: {
+    color: colors.backgroundTertiary,
+    textAlign: 'center',
+  },
+  closeX: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    padding: spacing.lg,
+  },
+  closeButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xxl,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.backgroundTertiary,
+  },
+  closeButtonText: {
     color: colors.backgroundTertiary,
     textAlign: 'center',
   },

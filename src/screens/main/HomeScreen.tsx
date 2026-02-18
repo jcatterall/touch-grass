@@ -100,21 +100,30 @@ export const HomeScreen = () => {
 
   const footprintActive = backgroundTrackingEnabled && permissionsGranted;
 
-  const [usageStatsPermission, setUsageStatsPermission] = useState(false);
+  const [blockerPermsGranted, setBlockerPermsGranted] = useState(false);
 
   useEffect(() => {
-    AppBlocker.hasUsageStatsPermission().then(setUsageStatsPermission);
+    const check = async () => {
+      const hasUsage = await AppBlocker.hasUsageStatsPermission();
+      const hasOverlay = await AppBlocker.hasOverlayPermission();
+      setBlockerPermsGranted(hasUsage && hasOverlay);
+    };
+    check();
     const sub = AppState.addEventListener('change', state => {
-      if (state === 'active') {
-        AppBlocker.hasUsageStatsPermission().then(setUsageStatsPermission);
-      }
+      if (state === 'active') check();
     });
     return () => sub.remove();
   }, []);
 
   const requestBlockerPermissions = async () => {
-    if (!usageStatsPermission) {
+    const hasUsage = await AppBlocker.hasUsageStatsPermission();
+    if (!hasUsage) {
       await AppBlocker.requestUsageStatsPermission();
+      return;
+    }
+    const hasOverlay = await AppBlocker.hasOverlayPermission();
+    if (!hasOverlay) {
+      await AppBlocker.requestOverlayPermission();
     }
   };
 
@@ -182,7 +191,7 @@ export const HomeScreen = () => {
           )}
         </Pressable>
 
-        {!usageStatsPermission && (
+        {!blockerPermsGranted && (
           <Pressable
             style={[styles.actionButton, styles.actionButtonHighlight]}
             onPress={requestBlockerPermissions}
@@ -223,6 +232,9 @@ export const HomeScreen = () => {
         </Typography>
         <Typography variant="body" style={styles.debugText}>
           plans: {activePlans.length} | goalsReached: {String(allGoalsReached)}
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          usageStatsPerm: {String(blockerPermsGranted)}
         </Typography>
         {debugInfo.startTrackingBlocked && (
           <Typography variant="body" style={styles.debugWarn}>

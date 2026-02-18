@@ -18,7 +18,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const minDelay = new Promise<void>(resolve => setTimeout(resolve, 2000));
+    const minDelay = new Promise<void>(resolve => setTimeout(resolve, 1000));
     const loadData = storage.getOnboardingComplete();
 
     Promise.all([minDelay, loadData]).then(([, complete]) => {

@@ -59,4 +59,14 @@ export const AppBlocker = {
     if (!isAvailable) return false;
     return AppBlockerModule.clearCurrentlyBlockedApp();
   },
+
+  async setImmersiveMode(enabled: boolean): Promise<boolean> {
+    if (!isAvailable) return false;
+    return AppBlockerModule.setImmersiveMode(enabled);
+  },
+
+  async dismissBlockingScreen(): Promise<boolean> {
+    if (!isAvailable) return false;
+    return AppBlockerModule.dismissBlockingScreen();
+  },
 };

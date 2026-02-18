@@ -5,11 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.os.Process
 import android.provider.Settings
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.bridge.UiThreadUtil
 import org.json.JSONArray
 
 class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
@@ -119,5 +122,52 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
             .remove(AppBlockerService.PREF_CURRENTLY_BLOCKED)
             .apply()
         promise.resolve(true)
+    }
+
+    @ReactMethod
+    fun setImmersiveMode(enabled: Boolean, promise: Promise) {
+        UiThreadUtil.runOnUiThread {
+            try {
+                val activity = getCurrentActivity() ?: run {
+                    promise.resolve(false)
+                    return@runOnUiThread
+                }
+                val controller: WindowInsetsController? = activity.window.insetsController
+                if (controller != null) {
+                    if (enabled) {
+                        controller.hide(WindowInsets.Type.navigationBars())
+                        controller.systemBarsBehavior =
+                            WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    } else {
+                        controller.show(WindowInsets.Type.navigationBars())
+                    }
+                }
+                promise.resolve(true)
+            } catch (e: Exception) {
+                promise.resolve(false)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun dismissBlockingScreen(promise: Promise) {
+        try {
+            // Clear the blocked state so the service stops re-launching
+            reactApplicationContext.getSharedPreferences(
+                AppBlockerService.PREFS_NAME, Context.MODE_PRIVATE
+            ).edit()
+                .remove(AppBlockerService.PREF_CURRENTLY_BLOCKED)
+                .apply()
+
+            // Send user to the home screen (minimizes the app)
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
     }
 }

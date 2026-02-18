@@ -50,7 +50,7 @@ class ActivityRecognitionModule(reactContext: ReactApplicationContext) : ReactCo
             val client = ActivityRecognition.getClient(reactApplicationContext)
             client.requestActivityUpdates(POLLING_INTERVAL_MS, activityRecognitionPendingIntent!!)
                 .addOnSuccessListener {
-                    Log.d(TAG, "Activity recognition updates registered (polling, 10s interval)")
+                    Log.d(TAG, "Activity recognition updates registered (polling, 30s interval)")
                     promise.resolve(true)
                 }
                 .addOnFailureListener { e ->
@@ -152,6 +152,6 @@ class ActivityRecognitionModule(reactContext: ReactApplicationContext) : ReactCo
 
     companion object {
         private const val TAG = "ActivityRecognition"
-        private const val POLLING_INTERVAL_MS = 10_000L
+        private const val POLLING_INTERVAL_MS = 30_000L
     }
 }
