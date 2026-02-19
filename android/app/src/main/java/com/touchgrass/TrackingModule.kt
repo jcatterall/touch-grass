@@ -20,6 +20,25 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     private var trackingService: TrackingService? = null
     private var bound = false
 
+    /**
+     * Called by RN after the module is attached to the React context.
+     * If TrackingService is already running (e.g. started by a headless task while the app
+     * was in the background), bind to it so progress events flow to JS and getProgress() works.
+     */
+    override fun initialize() {
+        super.initialize()
+        try {
+            val intent = Intent(reactApplicationContext, TrackingService::class.java)
+            // Flag 0 = bind only if already running; never creates the service.
+            val didBind = reactApplicationContext.bindService(intent, connection, 0)
+            if (didBind) {
+                Log.d(TAG, "initialize: bound to already-running TrackingService")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "initialize: could not attempt bind to running service", e)
+        }
+    }
+
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as TrackingService.TrackingBinder

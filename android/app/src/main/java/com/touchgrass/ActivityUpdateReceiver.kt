@@ -81,10 +81,58 @@ class ActivityUpdateReceiver : BroadcastReceiver() {
         }
     }
 
+    /**
+     * Returns true if TrackingService is currently running as a foreground service.
+     * Used to decide whether to signal the service directly vs. launch a headless task.
+     */
+    private fun isTrackingServiceRunning(context: Context): Boolean {
+        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        @Suppress("DEPRECATION") // getRunningServices is deprecated but is the only reliable check for our own service
+        return manager.getRunningServices(Int.MAX_VALUE).any {
+            it.service.className == TrackingService::class.java.name
+        }
+    }
+
+    /**
+     * Sends a targeted Intent action to the already-running TrackingService via
+     * onStartCommand. The service intercepts these before its session-init block so
+     * no tracking state is reset.
+     */
+    private fun sendActionToTrackingService(context: Context, action: String) {
+        val intent = Intent(context, TrackingService::class.java).apply { this.action = action }
+        try {
+            context.startService(intent)
+            Log.d(TAG, "Sent $action to TrackingService")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send $action to TrackingService", e)
+        }
+    }
+
     private fun maybeStartHeadlessTask(context: Context, activityName: String) {
-        if (activityName == "STILL") {
-            Log.d(TAG, "Skipping headless task for STILL activity.")
-            return
+        val serviceRunning = isTrackingServiceRunning(context)
+
+        when (activityName) {
+            "STILL" -> {
+                // Never start a headless task for STILL. If the service is running, signal
+                // it to arm its fast-stop countdown. Otherwise there is nothing to do.
+                if (serviceRunning) {
+                    Log.d(TAG, "STILL detected, signalling TrackingService to arm fast-stop")
+                    sendActionToTrackingService(context, TrackingService.ACTION_STILL_DETECTED)
+                } else {
+                    Log.d(TAG, "STILL detected, TrackingService not running — nothing to do")
+                }
+                return
+            }
+            "WALKING", "RUNNING", "CYCLING" -> {
+                if (serviceRunning) {
+                    // Service is already tracking — cancel any active fast-stop countdown
+                    // and restore the normal 5-min inactivity timer.
+                    Log.d(TAG, "$activityName detected while service running — cancelling fast-stop")
+                    sendActionToTrackingService(context, TrackingService.ACTION_MOTION_DETECTED)
+                    return
+                }
+                // Service not running: fall through to start a headless task.
+            }
         }
 
         Log.d(TAG, "Launching headless task for $activityName")

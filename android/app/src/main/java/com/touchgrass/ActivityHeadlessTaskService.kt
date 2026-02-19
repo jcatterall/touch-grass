@@ -25,8 +25,10 @@ class ActivityHeadlessTaskService : HeadlessJsTaskService() {
         return HeadlessJsTaskConfig(
             "TouchGrassActivityTask", // Correct task name
             Arguments.fromBundle(extras), // Data to pass to the JS task
-            5000, // Timeout for the task in milliseconds
-            true // Optional: Allow the task to run in the foreground
+            // 30 seconds: JS runtime cold-start + AsyncStorage reads + native bridge calls
+            // all need time to complete. 5 seconds was too short and caused silent timeouts.
+            30_000,
+            true // Allow the task to run in the foreground
         )
     }
 

@@ -50,7 +50,7 @@ class ActivityRecognitionModule(reactContext: ReactApplicationContext) : ReactCo
             val client = ActivityRecognition.getClient(reactApplicationContext)
             client.requestActivityUpdates(POLLING_INTERVAL_MS, activityRecognitionPendingIntent!!)
                 .addOnSuccessListener {
-                    Log.d(TAG, "Activity recognition updates registered (polling, 30s interval)")
+                    Log.d(TAG, "Activity recognition updates registered (polling, 60s interval)")
                     promise.resolve(true)
                 }
                 .addOnFailureListener { e ->
@@ -66,14 +66,32 @@ class ActivityRecognitionModule(reactContext: ReactApplicationContext) : ReactCo
     @ReactMethod
     fun stop(promise: Promise) {
         try {
-            activityRecognitionPendingIntent?.let {
-                val client = ActivityRecognition.getClient(reactApplicationContext)
-                client.removeActivityUpdates(it)
-                it.cancel()
-                activityRecognitionPendingIntent = null
-                Log.d(TAG, "Activity recognition updates removed")
+            // Reconstruct the PendingIntent using the same parameters as start() so we can
+            // remove the Play Services registration even after a process restart (where
+            // activityRecognitionPendingIntent would be null).
+            val pendingIntent = activityRecognitionPendingIntent ?: run {
+                val intent = Intent(reactApplicationContext, ActivityUpdateReceiver::class.java).apply {
+                    action = ActivityUpdateReceiver.ACTION_ACTIVITY_UPDATE
+                }
+                PendingIntent.getBroadcast(
+                    reactApplicationContext,
+                    0,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                )
             }
-            promise.resolve(true)
+            val client = ActivityRecognition.getClient(reactApplicationContext)
+            client.removeActivityUpdates(pendingIntent)
+                .addOnSuccessListener {
+                    pendingIntent.cancel()
+                    activityRecognitionPendingIntent = null
+                    Log.d(TAG, "Activity recognition updates removed")
+                    promise.resolve(true)
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Failed to remove activity updates", e)
+                    promise.reject("ERROR", e.message)
+                }
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping activity recognition", e)
             promise.reject("ERROR", e.message)
@@ -152,6 +170,6 @@ class ActivityRecognitionModule(reactContext: ReactApplicationContext) : ReactCo
 
     companion object {
         private const val TAG = "ActivityRecognition"
-        private const val POLLING_INTERVAL_MS = 30_000L
+        private const val POLLING_INTERVAL_MS = 60_000L
     }
 }

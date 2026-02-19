@@ -72,7 +72,7 @@ export interface AggregatedGoals {
   hasTimeGoal: boolean;
 }
 
-function aggregateGoals(plans: BlockingPlan[]): AggregatedGoals {
+export function aggregateGoals(plans: BlockingPlan[]): AggregatedGoals {
   let totalDistanceMeters = 0;
   let totalTimeSeconds = 0;
 
@@ -170,6 +170,8 @@ export function useTracking(): TrackingState {
   const progressSub = useRef<EmitterSubscription | null>(null);
   const transitionSub = useRef<EmitterSubscription | null>(null);
   const trackingStarted = useRef(false);
+  // Debounce timer for STILL-based auto-stop in the foreground case.
+  const stillDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Time interpolation: store the last native update so we can tick every second
   const lastNativeUpdate = useRef<{
@@ -386,6 +388,15 @@ export function useTracking(): TrackingState {
     return () => clearInterval(timer);
   }, [isTracking]);
 
+  // Stable callback to cancel any pending STILL-based auto-stop.
+  // Only reads/writes a ref so it has no deps and never causes re-renders.
+  const cancelStillDebounce = useCallback(() => {
+    if (stillDebounceTimer.current !== null) {
+      clearTimeout(stillDebounceTimer.current);
+      stillDebounceTimer.current = null;
+    }
+  }, []);
+
   // Start tracking — uses a large goal for the native service
   // so JS handles the aggregated goal-reached logic
   const startTracking = useCallback(
@@ -540,17 +551,27 @@ export function useTracking(): TrackingState {
 
     const handleActivity = (event: ActivityDetectedEvent) => {
       const ts = new Date().toLocaleTimeString();
-      setDebugLastTransition(
-        `${event.activity} ${event.confidence}% @ ${ts}`,
-      );
+      setDebugLastTransition(`${event.activity} ${event.confidence}% @ ${ts}`);
 
-      // Start auto-tracking when a trackable activity is detected with confidence
       if (
         event.activity === 'WALKING' ||
         event.activity === 'RUNNING' ||
         event.activity === 'CYCLING'
       ) {
+        // Cancel any pending STILL-based auto-stop before starting/continuing tracking.
+        cancelStillDebounce();
         startTracking('auto');
+      } else if (event.activity === 'STILL') {
+        // Only auto-stop sessions that were started automatically — leave manual sessions alone.
+        if (trackingMode !== 'auto' || !isTracking) return;
+        // Debounce: wait 2 minutes before stopping. If the user resumes movement
+        // before the timer fires, the WALKING/RUNNING/CYCLING branch above cancels it.
+        cancelStillDebounce();
+        stillDebounceTimer.current = setTimeout(async () => {
+          stillDebounceTimer.current = null;
+          console.log('[useTracking] STILL debounce fired — stopping auto tracking');
+          await stop();
+        }, 2 * 60 * 1000);
       }
     };
 
@@ -563,9 +584,10 @@ export function useTracking(): TrackingState {
     return () => {
       transitionSub.current?.remove();
       transitionSub.current = null;
+      cancelStillDebounce();
       setDebugActRecogRegistered(false);
     };
-  }, [backgroundTrackingEnabled, activePlans, startTracking]);
+  }, [backgroundTrackingEnabled, activePlans, startTracking, cancelStillDebounce, isTracking, trackingMode, stop]);
 
   const debugInfo = useMemo<DebugInfo>(
     () => ({

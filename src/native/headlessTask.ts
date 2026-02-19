@@ -1,6 +1,6 @@
 import { AppRegistry } from 'react-native';
 import { storage } from '../storage';
-import { findActivePlansForToday } from '../hooks/useTracking';
+import { findActivePlansForToday, aggregateGoals } from '../hooks/useTracking';
 import { Tracking } from './Tracking';
 import { TrackingPermissions } from './Permissions';
 
@@ -50,9 +50,43 @@ async function activityTask(data: TaskData): Promise<void> {
     `[HeadlessTask] Found ${activePlans.length} active plans for today.`,
   );
 
+  // Read today's already-completed activity so we pass the REMAINING goal to the
+  // native service. This lets TrackingService stop itself (and persist the session
+  // to SharedPreferences) when the goal is reached, even while the app stays closed.
+  const todayActivity = await storage.getTodayActivity();
+  const goals = aggregateGoals(activePlans);
+
   try {
-    console.log('[HeadlessTask] Calling Tracking.startTracking...');
-    await Tracking.startTracking('distance', 999, 'km');
+    if (goals.hasDistanceGoal) {
+      const remainingMeters = Math.max(
+        0,
+        goals.totalDistanceMeters - todayActivity.distanceMeters,
+      );
+      if (remainingMeters <= 0) {
+        console.log('[HeadlessTask] Distance goal already met today. Aborting.');
+        return;
+      }
+      console.log(
+        `[HeadlessTask] Starting distance tracking: ${remainingMeters}m remaining.`,
+      );
+      await Tracking.startTracking('distance', remainingMeters / 1000, 'km');
+    } else if (goals.hasTimeGoal) {
+      const remainingSeconds = Math.max(
+        0,
+        goals.totalTimeSeconds - todayActivity.elapsedSeconds,
+      );
+      if (remainingSeconds <= 0) {
+        console.log('[HeadlessTask] Time goal already met today. Aborting.');
+        return;
+      }
+      console.log(
+        `[HeadlessTask] Starting time tracking: ${remainingSeconds}s remaining.`,
+      );
+      await Tracking.startTracking('time', remainingSeconds / 60, 'min');
+    } else {
+      console.log('[HeadlessTask] No trackable goal found. Aborting.');
+      return;
+    }
     console.log('[HeadlessTask] SUCCEEDED: Tracking.startTracking called.');
   } catch (e) {
     console.error('[HeadlessTask] FAILED: Tracking.startTracking threw an error.', e);
