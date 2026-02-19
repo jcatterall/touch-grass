@@ -44,12 +44,19 @@ class TrackingService : Service() {
         // GPS jitter when stationary is typically 2-6m; 10m safely clears that noise.
         private const val MOVEMENT_THRESHOLD_M = 10f
 
-        // Passive inactivity fallback — fires if GPS stops delivering fixes (e.g. indoors).
-        private const val STOP_TIMEOUT_MS = 5 * 60 * 1000L
+        // Passive inactivity fallback — fires if GPS stops delivering fixes entirely (e.g. deep indoors).
+        // Kept short because the GPS-fix idle counter is the primary idle path now.
+        private const val STOP_TIMEOUT_MS = 90_000L  // 90 seconds
 
-        // After STILL is confirmed by ActivityRecognition, wait this long before shutting down.
-        // 120 seconds covers traffic lights and brief stationary pauses (per QA spec).
-        private const val STATIONARY_BUFFER_MS = 120_000L
+        // After STILL is confirmed (by ActivityRecognition OR GPS-fix idle counter), wait this long
+        // before ending the session. 30s is enough to absorb a traffic-light pause; the GPS-fix
+        // counter already requires N consecutive idle fixes before arming this buffer.
+        private const val STATIONARY_BUFFER_MS = 30_000L
+
+        // Number of consecutive GPS fixes with movement below MOVEMENT_THRESHOLD_M required
+        // before the service arms the stationary buffer independently of Activity Recognition.
+        // On LOW_POWER (10s interval) this is ~30s of confirmed no movement.
+        private const val IDLE_FIX_COUNT_THRESHOLD = 3
 
         // Vehicle speed threshold in km/h — above this, distance accumulation pauses.
         private const val VEHICLE_SPEED_KMH = 25f
@@ -67,9 +74,10 @@ class TrackingService : Service() {
         const val ACTION_START_AUTO_TRACKING = "com.touchgrass.action.START_AUTO_TRACKING"
         const val ACTION_STOP_BACKGROUND = "com.touchgrass.action.STOP_BACKGROUND"
 
-        // Separate notification channel + ID for idle state (low importance, no sound).
-        const val IDLE_CHANNEL_ID = "touchgrass_idle"
-        const val IDLE_NOTIFICATION_ID = 1002
+        // Sent by AppBlockerService when it starts/stops, so the shared notification
+        // can reflect both tracking progress and blocker state in one slot.
+        const val ACTION_BLOCKER_STARTED = "com.touchgrass.action.BLOCKER_STARTED"
+        const val ACTION_BLOCKER_STOPPED = "com.touchgrass.action.BLOCKER_STOPPED"
 
         // Periodic elapsed flush interval — write delta to MMKV every 30s
         private const val ELAPSED_FLUSH_INTERVAL_MS = 30_000L
@@ -102,6 +110,11 @@ class TrackingService : Service() {
     private var goalUnit: String = "km"
     private var startTimeMs: Long = 0
 
+    // Counts consecutive GPS fixes where movement was below MOVEMENT_THRESHOLD_M.
+    // When this reaches IDLE_FIX_COUNT_THRESHOLD, we arm the stationary buffer without
+    // waiting for an Activity Recognition STILL event (which can lag by up to 60s).
+    private var consecutiveIdleFixes: Int = 0
+
     // Service state: IDLE = running but GPS off (waiting for motion signal)
     //               TRACKING = GPS active, distance accumulating
     private var serviceState = ServiceState.IDLE
@@ -109,6 +122,10 @@ class TrackingService : Service() {
     private var onProgressUpdate: ((Double, Long, Boolean) -> Unit)? = null
     private var onGoalReachedCallback: (() -> Unit)? = null
     private var lastNotificationUpdateMs: Long = 0
+
+    // Set to true while AppBlockerService is running so the shared notification
+    // can show blocker state without a second notification appearing.
+    private var blockerActive: Boolean = false
 
     // Periodic elapsed flush — write delta to MMKV every 30s so elapsed survives process kill
     private var lastFlushedElapsedSeconds: Long = 0
@@ -148,18 +165,17 @@ class TrackingService : Service() {
         lastFlushedElapsedSeconds = 0
         goalReached = false
         lastLocation = null
+        consecutiveIdleFixes = 0
         startTimeMs = 0
         MMKVStore.setAutoTracking(false)
-        val notification = buildIdleNotification()
+        // Stay on the same notification ID — no second notification appears.
+        val notification = buildNotification()
         val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(IDLE_NOTIFICATION_ID, notification)
-        // Cancel the tracking notification (different ID)
-        manager.cancel(NOTIFICATION_ID)
-        // Re-issue as IDLE foreground notification
+        manager.notify(NOTIFICATION_ID, notification)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(IDLE_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
         } else {
-            startForeground(IDLE_NOTIFICATION_ID, notification)
+            startForeground(NOTIFICATION_ID, notification)
         }
     }
 
@@ -189,11 +205,11 @@ class TrackingService : Service() {
                 Log.d(TAG, "Entering IDLE state — watching for motion")
                 serviceState = ServiceState.IDLE
                 MMKVStore.setAutoTracking(false)
-                val notification = buildIdleNotification()
+                val notification = buildNotification()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(IDLE_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
                 } else {
-                    startForeground(IDLE_NOTIFICATION_ID, notification)
+                    startForeground(NOTIFICATION_ID, notification)
                 }
                 HeartbeatManager.schedule(this)
                 return START_STICKY
@@ -204,6 +220,20 @@ class TrackingService : Service() {
                 Log.d(TAG, "Stopping background tracking service")
                 stopSelf()
                 return START_NOT_STICKY
+            }
+
+            ACTION_BLOCKER_STARTED -> {
+                blockerActive = true
+                Log.d(TAG, "Blocker started — refreshing notification")
+                refreshNotification()
+                return START_STICKY
+            }
+
+            ACTION_BLOCKER_STOPPED -> {
+                blockerActive = false
+                Log.d(TAG, "Blocker stopped — refreshing notification")
+                refreshNotification()
+                return START_STICKY
             }
 
             ACTION_START_AUTO_TRACKING -> {
@@ -238,6 +268,7 @@ class TrackingService : Service() {
             ACTION_MOTION_DETECTED -> {
                 if (serviceState == ServiceState.TRACKING) {
                     Log.d(TAG, "MOTION_DETECTED: stationary buffer cancelled, GPS restarting")
+                    consecutiveIdleFixes = 0
                     handler.removeCallbacks(stationaryBufferRunnable)
                     handler.removeCallbacks(stopTimeoutRunnable)
                     setGpsPriority(GpsMode.LOW_POWER)
@@ -276,6 +307,7 @@ class TrackingService : Service() {
         lastElapsedFlushMs = 0
         goalReached = false
         lastLocation = null
+        consecutiveIdleFixes = 0
         startTimeMs = System.currentTimeMillis()
         MMKVStore.setAutoTracking(true)
 
@@ -401,11 +433,26 @@ class TrackingService : Service() {
                 Log.d(TAG, "Filtered GPS jump: ${delta}m (accuracy: ${location.accuracy}m)")
             }
 
-            // Only reset the inactivity timer for genuine movement (> jitter threshold).
+            // GPS-fix-based idle detection: count consecutive fixes below movement threshold.
+            // This catches the "device on table" case independently of Activity Recognition,
+            // which can lag by up to 60 seconds between polls.
             if (delta >= MOVEMENT_THRESHOLD_M) {
+                // Genuine movement — reset idle counter and passive timeout.
+                consecutiveIdleFixes = 0
                 handler.removeCallbacks(stopTimeoutRunnable)
                 handler.removeCallbacks(stationaryBufferRunnable)
                 handler.postDelayed(stopTimeoutRunnable, STOP_TIMEOUT_MS)
+            } else {
+                consecutiveIdleFixes++
+                Log.d(TAG, "Idle fix #$consecutiveIdleFixes (delta=${delta}m, threshold=$MOVEMENT_THRESHOLD_M)")
+                if (consecutiveIdleFixes >= IDLE_FIX_COUNT_THRESHOLD) {
+                    Log.d(TAG, "GPS-fix idle threshold reached ($IDLE_FIX_COUNT_THRESHOLD fixes) — arming stationary buffer")
+                    handler.removeCallbacks(stopTimeoutRunnable)
+                    handler.removeCallbacks(stationaryBufferRunnable)
+                    setGpsPriority(GpsMode.OFF)
+                    handler.postDelayed(stationaryBufferRunnable, STATIONARY_BUFFER_MS)
+                    consecutiveIdleFixes = 0  // reset so re-entry after MOTION is clean
+                }
             }
         } ?: run {
             // First fix: arm the passive fallback timer.
@@ -460,104 +507,94 @@ class TrackingService : Service() {
     }
 
     // ---- Notification ----
+    // Single notification (ID 1001, channel "touchgrass_tracking") shared across all states:
+    // idle, tracking, and app-blocker. AppBlockerService also uses this same ID so only
+    // one notification ever appears in the drawer.
 
+    /**
+     * Builds the unified notification for all service states.
+     * Title is always "TouchGrass is active".
+     * Body shows goal progress when available, a status line otherwise.
+     * If the blocker is active a second line notes it.
+     */
     private fun buildNotification(): Notification {
         val (body, progress, max) = getNotificationContent()
+        val title = when {
+            goalReached -> "TouchGrass: Goal Reached!"
+            else -> "TouchGrass is active"
+        }
+        val text = buildString {
+            append(body)
+            if (blockerActive) append(" · App blocker on")
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("TouchGrass: Goal in Progress")
-            .setContentText(body)
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setOngoing(true)
-            .setColor(0xFF4F7942.toInt())
-            .setProgress(max, progress, false)
-            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            .build()
-    }
-
-    private fun updateNotification() {
-        val (body, progress, max) = getNotificationContent()
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(if (goalReached) "TouchGrass: Goal Reached!" else "TouchGrass: Goal in Progress")
-            .setContentText(body)
+            .setContentTitle(title)
+            .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(!goalReached)
             .setColor(0xFF4F7942.toInt())
             .setProgress(max, progress, false)
-            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun refreshNotification() {
+        val notification = buildNotification()
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun updateNotification() {
+        refreshNotification()
     }
 
     private fun getNotificationContent(): Triple<String, Int, Int> {
+        // Always show today's cumulative totals so the notification is useful even while idle.
+        val todayDistanceM = MMKVStore.getTodayDistance()
         return when (goalType) {
             "distance" -> {
                 val goalMeters = if (goalUnit == "mi") goalValue * 1609.34 else goalValue * 1000.0
-                val currentDisplay = if (distanceMeters >= 1000) {
-                    String.format("%.1fkm", distanceMeters / 1000.0)
+                val displayDist = if (serviceState == ServiceState.TRACKING) distanceMeters else todayDistanceM
+                val currentDisplay = if (displayDist >= 1000) {
+                    String.format("%.1fkm", displayDist / 1000.0)
                 } else {
-                    String.format("%.0fm", distanceMeters)
+                    String.format("%.0fm", displayDist)
                 }
                 val goalDisplay = if (goalUnit == "mi") {
                     String.format("%.1fmi", goalValue)
                 } else {
                     String.format("%.1fkm", goalValue)
                 }
-                Triple(
-                    "$currentDisplay / $goalDisplay",
-                    distanceMeters.toInt().coerceAtMost(goalMeters.toInt()),
-                    goalMeters.toInt()
-                )
+                val progressVal = displayDist.toInt().coerceAtMost(goalMeters.toInt())
+                Triple("$currentDisplay / $goalDisplay", progressVal, goalMeters.toInt())
             }
             "time" -> {
                 val goalMinutes = goalValue.toInt()
-                val elapsedMin = (elapsedSeconds / 60).toInt()
+                val todayElapsedSec = MMKVStore.getTodayElapsed()
+                val displayElapsed = if (serviceState == ServiceState.TRACKING) elapsedSeconds else todayElapsedSec
+                val elapsedMin = (displayElapsed / 60).toInt()
                 Triple(
                     "${elapsedMin}min / ${goalMinutes}min",
                     elapsedMin.coerceAtMost(goalMinutes),
                     goalMinutes
                 )
             }
-            else -> Triple("Tracking...", 0, 100)
+            else -> Triple("Watching for movement...", 0, 0)
         }
-    }
-
-    private fun buildIdleNotification(): Notification {
-        return NotificationCompat.Builder(this, IDLE_CHANNEL_ID)
-            .setContentTitle("TouchGrass")
-            .setContentText("Watching for movement...")
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setOngoing(true)
-            .setColor(0xFF4F7942.toInt())
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .build()
     }
 
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)
 
-        // Tracking channel — shown during active GPS session
+        // Single channel for all states (idle, tracking, blocker).
         val trackingChannel = NotificationChannel(
             CHANNEL_ID,
-            "Activity Tracking",
+            "TouchGrass",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Shows progress toward your walking goal"
+            description = "Shows TouchGrass activity status and goal progress"
             setShowBadge(false)
         }
         manager.createNotificationChannel(trackingChannel)
-
-        // Idle channel — shown while waiting for motion, lowest possible visibility
-        val idleChannel = NotificationChannel(
-            IDLE_CHANNEL_ID,
-            "Background Tracking",
-            NotificationManager.IMPORTANCE_MIN
-        ).apply {
-            description = "TouchGrass is watching for movement in the background"
-            setShowBadge(false)
-        }
-        manager.createNotificationChannel(idleChannel)
     }
 
     /** Stops GPS and cancels all pending timers. Used by setGpsPriority(OFF) and onDestroy. */
