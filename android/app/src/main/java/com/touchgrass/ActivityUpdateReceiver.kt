@@ -3,12 +3,24 @@ package com.touchgrass
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Bundle
 import android.util.Log
 import com.facebook.react.ReactApplication
 import com.google.android.gms.location.ActivityRecognitionResult
 import com.google.android.gms.location.DetectedActivity
 
+/**
+ * Receives activity recognition broadcasts from Google Play Services and routes them to
+ * TrackingService via targeted intents.
+ *
+ * Architecture (reference-library-inspired):
+ *   TrackingService is always running (in IDLE state) while background tracking is enabled.
+ *   This receiver never calls startService() or startForegroundService() to launch a new
+ *   service — it only signals the already-running service via startService() with an action
+ *   intent, which is always permitted by Android regardless of app state or API level.
+ *
+ * This eliminates the Android 8+ IllegalStateException that occurs when trying to start
+ * a background service from a BroadcastReceiver when the app is not in the foreground.
+ */
 class ActivityUpdateReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -47,20 +59,72 @@ class ActivityUpdateReceiver : BroadcastReceiver() {
         processActivity(context, activityName, mostProbableActivity.confidence)
     }
 
-    private fun processActivity(context: Context, activityName: String, confidence: Int) {
-        Log.i(TAG, "Confident activity detected: $activityName ($confidence%)")
-        if (tryEmitToJs(context, activityName, confidence)) {
-            Log.d(TAG, "Successfully emitted event to JS.")
-        } else {
-            Log.d(TAG, "React instance not active. Attempting to launch headless task.")
-            maybeStartHeadlessTask(context, activityName)
-        }
-    }
-
     private fun findMostProbableTrackedActivity(result: ActivityRecognitionResult): DetectedActivity? {
         return result.probableActivities
             .filter { SUPPORTED_ACTIVITIES.contains(it.type) }
             .maxByOrNull { it.confidence }
+    }
+
+    private fun processActivity(context: Context, activityName: String, confidence: Int) {
+        Log.i(TAG, "Confident activity detected: $activityName ($confidence%)")
+
+        // Try to emit to a live JS instance first (app is in foreground)
+        if (tryEmitToJs(context, activityName, confidence)) {
+            Log.d(TAG, "Successfully emitted event to JS.")
+        }
+
+        // Always route to TrackingService if it's running — this is the primary path
+        // for background tracking. The service is always running (IDLE or TRACKING) when
+        // background tracking is enabled, so we can always use startService() here.
+        if (isTrackingServiceRunning(context)) {
+            routeToTrackingService(context, activityName)
+        } else {
+            Log.d(TAG, "TrackingService not running — background tracking disabled, ignoring $activityName")
+        }
+    }
+
+    /**
+     * Routes the detected activity to the already-running TrackingService.
+     * Uses startService() with an action intent, which is always permitted when the
+     * target service is already running (regardless of Android API level or app state).
+     */
+    private fun routeToTrackingService(context: Context, activityName: String) {
+        val isAutoTracking = MMKVStore.isAutoTracking()  // true = TRACKING state, false = IDLE
+
+        val action = when (activityName) {
+            "WALKING", "RUNNING", "CYCLING" -> {
+                if (isAutoTracking) {
+                    // Service is already TRACKING — cancel any stationary buffer, keep GPS alive
+                    Log.d(TAG, "$activityName detected while TRACKING — cancelling stationary buffer")
+                    TrackingService.ACTION_MOTION_DETECTED
+                } else {
+                    // Service is IDLE — transition to TRACKING
+                    Log.d(TAG, "$activityName detected while IDLE — starting tracking session")
+                    TrackingService.ACTION_START_AUTO_TRACKING
+                }
+            }
+            "STILL" -> {
+                if (isAutoTracking) {
+                    Log.d(TAG, "STILL detected while TRACKING — arming stationary buffer")
+                    TrackingService.ACTION_STILL_DETECTED
+                } else {
+                    Log.d(TAG, "STILL detected while IDLE — no-op")
+                    return
+                }
+            }
+            "IN_VEHICLE" -> {
+                // Vehicle movement: never start a new session. Speed filter in processLocation
+                // handles distance pausing if the service is already TRACKING.
+                Log.d(TAG, "IN_VEHICLE detected — speed filter handles this in TrackingService")
+                return
+            }
+            else -> {
+                Log.d(TAG, "Unknown activity $activityName — ignoring")
+                return
+            }
+        }
+
+        sendActionToTrackingService(context, action)
     }
 
     private fun tryEmitToJs(context: Context, activity: String, confidence: Int): Boolean {
@@ -83,20 +147,19 @@ class ActivityUpdateReceiver : BroadcastReceiver() {
 
     /**
      * Returns true if TrackingService is currently running as a foreground service.
-     * Used to decide whether to signal the service directly vs. launch a headless task.
      */
     private fun isTrackingServiceRunning(context: Context): Boolean {
         val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        @Suppress("DEPRECATION") // getRunningServices is deprecated but is the only reliable check for our own service
+        @Suppress("DEPRECATION") // getRunningServices is deprecated but reliable for our own service
         return manager.getRunningServices(Int.MAX_VALUE).any {
             it.service.className == TrackingService::class.java.name
         }
     }
 
     /**
-     * Sends a targeted Intent action to the already-running TrackingService via
-     * onStartCommand. The service intercepts these before its session-init block so
-     * no tracking state is reset.
+     * Sends a targeted action intent to the already-running TrackingService.
+     * This is always permitted — startService() to an already-running foreground service
+     * works regardless of Android API level or app background state.
      */
     private fun sendActionToTrackingService(context: Context, action: String) {
         val intent = Intent(context, TrackingService::class.java).apply { this.action = action }
@@ -108,59 +171,15 @@ class ActivityUpdateReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun maybeStartHeadlessTask(context: Context, activityName: String) {
-        val serviceRunning = isTrackingServiceRunning(context)
-
-        when (activityName) {
-            "STILL" -> {
-                // Never start a headless task for STILL. If the service is running, signal
-                // it to arm its fast-stop countdown. Otherwise there is nothing to do.
-                if (serviceRunning) {
-                    Log.d(TAG, "STILL detected, signalling TrackingService to arm fast-stop")
-                    sendActionToTrackingService(context, TrackingService.ACTION_STILL_DETECTED)
-                } else {
-                    Log.d(TAG, "STILL detected, TrackingService not running — nothing to do")
-                }
-                return
-            }
-            "WALKING", "RUNNING", "CYCLING" -> {
-                if (serviceRunning) {
-                    // Service is already tracking — cancel any active fast-stop countdown
-                    // and restore the normal 5-min inactivity timer.
-                    Log.d(TAG, "$activityName detected while service running — cancelling fast-stop")
-                    sendActionToTrackingService(context, TrackingService.ACTION_MOTION_DETECTED)
-                    return
-                }
-                // Service not running: fall through to start a headless task.
-            }
-        }
-
-        Log.d(TAG, "Launching headless task for $activityName")
-        val serviceIntent = Intent(context, ActivityHeadlessTaskService::class.java).apply {
-            val extras = Bundle().apply {
-                putString("activity", activityName)
-                putString("transition", "ENTER")
-            }
-            putExtras(extras)
-        }
-
-        try {
-            context.startService(serviceIntent)
-        } catch (e: IllegalStateException) {
-            Log.e(TAG, "Failed to start headless task service. App may be restricted.", e)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start headless task service", e)
-        }
-    }
-
     private fun mapActivityType(type: Int): String? = when (type) {
         DetectedActivity.WALKING, DetectedActivity.ON_FOOT -> "WALKING"
         DetectedActivity.RUNNING -> "RUNNING"
         DetectedActivity.ON_BICYCLE -> "CYCLING"
         DetectedActivity.STILL -> "STILL"
+        DetectedActivity.IN_VEHICLE -> "IN_VEHICLE"
         else -> null
     }
-    
+
     private fun parseTestActivityType(type: String): Int = when (type) {
         "WALKING" -> DetectedActivity.WALKING
         "RUNNING" -> DetectedActivity.RUNNING
@@ -201,7 +220,8 @@ class ActivityUpdateReceiver : BroadcastReceiver() {
             DetectedActivity.RUNNING,
             DetectedActivity.ON_BICYCLE,
             DetectedActivity.ON_FOOT,
-            DetectedActivity.STILL
+            DetectedActivity.STILL,
+            DetectedActivity.IN_VEHICLE
         )
     }
 }

@@ -1,8 +1,23 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
+import { MMKV } from 'react-native-mmkv';
 import type { OnboardingData } from './screens';
 import { BlockingPlan, DailyActivity } from './types';
 import { generateUUID } from './utils/guid';
+
+/**
+ * Synchronous fast-path for today's totals, shared with the Kotlin layer via MMKV.
+ * Key names here must match MMKVStore.kt constants.
+ * These reads are zero-latency (mmap, no bridge), enabling synchronous useState init.
+ */
+const _mmkv = new MMKV({ id: 'touchgrass_state' });
+
+export const fastStorage = {
+  getTodayDistance: (): number => _mmkv.getNumber('today_distance_meters') ?? 0,
+  getTodayElapsed:  (): number => _mmkv.getNumber('today_elapsed_seconds') ?? 0,
+  getGoalsReached:  (): boolean => _mmkv.getBoolean('today_goals_reached') ?? false,
+  isAutoTracking:   (): boolean => _mmkv.getBoolean('is_auto_tracking') ?? false,
+};
 
 export const PLANS_CHANGED_EVENT = 'plans_changed';
 

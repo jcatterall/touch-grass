@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: "kotlin-kapt"
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -93,6 +94,11 @@ android {
             keyPassword 'android'
         }
     }
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
@@ -113,6 +119,22 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
     implementation("com.google.android.gms:play-services-location:21.3.0")
+
+    // MMKV: JSI-based synchronous key-value store shared between Kotlin and JS
+    implementation("com.tencent:mmkv:2.0.1")
+
+    // Room: native SQLite persistence for sessions and daily totals
+    def room_version = "2.7.1"
+    implementation("androidx.room:room-runtime:$room_version")
+    implementation("androidx.room:room-ktx:$room_version")
+    kapt("androidx.room:room-compiler:$room_version")
+
+    // WorkManager: periodic heartbeat for Android 15 foreground service priority
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
+
+    // Robolectric: unit tests for Android receiver/service routing logic
+    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("androidx.test:core:1.6.1")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

@@ -74,4 +74,45 @@ export const Tracking = {
     if (!isAvailable) return null;
     return TrackingModule.getUnsavedSession();
   },
+
+  /**
+   * Returns today's accumulated totals from Room (native SQLite).
+   * Faster and more reliable than AsyncStorage for headless task recovery.
+   */
+  async getDailyTotalNative(): Promise<{
+    distanceMeters: number;
+    elapsedSeconds: number;
+    goalsReached: boolean;
+  } | null> {
+    if (!isAvailable) return null;
+    return TrackingModule.getDailyTotalNative();
+  },
+
+  /**
+   * Returns whether auto-tracking is currently active per MMKV.
+   * Useful on app open before the first progress event arrives.
+   */
+  async getIsAutoTracking(): Promise<boolean> {
+    if (!isAvailable) return false;
+    return TrackingModule.getIsAutoTracking();
+  },
+
+  /**
+   * Starts TrackingService in IDLE state (foreground, GPS off).
+   * The service transitions to TRACKING when ActivityUpdateReceiver detects motion.
+   * Call this when the user enables background tracking.
+   */
+  async startIdleService(): Promise<boolean> {
+    if (!isAvailable) return false;
+    return TrackingModule.startIdleService();
+  },
+
+  /**
+   * Stops the background idle/tracking service entirely.
+   * Call this when the user disables background tracking.
+   */
+  async stopIdleService(): Promise<boolean> {
+    if (!isAvailable) return false;
+    return TrackingModule.stopIdleService();
+  },
 };

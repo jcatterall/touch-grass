@@ -60,7 +60,9 @@ class AppBlockerService : Service() {
 
     private fun checkForegroundApp() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val goalsReached = prefs.getBoolean(PREF_GOALS_REACHED, false)
+        // Goals-reached is read from MMKV so it propagates within one poll cycle (<500ms)
+        // rather than waiting for the 15-second JS blocker sync interval.
+        val goalsReached = MMKVStore.getGoalsReached()
         val hasPermanent = prefs.getBoolean(PREF_HAS_PERMANENT, false)
 
         if (goalsReached && !hasPermanent) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { DeviceEventEmitter, EmitterSubscription } from 'react-native';
-import { storage, PLANS_CHANGED_EVENT } from '../storage';
+import { storage, fastStorage, PLANS_CHANGED_EVENT } from '../storage';
 import { BlockingPlan, DayKey } from '../types';
 import {
   ActivityRecognition,
@@ -124,6 +124,7 @@ export interface DebugInfo {
 
 export interface TrackingState {
   isTracking: boolean;
+  isAutoTracking: boolean;
   trackingMode: TrackingMode;
   progress: TrackingProgress;
   activePlans: BlockingPlan[];
@@ -141,12 +142,14 @@ export function useTracking(): TrackingState {
   const [isTracking, setIsTracking] = useState(false);
   const [trackingMode, setTrackingMode] = useState<TrackingMode>('idle');
 
-  // dailyBaseline holds the accumulated activity from previous sessions today
-  const [dailyBaseline, setDailyBaseline] = useState<TrackingProgress>({
-    distanceMeters: 0,
-    elapsedSeconds: 0,
-    goalReached: false,
-  });
+  // dailyBaseline holds the accumulated activity from previous sessions today.
+  // Initialised synchronously from MMKV (zero-latency mmap read) so the UI
+  // shows the correct value on the very first render — no async "calculating..." state.
+  const [dailyBaseline, setDailyBaseline] = useState<TrackingProgress>(() => ({
+    distanceMeters: fastStorage.getTodayDistance(),
+    elapsedSeconds: fastStorage.getTodayElapsed(),
+    goalReached: fastStorage.getGoalsReached(),
+  }));
 
   // sessionProgress holds the current active session's progress
   const [sessionProgress, setSessionProgress] = useState<TrackingProgress>({
@@ -170,8 +173,6 @@ export function useTracking(): TrackingState {
   const progressSub = useRef<EmitterSubscription | null>(null);
   const transitionSub = useRef<EmitterSubscription | null>(null);
   const trackingStarted = useRef(false);
-  // Debounce timer for STILL-based auto-stop in the foreground case.
-  const stillDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Time interpolation: store the last native update so we can tick every second
   const lastNativeUpdate = useRef<{
@@ -278,33 +279,38 @@ export function useTracking(): TrackingState {
     storage.getBackgroundTrackingEnabled().then(setBackgroundTrackingEnabled);
   }, []);
 
-  // On mount: load today's baseline, recover unsaved sessions, restore active tracking
+  // On mount: recover unsaved sessions and restore active tracking state.
+  // The daily baseline is already populated synchronously from MMKV above.
+  // This effect only handles two edge cases:
+  //   1. A pure-background headless session that completed before MMKV was in place
+  //      (SharedPreferences fallback, kept for backward compat — only applied when
+  //      MMKV has no data, i.e. pre-upgrade device. If MMKV has data, the service
+  //      already wrote there and adding SharedPreferences on top causes double-counting.)
+  //   2. Re-opening the app while the native service is still running mid-session.
   useEffect(() => {
     const recover = async () => {
-      // 1. Load today's stored activity as the baseline
-      const todayActivity = await storage.getTodayActivity();
-      const baseline: TrackingProgress = {
-        distanceMeters: todayActivity.distanceMeters,
-        elapsedSeconds: todayActivity.elapsedSeconds,
-        goalReached: todayActivity.goalsReached,
-      };
-
-      // 2. Persist any completed background session from SharedPreferences
-      const unsaved = await Tracking.getUnsavedSession();
-      if (unsaved) {
-        await storage.saveDailyActivity(
-          unsaved.distanceMeters,
-          unsaved.elapsedSeconds,
-          unsaved.goalsReached,
-        );
-        baseline.distanceMeters += unsaved.distanceMeters;
-        baseline.elapsedSeconds += unsaved.elapsedSeconds;
-        baseline.goalReached = baseline.goalReached || unsaved.goalsReached;
+      // Backward-compat: only use SharedPreferences session if MMKV has no data yet.
+      // MMKV is written by TrackingService on every GPS fix, so it's always current
+      // for devices that have run the upgraded app at least once.
+      const mmkvHasData =
+        fastStorage.getTodayDistance() > 0 || fastStorage.getTodayElapsed() > 0;
+      if (!mmkvHasData) {
+        const unsaved = await Tracking.getUnsavedSession();
+        if (unsaved) {
+          await storage.saveDailyActivity(
+            unsaved.distanceMeters,
+            unsaved.elapsedSeconds,
+            unsaved.goalsReached,
+          );
+          setDailyBaseline(prev => ({
+            distanceMeters: prev.distanceMeters + unsaved.distanceMeters,
+            elapsedSeconds: prev.elapsedSeconds + unsaved.elapsedSeconds,
+            goalReached: prev.goalReached || unsaved.goalsReached,
+          }));
+        }
       }
 
-      setDailyBaseline(baseline);
-
-      // 3. Check if the native service is still running
+      // Restore active session if the native service is still running
       const current = await Tracking.getProgress();
       if (current.distanceMeters > 0 || current.elapsedSeconds > 0) {
         setSessionProgress(current);
@@ -388,14 +394,6 @@ export function useTracking(): TrackingState {
     return () => clearInterval(timer);
   }, [isTracking]);
 
-  // Stable callback to cancel any pending STILL-based auto-stop.
-  // Only reads/writes a ref so it has no deps and never causes re-renders.
-  const cancelStillDebounce = useCallback(() => {
-    if (stillDebounceTimer.current !== null) {
-      clearTimeout(stillDebounceTimer.current);
-      stillDebounceTimer.current = null;
-    }
-  }, []);
 
   // Start tracking — uses a large goal for the native service
   // so JS handles the aggregated goal-reached logic
@@ -517,24 +515,33 @@ export function useTracking(): TrackingState {
     }
   }, [sessionProgress, allGoalsReached]);
 
-  // Manual start
+  // Manual start — blocked while auto-tracking is active (QA spec conflict resolution)
   const startManual = useCallback(async () => {
+    if (trackingMode === 'auto' && isTracking) {
+      setDebugStartBlocked('auto_tracking_active');
+      return;
+    }
     await startTracking('manual');
-  }, [startTracking]);
+  }, [trackingMode, isTracking, startTracking]);
 
-  // Toggle background tracking
+  // Toggle background tracking.
+  // Enabling starts TrackingService in IDLE state (foreground, GPS off) so it can
+  // receive motion signals directly from ActivityUpdateReceiver without any
+  // startForegroundService() call from a BroadcastReceiver (which fails on Android 8+).
   const toggleBackgroundTracking = useCallback(async () => {
     if (backgroundTrackingEnabled) {
-      // Turning off
+      // Turning off — stop activity recognition and the idle service
       await ActivityRecognition.stop().catch(() => {});
+      await Tracking.stopIdleService().catch(() => {});
       await storage.setBackgroundTrackingEnabled(false);
       setBackgroundTrackingEnabled(false);
     } else {
-      // Turning on — request permissions first
+      // Turning on — request permissions first, then start idle service + activity recognition
       const granted = await TrackingPermissions.requestAll();
       setPermissionsGranted(granted);
       if (!granted) return;
 
+      await Tracking.startIdleService().catch(() => {});
       await ActivityRecognition.start().catch(() => {});
       await storage.setBackgroundTrackingEnabled(true);
       setBackgroundTrackingEnabled(true);
@@ -558,21 +565,13 @@ export function useTracking(): TrackingState {
         event.activity === 'RUNNING' ||
         event.activity === 'CYCLING'
       ) {
-        // Cancel any pending STILL-based auto-stop before starting/continuing tracking.
-        cancelStillDebounce();
+        // STILL → MOVING: native TrackingService cancels the 120s stationary buffer
+        // via ACTION_MOTION_DETECTED. JS just needs to start/continue the session.
         startTracking('auto');
-      } else if (event.activity === 'STILL') {
-        // Only auto-stop sessions that were started automatically — leave manual sessions alone.
-        if (trackingMode !== 'auto' || !isTracking) return;
-        // Debounce: wait 2 minutes before stopping. If the user resumes movement
-        // before the timer fires, the WALKING/RUNNING/CYCLING branch above cancels it.
-        cancelStillDebounce();
-        stillDebounceTimer.current = setTimeout(async () => {
-          stillDebounceTimer.current = null;
-          console.log('[useTracking] STILL debounce fired — stopping auto tracking');
-          await stop();
-        }, 2 * 60 * 1000);
       }
+      // STILL: handled entirely by the native 120s stationary buffer in TrackingService.
+      // The service shuts itself down and onDestroy fires, which will cause the
+      // onTrackingStarted / getProgress recovery path to see isTracking=false next open.
     };
 
     transitionSub.current =
@@ -584,10 +583,9 @@ export function useTracking(): TrackingState {
     return () => {
       transitionSub.current?.remove();
       transitionSub.current = null;
-      cancelStillDebounce();
       setDebugActRecogRegistered(false);
     };
-  }, [backgroundTrackingEnabled, activePlans, startTracking, cancelStillDebounce, isTracking, trackingMode, stop]);
+  }, [backgroundTrackingEnabled, activePlans, startTracking]);
 
   const debugInfo = useMemo<DebugInfo>(
     () => ({
@@ -612,6 +610,7 @@ export function useTracking(): TrackingState {
 
   return {
     isTracking,
+    isAutoTracking: trackingMode === 'auto' && isTracking,
     trackingMode,
     progress,
     activePlans,

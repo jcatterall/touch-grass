@@ -43,7 +43,6 @@
           android:exported="false" />
       <service
           android:name=".ActivityHeadlessTaskService"
-          android:foregroundServiceType="shortService"
           android:exported="false" />
       <service
           android:name=".AppBlockerService"

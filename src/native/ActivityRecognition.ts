@@ -10,7 +10,7 @@ const { ActivityRecognitionModule } = NativeModules;
 const isAvailable =
   Platform.OS === 'android' && ActivityRecognitionModule != null;
 
-export type ActivityType = 'WALKING' | 'RUNNING' | 'CYCLING' | 'STILL';
+export type ActivityType = 'WALKING' | 'RUNNING' | 'CYCLING' | 'STILL' | 'IN_VEHICLE';
 
 export interface ActivityDetectedEvent {
   activity: ActivityType;

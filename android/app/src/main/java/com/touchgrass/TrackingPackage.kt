@@ -7,11 +7,12 @@ import com.facebook.react.uimanager.ViewManager
 
 class TrackingPackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
-        return listOf(
+        return listOfNotNull(
             ActivityRecognitionModule(reactContext),
             TrackingModule(reactContext),
             BuildConfigModule(reactContext),
-            AppBlockerModule(reactContext)
+            AppBlockerModule(reactContext),
+            if (BuildConfig.DEBUG) GpxPlaybackModule(reactContext) else null,
         )
     }
 

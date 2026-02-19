@@ -6,12 +6,20 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.touchgrass.db.SessionRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
@@ -178,6 +186,90 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             Log.e(TAG, "Failed to get unsaved session", e)
             promise.reject("ERROR", e.message)
         }
+    }
+
+    /**
+     * Returns today's accumulated distance/elapsed/goalsReached from Room.
+     * Used by headlessTask.ts and useTracking.ts recovery path as a fast native
+     * alternative to the AsyncStorage daily_activity read.
+     */
+    @ReactMethod
+    fun getDailyTotalNative(promise: Promise) {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val repo = SessionRepository(reactApplicationContext)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val total = repo.getDailyTotal(today)
+                if (total == null) {
+                    promise.resolve(null)
+                } else {
+                    val result = Arguments.createMap().apply {
+                        putDouble("distanceMeters", total.distanceMeters)
+                        putDouble("elapsedSeconds", total.elapsedSeconds.toDouble())
+                        putBoolean("goalsReached", total.goalsReached)
+                    }
+                    promise.resolve(result)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get daily total", e)
+                promise.reject("ERROR", e.message)
+            }
+        }
+    }
+
+    /**
+     * Starts TrackingService in IDLE state — service runs as a foreground service
+     * but GPS is off. ActivityUpdateReceiver will signal it when motion is detected,
+     * transitioning it to TRACKING without any startForegroundService() call from
+     * a BroadcastReceiver (which would fail on Android 8+ when the app is backgrounded).
+     */
+    @ReactMethod
+    fun startIdleService(promise: Promise) {
+        try {
+            val context = reactApplicationContext
+            val intent = Intent(context, TrackingService::class.java).apply {
+                action = TrackingService.ACTION_START_IDLE
+            }
+            ContextCompat.startForegroundService(context, intent)
+            // Bind so the module has a handle to the service if needed
+            context.bindService(intent, connection, 0)
+            Log.d(TAG, "Idle service started")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start idle service", e)
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    /**
+     * Stops the background idle/tracking service entirely.
+     * Called when the user disables background tracking.
+     */
+    @ReactMethod
+    fun stopIdleService(promise: Promise) {
+        try {
+            val context = reactApplicationContext
+            val intent = Intent(context, TrackingService::class.java).apply {
+                action = TrackingService.ACTION_STOP_BACKGROUND
+            }
+            // Sending an action to a running service is always permitted
+            context.startService(intent)
+            unbindService()
+            Log.d(TAG, "Idle service stop requested")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to stop idle service", e)
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    /**
+     * Synchronous MMKV-backed check of whether auto-tracking is active.
+     * Useful for JS recovery on app open before the first progress event arrives.
+     */
+    @ReactMethod
+    fun getIsAutoTracking(promise: Promise) {
+        promise.resolve(MMKVStore.isAutoTracking())
     }
 
     @ReactMethod

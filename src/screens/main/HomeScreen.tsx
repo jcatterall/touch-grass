@@ -9,6 +9,7 @@ import {
 import {
   Footprints,
   LeafyGreen,
+  Map,
   Play,
   Shield,
   Square,
@@ -20,6 +21,7 @@ import { TrackingProgress } from '../../native/Tracking';
 import { AppBlocker } from '../../native/AppBlocker';
 import { colors, spacing } from '../../theme';
 import { ActivityRecognition } from '../../native/ActivityRecognition';
+import { GpxPlayback } from '../../native/GpxPlayback';
 
 function getOverallFraction(
   goals: AggregatedGoals,
@@ -60,6 +62,7 @@ function formatTime(seconds: number, totalSeconds: number): string {
 
 export const HomeScreen = () => {
   const [isTesting, setIsTesting] = useState(false);
+  const [isGpxPlaying, setIsGpxPlaying] = useState(false);
 
   const triggerTest = () => {
     const currentTesting = !isTesting;
@@ -67,8 +70,19 @@ export const HomeScreen = () => {
     ActivityRecognition.triggerTest(currentTesting ? 'WALKING' : 'STILL');
   };
 
+  const toggleGpxPlayback = async () => {
+    if (isGpxPlaying) {
+      await GpxPlayback.stopPlayback();
+      setIsGpxPlaying(false);
+    } else {
+      await GpxPlayback.startPlayback();
+      setIsGpxPlaying(true);
+    }
+  };
+
   const {
     isTracking,
+    isAutoTracking,
     trackingMode,
     progress,
     activePlans,
@@ -85,7 +99,7 @@ export const HomeScreen = () => {
   const fraction = getOverallFraction(goals, progress);
   const hasPlans = activePlans.length > 0;
 
-  const isAutoTracking = isTracking && trackingMode === 'auto';
+  // Play button is unmounted (not hidden) during auto-tracking — QA spec requirement
   const showPlayButton = hasPlans && !allGoalsReached && !isAutoTracking;
 
   const statusText = !hasPlans
@@ -190,6 +204,15 @@ export const HomeScreen = () => {
             <LeafyGreen size={20} color={colors.white} />
           )}
         </Pressable>
+        {GpxPlayback.isAvailable && (
+          <Pressable
+            style={[styles.actionButton]}
+            onPress={toggleGpxPlayback}
+            hitSlop={12}
+          >
+            <Map size={20} color={isGpxPlaying ? colors.terracotta : colors.white} />
+          </Pressable>
+        )}
 
         {!blockerPermsGranted && (
           <Pressable
