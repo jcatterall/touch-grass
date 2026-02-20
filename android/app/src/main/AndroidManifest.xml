@@ -12,9 +12,10 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
       android:name=".MainApplication"
@@ -37,23 +38,43 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+
+      <!-- GPS tracking foreground service (location type) -->
       <service
-          android:name=".TrackingService"
+          android:name=".tracking.TrackingService"
           android:foregroundServiceType="location"
           android:exported="false" />
+
+      <!-- Headless JS task service -->
       <service
           android:name=".ActivityHeadlessTaskService"
           android:exported="false" />
+
+      <!-- App blocker overlay service -->
       <service
           android:name=".AppBlockerService"
           android:foregroundServiceType="specialUse"
           android:exported="false" />
+
+      <!--
+          MotionTracker: motion detection foreground service (health type, Android 14+).
+          Keeps sensors and Activity Recognition running in background.
+      -->
+      <service
+          android:name="com.touchgrass.motion.MotionService"
+          android:enabled="true"
+          android:exported="false"
+          android:foregroundServiceType="health" />
+
+      <!--
+          MotionTracker: Activity Transition broadcast receiver.
+          exported="true" is required — the PendingIntent is delivered by
+          Google Play Services (an external process).
+      -->
       <receiver
-          android:name=".ActivityUpdateReceiver"
-          android:exported="false">
-          <intent-filter>
-              <action android:name="com.touchgrass.ACTIVITY_UPDATE" />
-          </intent-filter>
-      </receiver>
+          android:name="com.touchgrass.motion.ActivityTransitionReceiver"
+          android:enabled="true"
+          android:exported="true" />
+
     </application>
 </manifest>

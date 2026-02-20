@@ -10,7 +10,7 @@ import com.facebook.react.jstasks.HeadlessJsTaskConfig
 /**
  * A service that runs a JavaScript task in the background.
  *
- * This is invoked by [ActivityUpdateReceiver] when a significant motion activity
+ * This is invoked by the motion detection system when a significant motion activity
  * is detected and the main React Native application is not in the foreground.
  * The service is responsible for starting the app in the background and passing
  * the activity data to a predefined JavaScript task.

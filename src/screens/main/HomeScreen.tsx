@@ -10,7 +10,7 @@ import { Footprints, Play, Shield, Square } from 'lucide-react-native';
 import { Typography } from '../../components';
 import { ProgressRing } from '../../components/ProgressRing';
 import { useTracking, AggregatedGoals } from '../../hooks/useTracking';
-import { TrackingProgress } from '../../native/Tracking';
+import { TrackingProgress } from '../../tracking/Tracking';
 import { AppBlocker } from '../../native/AppBlocker';
 import { colors, spacing } from '../../theme';
 
@@ -191,11 +191,12 @@ export const HomeScreen = () => {
           goalsReached: {String(allGoalsReached)}
         </Typography>
         <Typography variant="body" style={styles.debugText}>
-          actRecog: {String(debugInfo.actRecogRegistered)} | service:{' '}
+          motion: {debugInfo.motionState} | service:{' '}
+          {String(debugInfo.motionServiceRunning)} | gps:{' '}
           {String(debugInfo.nativeServiceRunning)}
         </Typography>
         <Typography variant="body" style={styles.debugText}>
-          lastActivity: {debugInfo.lastActivity}
+          activity: {debugInfo.motionActivity}
         </Typography>
       </View>
     </ScrollView>

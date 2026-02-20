@@ -8,6 +8,6 @@ import App from './src/App';
 import { name as appName } from './app.json';
 
 // Register the headless task for background activity detection
-import './src/native/headlessTask';
+import './src/tracking/headlessTask';
 
 AppRegistry.registerComponent(appName, () => App);

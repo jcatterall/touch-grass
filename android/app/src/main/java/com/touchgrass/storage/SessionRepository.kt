@@ -1,4 +1,4 @@
-package com.touchgrass.db
+package com.touchgrass.storage
 
 import android.content.Context
 import kotlinx.coroutines.CoroutineScope

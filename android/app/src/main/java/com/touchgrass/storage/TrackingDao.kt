@@ -1,4 +1,4 @@
-package com.touchgrass.db
+package com.touchgrass.storage
 
 import androidx.room.Dao
 import androidx.room.Insert

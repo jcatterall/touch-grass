@@ -1,4 +1,4 @@
-package com.touchgrass
+package com.touchgrass.tracking
 
 import android.content.ComponentName
 import android.content.Context
@@ -13,7 +13,11 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.modules.core.DeviceEventManagerModule
-import com.touchgrass.db.SessionRepository
+import com.touchgrass.storage.SessionRepository
+import com.touchgrass.motion.MotionService
+import com.touchgrass.motion.MotionSessionController
+import com.touchgrass.motion.MotionTrackingBridge
+import com.touchgrass.MMKVStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -30,8 +34,8 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
 
     /**
      * Called by RN after the module is attached to the React context.
-     * If TrackingService is already running (e.g. started by a headless task while the app
-     * was in the background), bind to it so progress events flow to JS and getProgress() works.
+     * If TrackingService is already running (e.g. started while the app was backgrounded),
+     * bind to it so progress events flow to JS and getProgress() works.
      */
     override fun initialize() {
         super.initialize()
@@ -101,7 +105,6 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             context.startForegroundService(intent)
             context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
 
-            // Notify JS that tracking has started, so the UI can sync
             sendEvent("onTrackingStarted", Arguments.createMap())
 
             promise.resolve(true)
@@ -120,8 +123,6 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             context.stopService(intent)
             unbindService()
 
-            // Clear SharedPreferences so onDestroy's save doesn't get
-            // double-counted — JS handles persistence via saveAndResetSession
             context.getSharedPreferences("touchgrass_tracking_prefs", Context.MODE_PRIVATE)
                 .edit().clear().apply()
 
@@ -157,9 +158,7 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     /**
-     * Returns any unsaved session data from SharedPreferences (written by
-     * TrackingService.onDestroy when the service ran without JS) and clears it.
-     * Returns null fields if nothing is pending.
+     * Returns any unsaved session data from SharedPreferences and clears it.
      */
     @ReactMethod
     fun getUnsavedSession(promise: Promise) {
@@ -181,7 +180,6 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                 putBoolean("goalsReached", prefs.getBoolean("unsaved_goal_reached", false))
             }
 
-            // Clear after reading
             prefs.edit().clear().apply()
             Log.d(TAG, "Retrieved and cleared unsaved session for $date")
 
@@ -194,8 +192,6 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
 
     /**
      * Returns today's accumulated distance/elapsed/goalsReached from Room.
-     * Used by headlessTask.ts and useTracking.ts recovery path as a fast native
-     * alternative to the AsyncStorage daily_activity read.
      */
     @ReactMethod
     fun getDailyTotalNative(promise: Promise) {
@@ -222,22 +218,29 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     /**
-     * Starts TrackingService in IDLE state — service runs as a foreground service
-     * but GPS is off. ActivityUpdateReceiver will signal it when motion is detected,
-     * transitioning it to TRACKING without any startForegroundService() call from
-     * a BroadcastReceiver (which would fail on Android 8+ when the app is backgrounded).
+     * Starts TrackingService in IDLE state and starts MotionService for motion detection.
+     * The MotionService will signal TrackingService via MotionTrackingBridge when motion is detected.
+     * Call this when the user enables background tracking.
      */
     @ReactMethod
     fun startIdleService(promise: Promise) {
         try {
             val context = reactApplicationContext
-            val intent = Intent(context, TrackingService::class.java).apply {
+
+            // Initialize the bridge so MotionTracker can signal TrackingService
+            MotionTrackingBridge.init(context)
+
+            // Start TrackingService in IDLE state (foreground service, GPS off)
+            val trackingIntent = Intent(context, TrackingService::class.java).apply {
                 action = TrackingService.ACTION_START_IDLE
             }
-            ContextCompat.startForegroundService(context, intent)
-            // Bind so the module has a handle to the service if needed
-            context.bindService(intent, connection, 0)
-            Log.d(TAG, "Idle service started")
+            ContextCompat.startForegroundService(context, trackingIntent)
+            context.bindService(trackingIntent, connection, 0)
+
+            // Start MotionService (motion detection engine)
+            MotionService.start(context)
+
+            Log.d(TAG, "Idle service + MotionService started")
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start idle service", e)
@@ -246,20 +249,26 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     /**
-     * Stops the background idle/tracking service entirely.
+     * Stops the background idle/tracking service and the motion detection service.
      * Called when the user disables background tracking.
      */
     @ReactMethod
     fun stopIdleService(promise: Promise) {
         try {
             val context = reactApplicationContext
+
+            // Stop MotionService (stops motion detection)
+            MotionService.stop(context)
+            MotionSessionController.reset()
+
+            // Stop TrackingService background mode
             val intent = Intent(context, TrackingService::class.java).apply {
                 action = TrackingService.ACTION_STOP_BACKGROUND
             }
-            // Sending an action to a running service is always permitted
             context.startService(intent)
             unbindService()
-            Log.d(TAG, "Idle service stop requested")
+
+            Log.d(TAG, "Idle service + MotionService stopped")
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to stop idle service", e)
@@ -269,7 +278,6 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
 
     /**
      * Synchronous MMKV-backed check of whether auto-tracking is active.
-     * Useful for JS recovery on app open before the first progress event arrives.
      */
     @ReactMethod
     fun getIsAutoTracking(promise: Promise) {

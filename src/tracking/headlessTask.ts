@@ -20,7 +20,11 @@ async function activityTask(data: TaskData): Promise<void> {
     console.log('[HeadlessTask] Ignoring non-ENTER transition.');
     return;
   }
-  if (activity !== 'WALKING' && activity !== 'RUNNING' && activity !== 'CYCLING') {
+  if (
+    activity !== 'WALKING' &&
+    activity !== 'RUNNING' &&
+    activity !== 'CYCLING'
+  ) {
     console.log(`[HeadlessTask] Ignoring ignorable activity: ${activity}.`);
     return;
   }
@@ -28,9 +32,7 @@ async function activityTask(data: TaskData): Promise<void> {
   console.log('[HeadlessTask] Checking permissions...');
   const hasPerms = await TrackingPermissions.checkAll();
   if (!hasPerms) {
-    console.error(
-      '[HeadlessTask] FAILED: Permissions check failed. Aborting.',
-    );
+    console.error('[HeadlessTask] FAILED: Permissions check failed. Aborting.');
     return;
   }
   console.log('[HeadlessTask] Permissions check passed.');
@@ -74,7 +76,10 @@ async function activityTask(data: TaskData): Promise<void> {
       );
     }
   } catch (e) {
-    console.error('[HeadlessTask] Failed to read today activity, using zero baseline.', e);
+    console.error(
+      '[HeadlessTask] Failed to read today activity, using zero baseline.',
+      e,
+    );
   }
 
   const goals = aggregateGoals(activePlans);
@@ -86,7 +91,9 @@ async function activityTask(data: TaskData): Promise<void> {
         goals.totalDistanceMeters - todayDistanceMeters,
       );
       if (remainingMeters <= 0) {
-        console.log('[HeadlessTask] Distance goal already met today. Aborting.');
+        console.log(
+          '[HeadlessTask] Distance goal already met today. Aborting.',
+        );
         return;
       }
       console.log(
@@ -112,11 +119,11 @@ async function activityTask(data: TaskData): Promise<void> {
     }
     console.log('[HeadlessTask] SUCCEEDED: Tracking.startTracking called.');
   } catch (e) {
-    console.error('[HeadlessTask] FAILED: Tracking.startTracking threw an error.', e);
+    console.error(
+      '[HeadlessTask] FAILED: Tracking.startTracking threw an error.',
+      e,
+    );
   }
 }
 
-AppRegistry.registerHeadlessTask(
-  'TouchGrassActivityTask',
-  () => activityTask,
-);
+AppRegistry.registerHeadlessTask('TouchGrassActivityTask', () => activityTask);

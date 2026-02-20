@@ -1,4 +1,4 @@
-package com.touchgrass
+package com.touchgrass.tracking
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -21,9 +21,12 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import com.touchgrass.db.SessionRepository
+import com.touchgrass.storage.SessionRepository
+import com.touchgrass.motion.MotionTrackingBridge
+import com.touchgrass.MMKVStore
+import com.touchgrass.HeartbeatManager
 
-/** GPS power modes — controlled by velocity and activity recognition signals. */
+/** GPS power modes — controlled by velocity signals. */
 enum class GpsMode { OFF, LOW_POWER, HIGH_ACCURACY }
 
 /** Service lifecycle states. IDLE = running, GPS off, waiting for motion. TRACKING = active GPS session. */
@@ -45,33 +48,23 @@ class TrackingService : Service() {
         private const val MOVEMENT_THRESHOLD_M = 10f
 
         // Passive inactivity fallback — fires if GPS stops delivering fixes entirely (e.g. deep indoors).
-        // Kept short because the GPS-fix idle counter is the primary idle path now.
         private const val STOP_TIMEOUT_MS = 90_000L  // 90 seconds
 
-        // After STILL is confirmed (by ActivityRecognition OR GPS-fix idle counter), wait this long
-        // before ending the session. 30s is enough to absorb a traffic-light pause; the GPS-fix
-        // counter already requires N consecutive idle fixes before arming this buffer.
+        // After MotionTracker signals STOPPED, wait this long before ending the GPS session.
+        // 30s absorbs a traffic-light pause that MotionTracker's auto-pause already filtered.
         private const val STATIONARY_BUFFER_MS = 30_000L
 
         // Number of consecutive GPS fixes with movement below MOVEMENT_THRESHOLD_M required
-        // before the service arms the stationary buffer independently of Activity Recognition.
-        // On LOW_POWER (10s interval) this is ~30s of confirmed no movement.
+        // before the service arms the stationary buffer independently of MotionTracker.
         private const val IDLE_FIX_COUNT_THRESHOLD = 3
 
         // Vehicle speed threshold in km/h — above this, distance accumulation pauses.
         private const val VEHICLE_SPEED_KMH = 25f
 
-        // Intent actions sent by ActivityUpdateReceiver to signal motion state changes
-        // mid-session. Handled at the top of onStartCommand before any session re-init.
-        const val ACTION_STILL_DETECTED = "com.touchgrass.action.STILL_DETECTED"
-        const val ACTION_MOTION_DETECTED = "com.touchgrass.action.MOTION_DETECTED"
-
         // Idle service lifecycle — used by toggleBackgroundTracking in JS.
         // START_IDLE: service enters low-power watch mode (GPS off, notification visible).
-        // START_AUTO_TRACKING: activity recognition detected motion, begin tracking session.
         // STOP_BACKGROUND: user disabled background tracking, stop the service entirely.
         const val ACTION_START_IDLE = "com.touchgrass.action.START_IDLE"
-        const val ACTION_START_AUTO_TRACKING = "com.touchgrass.action.START_AUTO_TRACKING"
         const val ACTION_STOP_BACKGROUND = "com.touchgrass.action.STOP_BACKGROUND"
 
         // Sent by AppBlockerService when it starts/stops, so the shared notification
@@ -94,7 +87,7 @@ class TrackingService : Service() {
     private var locationCallback: LocationCallback? = null
     private var lastLocation: Location? = null
 
-    // Current GPS power mode — transitions driven by velocity and activity signals.
+    // Current GPS power mode — transitions driven by velocity signals.
     private var currentGpsMode = GpsMode.OFF
 
     // Tracking state
@@ -111,11 +104,9 @@ class TrackingService : Service() {
     private var startTimeMs: Long = 0
 
     // Counts consecutive GPS fixes where movement was below MOVEMENT_THRESHOLD_M.
-    // When this reaches IDLE_FIX_COUNT_THRESHOLD, we arm the stationary buffer without
-    // waiting for an Activity Recognition STILL event (which can lag by up to 60s).
     private var consecutiveIdleFixes: Int = 0
 
-    // Service state: IDLE = running but GPS off (waiting for motion signal)
+    // Service state: IDLE = running but GPS off (waiting for motion signal from MotionTracker)
     //               TRACKING = GPS active, distance accumulating
     private var serviceState = ServiceState.IDLE
 
@@ -135,30 +126,22 @@ class TrackingService : Service() {
     private val handler = Handler(Looper.getMainLooper())
 
     // Passive fallback: fires if GPS stops delivering fixes (indoors / GPS blocked).
-    // Returns to IDLE rather than stopping, so the service stays alive for the next
-    // motion event without needing a startForegroundService() call from the receiver.
     private val stopTimeoutRunnable = Runnable {
         Log.d(TAG, "Stop-detection: no GPS fixes for ${STOP_TIMEOUT_MS / 1000}s")
-        stationaryBufferRunnable.run()  // shared session-end + return-to-idle logic
+        stationaryBufferRunnable.run()
     }
 
-    // 120-second stationary buffer — armed when ActivityRecognition signals STILL.
-    // GPS is turned off immediately on STILL; the service waits 120s to confirm the
-    // user isn't just pausing at a traffic light before ending the session.
-    // If background tracking is still enabled, returns to IDLE instead of stopping.
+    // Stationary buffer — armed when MotionTracker signals MOTION_STOPPED or GPS idles out.
     private val stationaryBufferRunnable = Runnable {
         Log.d(TAG, "Stationary buffer expired (${STATIONARY_BUFFER_MS / 1000}s) — ending session")
         val wasTracking = serviceState == ServiceState.TRACKING
         if (wasTracking) {
-            // Persist the completed session
             val finalElapsed = if (startTimeMs > 0) (System.currentTimeMillis() - startTimeMs) / 1000 else 0L
             val unflushed = finalElapsed - lastFlushedElapsedSeconds
             if (unflushed > 0) MMKVStore.accumulateTodayElapsed(unflushed)
             sessionRepository.closeSession(distanceMeters, elapsedSeconds, goalReached)
             saveSessionToPrefs()
         }
-        // Return to IDLE — service stays alive for next motion event.
-        // This avoids any future startService() calls from the receiver.
         Log.d(TAG, "Returning to IDLE state after session end")
         serviceState = ServiceState.IDLE
         distanceMeters = 0.0
@@ -169,9 +152,7 @@ class TrackingService : Service() {
         consecutiveIdleFixes = 0
         startTimeMs = 0
         MMKVStore.setAutoTracking(false)
-        // Notify JS so it can update isTracking without requiring an app restart.
         if (wasTracking) onTrackingStoppedCallback?.invoke()
-        // Stay on the same notification ID — no second notification appears.
         val notification = buildNotification()
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(NOTIFICATION_ID, notification)
@@ -204,8 +185,8 @@ class TrackingService : Service() {
 
             ACTION_START_IDLE -> {
                 // Enter low-power watch mode: foreground service running, GPS off.
-                // GPS will be started when ActivityUpdateReceiver signals motion.
-                Log.d(TAG, "Entering IDLE state — watching for motion")
+                // MotionTracker (via MotionTrackingBridge) will signal when motion is detected.
+                Log.d(TAG, "Entering IDLE state — MotionTracker will signal when motion detected")
                 serviceState = ServiceState.IDLE
                 MMKVStore.setAutoTracking(false)
                 val notification = buildNotification()
@@ -219,7 +200,6 @@ class TrackingService : Service() {
             }
 
             ACTION_STOP_BACKGROUND -> {
-                // User disabled background tracking — stop service entirely.
                 Log.d(TAG, "Stopping background tracking service")
                 stopSelf()
                 return START_NOT_STICKY
@@ -239,47 +219,40 @@ class TrackingService : Service() {
                 return START_STICKY
             }
 
-            ACTION_START_AUTO_TRACKING -> {
-                // ActivityUpdateReceiver detected WALKING/RUNNING/CYCLING while IDLE.
-                // Transition to active tracking — goal params may arrive later via
-                // a concurrent headless task; for now track with defaults.
-                Log.d(TAG, "IDLE → TRACKING: motion detected by activity recognition")
-                startTrackingSession(
-                    type = intent.getStringExtra(EXTRA_GOAL_TYPE) ?: goalType,
-                    value = intent.getDoubleExtra(EXTRA_GOAL_VALUE, goalValue),
-                    unit = intent.getStringExtra(EXTRA_GOAL_UNIT) ?: goalUnit,
-                    mode = "auto",
-                )
-                return START_STICKY
-            }
+            // ---- MotionTracker bridge: motion detected (walking/running/cycling) ----
 
-            // ---- Mid-session signals from ActivityUpdateReceiver ----
-
-            ACTION_STILL_DETECTED -> {
-                if (serviceState == ServiceState.TRACKING) {
-                    Log.d(TAG, "STILL_DETECTED: GPS off, arming 120s stationary buffer")
-                    handler.removeCallbacks(stopTimeoutRunnable)
+            MotionTrackingBridge.ACTION_MOTION_STARTED -> {
+                val activityType = intent.getStringExtra(MotionTrackingBridge.EXTRA_ACTIVITY_TYPE) ?: "walking"
+                Log.d(TAG, "MotionTracker MOTION_STARTED ($activityType)")
+                if (serviceState == ServiceState.IDLE) {
+                    // Service is IDLE — transition to TRACKING
+                    Log.d(TAG, "IDLE → TRACKING: motion detected by MotionTracker")
+                    startTrackingSession(goalType, goalValue, goalUnit, "auto")
+                } else if (serviceState == ServiceState.TRACKING) {
+                    // Already TRACKING — cancel any pending stationary buffer, keep GPS alive
+                    Log.d(TAG, "Already TRACKING — cancelling stationary buffer, resuming GPS")
+                    consecutiveIdleFixes = 0
                     handler.removeCallbacks(stationaryBufferRunnable)
-                    setGpsPriority(GpsMode.OFF)
-                    handler.postDelayed(stationaryBufferRunnable, STATIONARY_BUFFER_MS)
-                } else {
-                    Log.d(TAG, "STILL_DETECTED while IDLE — no-op")
+                    handler.removeCallbacks(stopTimeoutRunnable)
+                    if (currentGpsMode == GpsMode.OFF) {
+                        setGpsPriority(GpsMode.LOW_POWER)
+                        handler.postDelayed(stopTimeoutRunnable, STOP_TIMEOUT_MS)
+                    }
                 }
                 return START_STICKY
             }
 
-            ACTION_MOTION_DETECTED -> {
+            // ---- MotionTracker bridge: motion stopped (inactivity/vehicle/manual) ----
+
+            MotionTrackingBridge.ACTION_MOTION_STOPPED -> {
+                val reason = intent.getStringExtra(MotionTrackingBridge.EXTRA_STOP_REASON) ?: "inactivity_timeout"
+                Log.d(TAG, "MotionTracker MOTION_STOPPED reason=$reason")
                 if (serviceState == ServiceState.TRACKING) {
-                    Log.d(TAG, "MOTION_DETECTED: stationary buffer cancelled, GPS restarting")
-                    consecutiveIdleFixes = 0
-                    handler.removeCallbacks(stationaryBufferRunnable)
+                    Log.d(TAG, "TRACKING → arming stationary buffer (${STATIONARY_BUFFER_MS / 1000}s)")
                     handler.removeCallbacks(stopTimeoutRunnable)
-                    setGpsPriority(GpsMode.LOW_POWER)
-                    handler.postDelayed(stopTimeoutRunnable, STOP_TIMEOUT_MS)
-                } else if (serviceState == ServiceState.IDLE) {
-                    // Motion detected while idle — same as START_AUTO_TRACKING.
-                    Log.d(TAG, "MOTION_DETECTED while IDLE → transitioning to TRACKING")
-                    startTrackingSession(goalType, goalValue, goalUnit, "auto")
+                    handler.removeCallbacks(stationaryBufferRunnable)
+                    setGpsPriority(GpsMode.OFF)
+                    handler.postDelayed(stationaryBufferRunnable, STATIONARY_BUFFER_MS)
                 }
                 return START_STICKY
             }
@@ -287,7 +260,6 @@ class TrackingService : Service() {
             // ---- Manual tracking start (from JS Play button) ----
 
             else -> {
-                // No specific action = manual start from TrackingModule.startTracking().
                 val type = intent?.getStringExtra(EXTRA_GOAL_TYPE) ?: "distance"
                 val value = intent?.getDoubleExtra(EXTRA_GOAL_VALUE, 5000.0) ?: 5000.0
                 val unit = intent?.getStringExtra(EXTRA_GOAL_UNIT) ?: "km"
@@ -341,12 +313,6 @@ class TrackingService : Service() {
 
     // ---- GPS power management ----
 
-    /**
-     * Switch GPS to the requested power mode. No-ops if already in that mode.
-     * OFF = remove all location updates (battery saving during STILL periods).
-     * LOW_POWER = balanced accuracy at 10s / 15m (walking).
-     * HIGH_ACCURACY = high accuracy at 5s / 5m (running/cycling).
-     */
     fun setGpsPriority(mode: GpsMode) {
         if (mode == currentGpsMode) return
         Log.d(TAG, "GPS mode: $currentGpsMode → $mode")
@@ -367,7 +333,6 @@ class TrackingService : Service() {
     }
 
     private fun restartLocationUpdates(priority: Int, intervalMs: Long, minDistanceM: Float) {
-        // Remove existing callback before registering a new one
         locationCallback?.let { fusedLocationClient.removeLocationUpdates(it) }
 
         val req = LocationRequest.Builder(priority, intervalMs)
@@ -384,7 +349,6 @@ class TrackingService : Service() {
 
         try {
             fusedLocationClient.requestLocationUpdates(req, cb, Looper.getMainLooper())
-            // Arm passive fallback timer — resets on every genuine movement fix
             handler.removeCallbacks(stopTimeoutRunnable)
             handler.postDelayed(stopTimeoutRunnable, STOP_TIMEOUT_MS)
             Log.d(TAG, "Location updates started: priority=$priority interval=${intervalMs}ms")
@@ -407,7 +371,6 @@ class TrackingService : Service() {
         val speedKmh = speedMs * 3.6f
 
         // Vehicle filter: speed > 25 km/h → pause distance accumulation.
-        // Keep GPS running at LOW_POWER to maintain awareness but skip distance.
         if (speedKmh > VEHICLE_SPEED_KMH) {
             if (currentGpsMode != GpsMode.LOW_POWER) setGpsPriority(GpsMode.LOW_POWER)
             lastLocation = location
@@ -415,20 +378,14 @@ class TrackingService : Service() {
             return
         }
 
-        // Velocity-based GPS quality switching (only while tracking)
+        // Velocity-based GPS quality switching
         val targetMode = if (speedKmh > 6f) GpsMode.HIGH_ACCURACY else GpsMode.LOW_POWER
         if (targetMode != currentGpsMode) setGpsPriority(targetMode)
 
         lastLocation?.let { prev ->
             val delta = prev.distanceTo(location)
 
-            // Elastic distance filter: scale minimum countable movement with speed.
-            //   Walking  ~1.4 m/s → effectiveFilter = max(10, 2.1)  = 10m
-            //   Running  ~4 m/s   → effectiveFilter = max(10, 6.0)  = 10m
-            //   Cycling  ~10 m/s  → effectiveFilter = max(10, 15.0) = 15m
             val effectiveFilter = maxOf(10f, speedMs * 1.5f)
-
-            // Sanity guard: drop implausible GPS teleportation jumps.
             val maxPlausibleDelta = maxOf(200f, location.accuracy * 10f)
 
             if (delta >= effectiveFilter && delta < maxPlausibleDelta) {
@@ -440,11 +397,8 @@ class TrackingService : Service() {
                 Log.d(TAG, "Filtered GPS jump: ${delta}m (accuracy: ${location.accuracy}m)")
             }
 
-            // GPS-fix-based idle detection: count consecutive fixes below movement threshold.
-            // This catches the "device on table" case independently of Activity Recognition,
-            // which can lag by up to 60 seconds between polls.
+            // GPS-fix-based idle detection
             if (delta >= MOVEMENT_THRESHOLD_M) {
-                // Genuine movement — reset idle counter and passive timeout.
                 consecutiveIdleFixes = 0
                 handler.removeCallbacks(stopTimeoutRunnable)
                 handler.removeCallbacks(stationaryBufferRunnable)
@@ -458,22 +412,18 @@ class TrackingService : Service() {
                     handler.removeCallbacks(stationaryBufferRunnable)
                     setGpsPriority(GpsMode.OFF)
                     handler.postDelayed(stationaryBufferRunnable, STATIONARY_BUFFER_MS)
-                    consecutiveIdleFixes = 0  // reset so re-entry after MOTION is clean
+                    consecutiveIdleFixes = 0
                 }
             }
         } ?: run {
-            // First fix: arm the passive fallback timer.
             handler.removeCallbacks(stopTimeoutRunnable)
             handler.postDelayed(stopTimeoutRunnable, STOP_TIMEOUT_MS)
         }
 
-        // Always advance lastLocation so the next genuine fix measures from a current position.
         lastLocation = location
 
         elapsedSeconds = (System.currentTimeMillis() - startTimeMs) / 1000
 
-        // Flush elapsed delta to MMKV every 30s so elapsed time survives process kill.
-        // Distance is already written on every fix; this closes the gap for elapsed.
         val nowMs = System.currentTimeMillis()
         if (nowMs - lastElapsedFlushMs >= ELAPSED_FLUSH_INTERVAL_MS) {
             lastElapsedFlushMs = nowMs
@@ -514,16 +464,7 @@ class TrackingService : Service() {
     }
 
     // ---- Notification ----
-    // Single notification (ID 1001, channel "touchgrass_tracking") shared across all states:
-    // idle, tracking, and app-blocker. AppBlockerService also uses this same ID so only
-    // one notification ever appears in the drawer.
 
-    /**
-     * Builds the unified notification for all service states.
-     * Title is always "TouchGrass is active".
-     * Body shows goal progress when available, a status line otherwise.
-     * If the blocker is active a second line notes it.
-     */
     private fun buildNotification(): Notification {
         val (body, progress, max) = getNotificationContent()
         val title = when {
@@ -555,22 +496,16 @@ class TrackingService : Service() {
     }
 
     private fun getNotificationContent(): Triple<String, Int, Int> {
-        // Goal comes from MMKV — written by JS whenever active plans change.
-        // This ensures the notification always reflects the real aggregated goal,
-        // regardless of what value was passed when startTracking() was called.
         val goalType  = MMKVStore.getGoalType()
         val goalValue = MMKVStore.getGoalValue()
 
         return when (goalType) {
             "distance" -> {
-                // goalValue is in meters (JS writes totalDistanceMeters)
                 val goalMeters = goalValue
-                val todayDistanceM = MMKVStore.getTodayDistance()
-                val displayDist = if (serviceState == ServiceState.TRACKING) {
-                    todayDistanceM + distanceMeters
-                } else {
-                    todayDistanceM
-                }
+                // getTodayDistance() already accumulates the current session's distance
+                // on every GPS fix (via accumulateTodayDistance). Do NOT add distanceMeters
+                // again — that would double-count the current session.
+                val displayDist = MMKVStore.getTodayDistance()
                 val currentDisplay = if (displayDist >= 1000) {
                     String.format("%.1fkm", displayDist / 1000.0)
                 } else {
@@ -585,11 +520,12 @@ class TrackingService : Service() {
                 Triple("$currentDisplay / $goalDisplay", progressVal, goalMeters.toInt())
             }
             "time" -> {
-                // goalValue is in seconds (JS writes totalTimeSeconds)
                 val goalSec = goalValue.toLong()
+                // getTodayElapsed() holds the flushed portion only (updated every 30s).
+                // Add the unflushed remainder so the notification stays current.
                 val todayElapsedSec = MMKVStore.getTodayElapsed()
                 val displayElapsed = if (serviceState == ServiceState.TRACKING) {
-                    todayElapsedSec + elapsedSeconds
+                    todayElapsedSec + (elapsedSeconds - lastFlushedElapsedSeconds)
                 } else {
                     todayElapsedSec
                 }
@@ -607,8 +543,6 @@ class TrackingService : Service() {
 
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)
-
-        // Single channel for all states (idle, tracking, blocker).
         val trackingChannel = NotificationChannel(
             CHANNEL_ID,
             "TouchGrass",
@@ -620,7 +554,6 @@ class TrackingService : Service() {
         manager.createNotificationChannel(trackingChannel)
     }
 
-    /** Stops GPS and cancels all pending timers. Used by setGpsPriority(OFF) and onDestroy. */
     private fun stopLocationUpdates() {
         handler.removeCallbacks(stopTimeoutRunnable)
         handler.removeCallbacks(stationaryBufferRunnable)
@@ -631,12 +564,6 @@ class TrackingService : Service() {
         currentGpsMode = GpsMode.OFF
     }
 
-    /**
-     * Save final session progress to SharedPreferences — backward-compat fallback so
-     * useTracking.ts can recover sessions on the first open after upgrading from the
-     * old pure-SharedPreferences path. Room (via sessionRepository.closeSession) is
-     * the primary persistence now.
-     */
     private fun saveSessionToPrefs() {
         if (distanceMeters == 0.0 && elapsedSeconds == 0L) return
 
@@ -667,8 +594,6 @@ class TrackingService : Service() {
         HeartbeatManager.cancel(this)
         if (serviceState == ServiceState.TRACKING && startTimeMs > 0) {
             val finalElapsed = (System.currentTimeMillis() - startTimeMs) / 1000
-            // Write only the unflushed remainder — the periodic flush already accumulated
-            // the earlier portion to MMKV. Writing the full elapsed again would double-count.
             val unflushed = finalElapsed - lastFlushedElapsedSeconds
             if (unflushed > 0) MMKVStore.accumulateTodayElapsed(unflushed)
         }

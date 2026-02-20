@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import { MMKV, Mode } from 'react-native-mmkv';
-import type { OnboardingData } from './screens';
-import { BlockingPlan, DailyActivity } from './types';
-import { generateUUID } from './utils/guid';
+import type { OnboardingData } from '../screens';
+import { BlockingPlan, DailyActivity } from '../types';
+import { generateUUID } from '../utils/guid';
 
 /**
  * Synchronous fast-path for today's totals, shared with the Kotlin layer via MMKV.
@@ -13,13 +13,18 @@ import { generateUUID } from './utils/guid';
 const _mmkv = new MMKV({ id: 'touchgrass_state', mode: Mode.MULTI_PROCESS });
 
 export const fastStorage = {
-  getTodayDistance: (): number  => _mmkv.getNumber('today_distance_meters') ?? 0,
-  getTodayElapsed:  (): number  => _mmkv.getNumber('today_elapsed_seconds') ?? 0,
-  getGoalsReached:  (): boolean => _mmkv.getBoolean('today_goals_reached') ?? false,
-  isAutoTracking:   (): boolean => _mmkv.getBoolean('is_auto_tracking') ?? false,
+  getTodayDistance: (): number => _mmkv.getNumber('today_distance_meters') ?? 0,
+  getTodayElapsed: (): number => _mmkv.getNumber('today_elapsed_seconds') ?? 0,
+  getGoalsReached: (): boolean =>
+    _mmkv.getBoolean('today_goals_reached') ?? false,
+  isAutoTracking: (): boolean => _mmkv.getBoolean('is_auto_tracking') ?? false,
 
   /** Write the aggregated goal so TrackingService can display correct progress in the notification. */
-  setGoal(type: 'distance' | 'time' | 'none', value: number, unit: string): void {
+  setGoal(
+    type: 'distance' | 'time' | 'none',
+    value: number,
+    unit: string,
+  ): void {
     _mmkv.set('goal_type', type);
     _mmkv.set('goal_value', value);
     _mmkv.set('goal_unit', unit);
@@ -135,9 +140,15 @@ export const storage = {
     if (idx >= 0) {
       activities[idx].distanceMeters += distanceMeters;
       activities[idx].elapsedSeconds += elapsedSeconds;
-      activities[idx].goalsReached = activities[idx].goalsReached || goalsReached;
+      activities[idx].goalsReached =
+        activities[idx].goalsReached || goalsReached;
     } else {
-      activities.push({ date: today, distanceMeters, elapsedSeconds, goalsReached });
+      activities.push({
+        date: today,
+        distanceMeters,
+        elapsedSeconds,
+        goalsReached,
+      });
     }
 
     await AsyncStorage.setItem(KEYS.DAILY_ACTIVITY, JSON.stringify(activities));

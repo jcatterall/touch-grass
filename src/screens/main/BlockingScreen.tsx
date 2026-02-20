@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { AppState, BackHandler, Pressable, StyleSheet, View } from 'react-native';
+import {
+  AppState,
+  BackHandler,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TreePine, X } from 'lucide-react-native';
 import { AppBlocker } from '../../native/AppBlocker';
@@ -9,7 +15,7 @@ import {
   findBlockingPlansForToday,
   AggregatedGoals,
 } from '../../hooks/useTracking';
-import { Tracking, TrackingProgress } from '../../native/Tracking';
+import { Tracking, TrackingProgress } from '../../tracking/Tracking';
 import { storage } from '../../storage';
 import { BlockingPlan } from '../../types';
 import { colors, spacing } from '../../theme';
@@ -119,7 +125,9 @@ export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
   // Hide navigation bar to prevent swipe-up gesture to Recents
   useEffect(() => {
     AppBlocker.setImmersiveMode(true);
-    return () => { AppBlocker.setImmersiveMode(false); };
+    return () => {
+      AppBlocker.setImmersiveMode(false);
+    };
   }, []);
 
   // Block the Android back button
@@ -171,7 +179,9 @@ export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
     ? Math.max(goals.totalTimeSeconds - progress.elapsedSeconds, 0)
     : 0;
 
-  const allMet = remainingDistance === 0 && remainingTime === 0 &&
+  const allMet =
+    remainingDistance === 0 &&
+    remainingTime === 0 &&
     (goals.hasDistanceGoal || goals.hasTimeGoal);
 
   return (
@@ -184,7 +194,11 @@ export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
         },
       ]}
     >
-      <Pressable style={[styles.closeX, { top: insets.top }]} onPress={dismiss} hitSlop={16}>
+      <Pressable
+        style={[styles.closeX, { top: insets.top }]}
+        onPress={dismiss}
+        hitSlop={16}
+      >
         <X size={24} color={colors.backgroundTertiary} />
       </Pressable>
 

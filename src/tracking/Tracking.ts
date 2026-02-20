@@ -104,7 +104,7 @@ export const Tracking = {
 
   /**
    * Starts TrackingService in IDLE state (foreground, GPS off).
-   * The service transitions to TRACKING when ActivityUpdateReceiver detects motion.
+   * The service transitions to TRACKING when MotionTracker (MotionTrackingBridge) detects motion.
    * Call this when the user enables background tracking.
    */
   async startIdleService(): Promise<boolean> {

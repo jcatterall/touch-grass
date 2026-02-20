@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { DeviceEventEmitter, EmitterSubscription } from 'react-native';
+import {
+  AppState,
+  DeviceEventEmitter,
+  EmitterSubscription,
+} from 'react-native';
 import { storage, fastStorage, PLANS_CHANGED_EVENT } from '../storage';
 import { BlockingPlan, DayKey } from '../types';
-import {
-  ActivityRecognition,
-  ActivityDetectedEvent,
-} from '../native/ActivityRecognition';
-import { Tracking, TrackingProgress } from '../native/Tracking';
-import { TrackingPermissions } from '../native/Permissions';
+import { MotionTracker, MotionEvent } from '../tracking/MotionTracker';
+import { Tracking, TrackingProgress } from '../tracking/Tracking';
+import { TrackingPermissions } from '../tracking/Permissions';
 import { AppBlocker } from '../native/AppBlocker';
 
 const DAY_MAP: Record<number, DayKey> = {
@@ -39,9 +40,7 @@ export function isWithinDuration(plan: BlockingPlan): boolean {
   return currentMinutes >= fromMinutes && currentMinutes <= toMinutes;
 }
 
-export function findActivePlansForToday(
-  plans: BlockingPlan[],
-): BlockingPlan[] {
+export function findActivePlansForToday(plans: BlockingPlan[]): BlockingPlan[] {
   const today = getTodayKey();
   return plans.filter(
     plan =>
@@ -112,8 +111,9 @@ function checkAllGoalsReached(
 export type TrackingMode = 'idle' | 'manual' | 'auto';
 
 export interface DebugInfo {
-  lastActivity: string;
-  actRecogRegistered: boolean;
+  motionState: string;
+  motionActivity: string;
+  motionServiceRunning: boolean;
   nativeServiceRunning: boolean;
 }
 
@@ -137,16 +137,18 @@ export function useTracking(): TrackingState {
   const [isTracking, setIsTracking] = useState(false);
   const [trackingMode, setTrackingMode] = useState<TrackingMode>('idle');
 
-  // dailyBaseline holds the accumulated activity from previous sessions today.
-  // Initialised synchronously from MMKV (zero-latency mmap read) so the UI
-  // shows the correct value on the very first render — no async "calculating..." state.
-  const [dailyBaseline, setDailyBaseline] = useState<TrackingProgress>(() => ({
-    distanceMeters: fastStorage.getTodayDistance(),
-    elapsedSeconds: fastStorage.getTodayElapsed(),
-    goalReached: fastStorage.getGoalsReached(),
-  }));
+  // dailyBaseline holds distance/elapsed from sessions that have already *ended* today.
+  // It is intentionally NOT read from MMKV at init time because MMKV's today_distance
+  // accumulates live during an active session — reading it here while a session is running
+  // would double-count the current session (baseline + sessionProgress both include it).
+  // Instead we set it to zero and let recover() fill sessionProgress from the live service,
+  // or let onTrackingStopped fill it from MMKV after the session ends.
+  const [dailyBaseline, setDailyBaseline] = useState<TrackingProgress>({
+    distanceMeters: 0,
+    elapsedSeconds: 0,
+    goalReached: false,
+  });
 
-  // sessionProgress holds the current active session's progress
   const [sessionProgress, setSessionProgress] = useState<TrackingProgress>({
     distanceMeters: 0,
     elapsedSeconds: 0,
@@ -158,12 +160,14 @@ export function useTracking(): TrackingState {
   const [backgroundTrackingEnabled, setBackgroundTrackingEnabled] =
     useState(false);
 
-  const [debugLastActivity, setDebugLastActivity] = useState('none');
-  const [debugActRecogRegistered, setDebugActRecogRegistered] = useState(false);
+  // MotionTracker debug state
+  const [debugMotionState, setDebugMotionState] = useState('STILL');
+  const [debugMotionActivity, setDebugMotionActivity] = useState('unknown');
+  const [debugMotionServiceRunning, setDebugMotionServiceRunning] =
+    useState(false);
   const [debugNativeRunning, setDebugNativeRunning] = useState(false);
 
   const progressSub = useRef<EmitterSubscription | null>(null);
-  const transitionSub = useRef<EmitterSubscription | null>(null);
   const trackingStarted = useRef(false);
 
   // Time interpolation: store the last native update so we can tick every second
@@ -173,6 +177,12 @@ export function useTracking(): TrackingState {
     goalReached: boolean;
     timestamp: number;
   } | null>(null);
+
+  // MotionTracker subscription refs
+  const motionStartedSub = useRef<EmitterSubscription | null>(null);
+  const motionStoppedSub = useRef<EmitterSubscription | null>(null);
+  const motionAutoPausedSub = useRef<EmitterSubscription | null>(null);
+  const motionResumedSub = useRef<EmitterSubscription | null>(null);
 
   const goals = useMemo(() => aggregateGoals(activePlans), [activePlans]);
 
@@ -188,14 +198,16 @@ export function useTracking(): TrackingState {
     }
   }, [goals]);
 
-  // Combined progress = daily baseline + current session
+  // Combined progress = daily baseline + current session.
+  // When tracking is active: sessionProgress comes from onProgress events (live GPS data).
+  // When not tracking: dailyBaseline holds today's total from completed sessions.
   const progress = useMemo<TrackingProgress>(
     () => ({
       distanceMeters:
         dailyBaseline.distanceMeters + sessionProgress.distanceMeters,
       elapsedSeconds:
         dailyBaseline.elapsedSeconds + sessionProgress.elapsedSeconds,
-      goalReached: sessionProgress.goalReached,
+      goalReached: dailyBaseline.goalReached || sessionProgress.goalReached,
     }),
     [dailyBaseline, sessionProgress],
   );
@@ -223,9 +235,6 @@ export function useTracking(): TrackingState {
   }, []);
 
   // Sync blocker service with current plan/progress state.
-  // Only block apps from plans whose individual goal is NOT yet met.
-  // Runs on a 15-second interval rather than on every progress tick
-  // to avoid excessive native bridge calls and storage reads.
   const progressRef = useRef(progress);
   progressRef.current = progress;
 
@@ -240,7 +249,6 @@ export function useTracking(): TrackingState {
         return;
       }
 
-      // Filter to plans whose goal is not yet reached
       const unmetPlans = blockingPlans.filter(plan => {
         if (plan.criteria.type === 'permanent') return true;
         if (plan.criteria.type === 'distance') {
@@ -268,7 +276,11 @@ export function useTracking(): TrackingState {
         p => p.criteria.type === 'permanent',
       );
 
-      await AppBlocker.updateBlockerConfig(blockedPackages, false, hasPermanent);
+      await AppBlocker.updateBlockerConfig(
+        blockedPackages,
+        false,
+        hasPermanent,
+      );
       await AppBlocker.startBlocker();
     };
 
@@ -280,32 +292,58 @@ export function useTracking(): TrackingState {
   // Check permissions + load background tracking state on mount
   useEffect(() => {
     TrackingPermissions.checkAll().then(setPermissionsGranted);
-    storage.getBackgroundTrackingEnabled().then(setBackgroundTrackingEnabled);
+    storage.getBackgroundTrackingEnabled().then(enabled => {
+      setBackgroundTrackingEnabled(enabled);
+      if (enabled) setDebugMotionServiceRunning(true);
+    });
   }, []);
 
-  // On mount: restore active tracking state if the native service is still running
-  // mid-session. The daily baseline is already populated synchronously from MMKV above.
-  useEffect(() => {
-    const recover = async () => {
+  // Sync live state from the native service. Called on mount and on app foreground resume.
+  // Uses getIsAutoTracking() (synchronous MMKV flag) to detect an active session even when
+  // distance/elapsed is still 0 (e.g. GPS just started, no fixes yet).
+  const syncFromNativeService = useCallback(async () => {
+    const isAutoTracking = await Tracking.getIsAutoTracking();
+    if (isAutoTracking) {
       const current = await Tracking.getProgress();
-      if (current.distanceMeters > 0 || current.elapsedSeconds > 0) {
-        setSessionProgress(current);
-        setIsTracking(true);
-        setTrackingMode('auto');
-        setDebugNativeRunning(true);
-        trackingStarted.current = true;
-        lastNativeUpdate.current = {
-          elapsedSeconds: current.elapsedSeconds,
-          distanceMeters: current.distanceMeters,
-          goalReached: current.goalReached,
-          timestamp: Date.now(),
-        };
-      }
-    };
-    recover();
+      setSessionProgress(current);
+      setIsTracking(true);
+      setTrackingMode('auto');
+      setDebugNativeRunning(true);
+      trackingStarted.current = true;
+      lastNativeUpdate.current = {
+        elapsedSeconds: current.elapsedSeconds,
+        distanceMeters: current.distanceMeters,
+        goalReached: current.goalReached,
+        timestamp: Date.now(),
+      };
+    } else {
+      // No active session — load today's completed totals from MMKV as the baseline.
+      // This only runs when not tracking, so there's no double-count risk.
+      setDailyBaseline({
+        distanceMeters: fastStorage.getTodayDistance(),
+        elapsedSeconds: fastStorage.getTodayElapsed(),
+        goalReached: fastStorage.getGoalsReached(),
+      });
+    }
   }, []);
 
-  // Subscribe to progress events once on mount
+  // On mount: restore state from running service
+  useEffect(() => {
+    syncFromNativeService();
+  }, [syncFromNativeService]);
+
+  // On app foreground resume: re-sync in case the native service state changed
+  // while the JS layer was suspended (background → foreground transition).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        syncFromNativeService();
+      }
+    });
+    return () => sub.remove();
+  }, [syncFromNativeService]);
+
+  // Subscribe to TrackingService progress events once on mount
   useEffect(() => {
     progressSub.current = Tracking.onProgress(p => {
       lastNativeUpdate.current = {
@@ -322,29 +360,33 @@ export function useTracking(): TrackingState {
     };
   }, []);
 
-  // Listen for native tracking start events (e.g., from headless task)
+  // Listen for native tracking start events (e.g., from auto-start via MotionTrackingBridge)
   useEffect(() => {
     const sub = Tracking.onTrackingStarted(() => {
-      if (!trackingStarted.current) {
-        trackingStarted.current = true;
-        lastNativeUpdate.current = {
-          elapsedSeconds: 0,
-          distanceMeters: 0,
-          goalReached: false,
-          timestamp: Date.now(),
-        };
-        setSessionProgress({ distanceMeters: 0, elapsedSeconds: 0, goalReached: false });
-        setIsTracking(true);
-        setTrackingMode('auto');
-        setDebugNativeRunning(true);
-      }
+      // Always update state on this event — it's the authoritative signal that a new
+      // GPS session has started. Reset trackingStarted guard so this always fires.
+      trackingStarted.current = true;
+      lastNativeUpdate.current = {
+        elapsedSeconds: 0,
+        distanceMeters: 0,
+        goalReached: false,
+        timestamp: Date.now(),
+      };
+      setSessionProgress({
+        distanceMeters: 0,
+        elapsedSeconds: 0,
+        goalReached: false,
+      });
+      setIsTracking(true);
+      setTrackingMode('auto');
+      setDebugNativeRunning(true);
     });
     return () => sub?.remove();
   }, []);
 
-  // Listen for native tracking stopped events (idle detector / stationary buffer fired).
-  // Kotlin has already written the final totals to MMKV, so we read them back
-  // synchronously here — no async storage call needed.
+  // Listen for native tracking stopped events.
+  // After TrackingService stops, MMKV holds the completed day total (including the session
+  // that just ended). Read it into dailyBaseline and clear sessionProgress.
   useEffect(() => {
     const sub = Tracking.onTrackingStopped(() => {
       trackingStarted.current = false;
@@ -357,7 +399,11 @@ export function useTracking(): TrackingState {
         elapsedSeconds: fastStorage.getTodayElapsed(),
         goalReached: fastStorage.getGoalsReached(),
       });
-      setSessionProgress({ distanceMeters: 0, elapsedSeconds: 0, goalReached: false });
+      setSessionProgress({
+        distanceMeters: 0,
+        elapsedSeconds: 0,
+        goalReached: false,
+      });
     });
     return () => sub?.remove();
   }, []);
@@ -382,8 +428,7 @@ export function useTracking(): TrackingState {
     return () => clearInterval(timer);
   }, [isTracking]);
 
-  // Start tracking — uses a large goal for the native service
-  // so JS handles the aggregated goal-reached logic
+  // Start tracking — uses a large goal for the native service so JS handles goal-reached logic
   const startTracking = useCallback(
     async (mode: TrackingMode) => {
       if (trackingStarted.current) return;
@@ -405,7 +450,11 @@ export function useTracking(): TrackingState {
         goalReached: false,
         timestamp: Date.now(),
       };
-      setSessionProgress({ distanceMeters: 0, elapsedSeconds: 0, goalReached: false });
+      setSessionProgress({
+        distanceMeters: 0,
+        elapsedSeconds: 0,
+        goalReached: false,
+      });
       setIsTracking(true);
       setTrackingMode(mode);
       setDebugNativeRunning(true);
@@ -413,15 +462,17 @@ export function useTracking(): TrackingState {
     [activePlans],
   );
 
-  // Reset session progress and pull the latest daily totals from MMKV.
-  // Kotlin writes MMKV on every GPS fix, so these values are always up to date.
   const saveAndResetSession = useCallback(() => {
     setDailyBaseline({
       distanceMeters: fastStorage.getTodayDistance(),
       elapsedSeconds: fastStorage.getTodayElapsed(),
       goalReached: fastStorage.getGoalsReached(),
     });
-    setSessionProgress({ distanceMeters: 0, elapsedSeconds: 0, goalReached: false });
+    setSessionProgress({
+      distanceMeters: 0,
+      elapsedSeconds: 0,
+      goalReached: false,
+    });
   }, []);
 
   // Auto-stop when all goals reached
@@ -436,14 +487,11 @@ export function useTracking(): TrackingState {
     }
   }, [allGoalsReached, isTracking, saveAndResetSession]);
 
-  // Stop tracking (manual / user-initiated).
-  // JS already has the latest session progress in state, so we merge it into the
-  // baseline directly rather than racing against the async service onDestroy flush.
   const stop = useCallback(async () => {
-    // Snapshot before any state resets
     const finalProgress = await Tracking.getProgress();
     const dist = finalProgress.distanceMeters || sessionProgress.distanceMeters;
-    const elapsed = finalProgress.elapsedSeconds || sessionProgress.elapsedSeconds;
+    const elapsed =
+      finalProgress.elapsedSeconds || sessionProgress.elapsedSeconds;
 
     await Tracking.stopTracking();
     setIsTracking(false);
@@ -456,73 +504,133 @@ export function useTracking(): TrackingState {
       elapsedSeconds: prev.elapsedSeconds + elapsed,
       goalReached: prev.goalReached || allGoalsReached,
     }));
-    setSessionProgress({ distanceMeters: 0, elapsedSeconds: 0, goalReached: false });
+    setSessionProgress({
+      distanceMeters: 0,
+      elapsedSeconds: 0,
+      goalReached: false,
+    });
   }, [sessionProgress, allGoalsReached]);
 
-  // Manual start — blocked while auto-tracking is active
   const startManual = useCallback(async () => {
     if (trackingMode === 'auto' && isTracking) return;
     await startTracking('manual');
   }, [trackingMode, isTracking, startTracking]);
 
-  // Toggle background tracking.
+  // Toggle background tracking using MotionTracker + idle TrackingService
   const toggleBackgroundTracking = useCallback(async () => {
     if (backgroundTrackingEnabled) {
-      await ActivityRecognition.stop().catch(() => {});
+      // Stop MotionTracker and the idle service
+      await MotionTracker.stopMonitoring().catch(() => {});
       await Tracking.stopIdleService().catch(() => {});
       await storage.setBackgroundTrackingEnabled(false);
       setBackgroundTrackingEnabled(false);
+      setDebugMotionServiceRunning(false);
+
+      // Clean up MotionTracker event subscriptions
+      motionStartedSub.current?.remove();
+      motionStoppedSub.current?.remove();
+      motionAutoPausedSub.current?.remove();
+      motionResumedSub.current?.remove();
+      motionStartedSub.current = null;
+      motionStoppedSub.current = null;
+      motionAutoPausedSub.current = null;
+      motionResumedSub.current = null;
     } else {
       const granted = await TrackingPermissions.requestAll();
       setPermissionsGranted(granted);
       if (!granted) return;
 
+      // startIdleService starts both TrackingService (IDLE) and MotionService
       await Tracking.startIdleService().catch(() => {});
-      await ActivityRecognition.start().catch(() => {});
       await storage.setBackgroundTrackingEnabled(true);
       setBackgroundTrackingEnabled(true);
+      setDebugMotionServiceRunning(true);
     }
   }, [backgroundTrackingEnabled]);
 
-  // Activity recognition listener — drives auto tracking start.
+  // MotionTracker event subscriptions — update UI state in real time.
+  // The actual TrackingService start/stop is handled natively via MotionTrackingBridge.
   useEffect(() => {
-    if (!backgroundTrackingEnabled || activePlans.length === 0) {
-      setDebugActRecogRegistered(false);
+    if (!backgroundTrackingEnabled) {
+      setDebugMotionState('STILL');
+      setDebugMotionActivity('unknown');
       return;
     }
 
-    const handleActivity = (event: ActivityDetectedEvent) => {
-      const ts = new Date().toLocaleTimeString();
-      setDebugLastActivity(`${event.activity} ${event.confidence}% @ ${ts}`);
+    motionStartedSub.current = MotionTracker.onMotionStarted(
+      (event: MotionEvent) => {
+        setDebugMotionState('MOVING');
+        setDebugMotionActivity(event.activityType);
+        // UI sync: TrackingService auto-started via MotionTrackingBridge natively.
+        // Update JS isTracking state if not already set.
+        if (!trackingStarted.current) {
+          trackingStarted.current = true;
+          lastNativeUpdate.current = {
+            elapsedSeconds: 0,
+            distanceMeters: 0,
+            goalReached: false,
+            timestamp: Date.now(),
+          };
+          setSessionProgress({
+            distanceMeters: 0,
+            elapsedSeconds: 0,
+            goalReached: false,
+          });
+          setIsTracking(true);
+          setTrackingMode('auto');
+          setDebugNativeRunning(true);
+        }
+      },
+    );
 
-      if (
-        event.activity === 'WALKING' ||
-        event.activity === 'RUNNING' ||
-        event.activity === 'CYCLING'
-      ) {
-        startTracking('auto');
-      }
-    };
+    motionAutoPausedSub.current = MotionTracker.onMotionAutoPaused(
+      (event: MotionEvent) => {
+        setDebugMotionState('AUTO_PAUSED');
+        setDebugMotionActivity(event.activityType);
+      },
+    );
 
-    transitionSub.current = ActivityRecognition.onActivityDetected(handleActivity);
-    ActivityRecognition.start()
-      .then(() => setDebugActRecogRegistered(true))
-      .catch(() => setDebugActRecogRegistered(false));
+    motionResumedSub.current = MotionTracker.onMotionResumed(
+      (event: MotionEvent) => {
+        setDebugMotionState('MOVING');
+        setDebugMotionActivity(event.activityType);
+      },
+    );
+
+    motionStoppedSub.current = MotionTracker.onMotionStopped(
+      (event: MotionEvent) => {
+        setDebugMotionState('STOPPED');
+        setDebugMotionActivity(event.activityType);
+        // TrackingService will fire onTrackingStopped separately (via MotionTrackingBridge).
+        // That event resets isTracking/trackingMode in the listener above.
+      },
+    );
 
     return () => {
-      transitionSub.current?.remove();
-      transitionSub.current = null;
-      setDebugActRecogRegistered(false);
+      motionStartedSub.current?.remove();
+      motionStoppedSub.current?.remove();
+      motionAutoPausedSub.current?.remove();
+      motionResumedSub.current?.remove();
+      motionStartedSub.current = null;
+      motionStoppedSub.current = null;
+      motionAutoPausedSub.current = null;
+      motionResumedSub.current = null;
     };
-  }, [backgroundTrackingEnabled, activePlans, startTracking]);
+  }, [backgroundTrackingEnabled]);
 
   const debugInfo = useMemo<DebugInfo>(
     () => ({
-      lastActivity: debugLastActivity,
-      actRecogRegistered: debugActRecogRegistered,
+      motionState: debugMotionState,
+      motionActivity: debugMotionActivity,
+      motionServiceRunning: debugMotionServiceRunning,
       nativeServiceRunning: debugNativeRunning,
     }),
-    [debugLastActivity, debugActRecogRegistered, debugNativeRunning],
+    [
+      debugMotionState,
+      debugMotionActivity,
+      debugMotionServiceRunning,
+      debugNativeRunning,
+    ],
   );
 
   return {

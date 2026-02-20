@@ -1,18 +1,19 @@
-package com.touchgrass
+package com.touchgrass.tracking
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.uimanager.ViewManager
+import com.touchgrass.BuildConfigModule
+import com.touchgrass.AppBlockerModule
+import com.touchgrass.BuildConfig
 
 class TrackingPackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
         return listOfNotNull(
-            ActivityRecognitionModule(reactContext),
             TrackingModule(reactContext),
             BuildConfigModule(reactContext),
             AppBlockerModule(reactContext),
-            if (BuildConfig.DEBUG) GpxPlaybackModule(reactContext) else null,
         )
     }
 
