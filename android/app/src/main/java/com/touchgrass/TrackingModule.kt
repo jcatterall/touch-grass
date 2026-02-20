@@ -68,6 +68,10 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                 sendEvent("onGoalReached", params)
                 unbindService()
             }
+
+            trackingService?.setTrackingStoppedListener {
+                sendEvent("onTrackingStopped", Arguments.createMap())
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -287,6 +291,7 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             try {
                 trackingService?.setProgressListener(null)
                 trackingService?.setGoalReachedListener(null)
+                trackingService?.setTrackingStoppedListener(null)
                 reactApplicationContext.unbindService(connection)
             } catch (e: Exception) {
                 Log.w(TAG, "Error unbinding service", e)

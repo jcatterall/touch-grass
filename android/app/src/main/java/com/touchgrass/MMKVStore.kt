@@ -32,6 +32,12 @@ object MMKVStore {
     const val KEY_GOALS_REACHED    = "today_goals_reached"
     const val KEY_IS_AUTO_TRACKING = "is_auto_tracking"
 
+    // Aggregated goal written by JS whenever active plans change.
+    // Consumed by TrackingService to display accurate progress in the notification.
+    const val KEY_GOAL_TYPE  = "goal_type"
+    const val KEY_GOAL_VALUE = "goal_value"
+    const val KEY_GOAL_UNIT  = "goal_unit"
+
     // ---- Distance accumulation (called from TrackingService on each GPS fix) ----
 
     /**
@@ -67,10 +73,21 @@ object MMKVStore {
     fun getGoalsReached(): Boolean = kv.decodeBool(KEY_GOALS_REACHED, false)
     fun isAutoTracking(): Boolean  = kv.decodeBool(KEY_IS_AUTO_TRACKING, false)
 
+    // ---- Goal readers ----
+
+    fun getGoalType(): String  = kv.decodeString(KEY_GOAL_TYPE) ?: "distance"
+    fun getGoalValue(): Double = kv.decodeDouble(KEY_GOAL_VALUE, 5000.0)
+    fun getGoalUnit(): String  = kv.decodeString(KEY_GOAL_UNIT) ?: "m"
+
     // ---- Writers ----
 
     fun setGoalsReached(v: Boolean) = kv.encode(KEY_GOALS_REACHED, v)
     fun setAutoTracking(v: Boolean) = kv.encode(KEY_IS_AUTO_TRACKING, v)
+    fun setGoal(type: String, value: Double, unit: String) {
+        kv.encode(KEY_GOAL_TYPE, type)
+        kv.encode(KEY_GOAL_VALUE, value)
+        kv.encode(KEY_GOAL_UNIT, unit)
+    }
 
     // ---- Helpers ----
 

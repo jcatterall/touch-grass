@@ -6,22 +6,13 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import {
-  Footprints,
-  LeafyGreen,
-  Map,
-  Play,
-  Shield,
-  Square,
-} from 'lucide-react-native';
+import { Footprints, Play, Shield, Square } from 'lucide-react-native';
 import { Typography } from '../../components';
 import { ProgressRing } from '../../components/ProgressRing';
 import { useTracking, AggregatedGoals } from '../../hooks/useTracking';
 import { TrackingProgress } from '../../native/Tracking';
 import { AppBlocker } from '../../native/AppBlocker';
 import { colors, spacing } from '../../theme';
-import { ActivityRecognition } from '../../native/ActivityRecognition';
-import { GpxPlayback } from '../../native/GpxPlayback';
 
 function getOverallFraction(
   goals: AggregatedGoals,
@@ -61,29 +52,8 @@ function formatTime(seconds: number, totalSeconds: number): string {
 }
 
 export const HomeScreen = () => {
-  const [isTesting, setIsTesting] = useState(false);
-  const [isGpxPlaying, setIsGpxPlaying] = useState(false);
-
-  const triggerTest = () => {
-    const currentTesting = !isTesting;
-    setIsTesting(currentTesting);
-    ActivityRecognition.triggerTest(currentTesting ? 'WALKING' : 'STILL');
-  };
-
-  const toggleGpxPlayback = async () => {
-    if (isGpxPlaying) {
-      await GpxPlayback.stopPlayback();
-      setIsGpxPlaying(false);
-    } else {
-      await GpxPlayback.startPlayback();
-      setIsGpxPlaying(true);
-    }
-  };
-
   const {
     isTracking,
-    isAutoTracking,
-    trackingMode,
     progress,
     activePlans,
     goals,
@@ -99,15 +69,21 @@ export const HomeScreen = () => {
   const fraction = getOverallFraction(goals, progress);
   const hasPlans = activePlans.length > 0;
 
-  // Play button is unmounted (not hidden) during auto-tracking — QA spec requirement
-  const showPlayButton = hasPlans && !allGoalsReached && !isAutoTracking;
+  // In background-tracking mode the play button is hidden — the service handles start/stop.
+  // In manual mode it's available whenever there are plans and goals aren't met.
+  const showPlayButton =
+    hasPlans && !allGoalsReached && !backgroundTrackingEnabled;
+
+  const motionMode = isTracking ? 'moving' : 'idle';
 
   const statusText = !hasPlans
     ? 'No active plan for today'
     : allGoalsReached
     ? 'Goal reached! Apps unlocked'
-    : isAutoTracking
-    ? 'Activity detected, automatically tracking'
+    : backgroundTrackingEnabled
+    ? isTracking
+      ? 'Activity detected, automatically tracking'
+      : 'Watching for movement...'
     : isTracking
     ? "Keep going! You're making progress"
     : 'Start walking to earn screen time';
@@ -193,27 +169,6 @@ export const HomeScreen = () => {
         >
           <Footprints size={20} color={colors.white} />
         </Pressable>
-        <Pressable
-          style={[styles.actionButton]}
-          onPress={triggerTest}
-          hitSlop={12}
-        >
-          {isTesting ? (
-            <LeafyGreen size={20} color={colors.terracotta} />
-          ) : (
-            <LeafyGreen size={20} color={colors.white} />
-          )}
-        </Pressable>
-        {GpxPlayback.isAvailable && (
-          <Pressable
-            style={[styles.actionButton]}
-            onPress={toggleGpxPlayback}
-            hitSlop={12}
-          >
-            <Map size={20} color={isGpxPlaying ? colors.terracotta : colors.white} />
-          </Pressable>
-        )}
-
         {!blockerPermsGranted && (
           <Pressable
             style={[styles.actionButton, styles.actionButtonHighlight]}
@@ -230,40 +185,18 @@ export const HomeScreen = () => {
           DEBUG
         </Typography>
         <Typography variant="body" style={styles.debugText}>
-          mode: {trackingMode} | isTracking: {String(isTracking)}
+          isTracking: {String(isTracking)} | mode: {motionMode}
         </Typography>
         <Typography variant="body" style={styles.debugText}>
-          bgEnabled: {String(backgroundTrackingEnabled)} | perms:{' '}
-          {String(permissionsGranted)}
+          goalsReached: {String(allGoalsReached)}
         </Typography>
         <Typography variant="body" style={styles.debugText}>
-          actRecog registered: {String(debugInfo.actRecogRegistered)}
+          actRecog: {String(debugInfo.actRecogRegistered)} | service:{' '}
+          {String(debugInfo.nativeServiceRunning)}
         </Typography>
         <Typography variant="body" style={styles.debugText}>
-          nativeService running: {String(debugInfo.nativeServiceRunning)}
+          lastActivity: {debugInfo.lastActivity}
         </Typography>
-        <Typography variant="body" style={styles.debugText}>
-          lastActivity: {debugInfo.lastTransition}
-        </Typography>
-        <Typography variant="body" style={styles.debugText}>
-          session: {debugInfo.sessionDistance.toFixed(1)}m /{' '}
-          {debugInfo.sessionTime.toFixed(0)}s
-        </Typography>
-        <Typography variant="body" style={styles.debugText}>
-          baseline: {debugInfo.baselineDistance.toFixed(1)}m /{' '}
-          {debugInfo.baselineTime.toFixed(0)}s
-        </Typography>
-        <Typography variant="body" style={styles.debugText}>
-          plans: {activePlans.length} | goalsReached: {String(allGoalsReached)}
-        </Typography>
-        <Typography variant="body" style={styles.debugText}>
-          usageStatsPerm: {String(blockerPermsGranted)}
-        </Typography>
-        {debugInfo.startTrackingBlocked && (
-          <Typography variant="body" style={styles.debugWarn}>
-            startTracking blocked: {debugInfo.startTrackingBlocked}
-          </Typography>
-        )}
       </View>
     </ScrollView>
   );

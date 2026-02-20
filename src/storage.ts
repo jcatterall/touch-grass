@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
-import { MMKV } from 'react-native-mmkv';
+import { MMKV, Mode } from 'react-native-mmkv';
 import type { OnboardingData } from './screens';
 import { BlockingPlan, DailyActivity } from './types';
 import { generateUUID } from './utils/guid';
@@ -10,13 +10,20 @@ import { generateUUID } from './utils/guid';
  * Key names here must match MMKVStore.kt constants.
  * These reads are zero-latency (mmap, no bridge), enabling synchronous useState init.
  */
-const _mmkv = new MMKV({ id: 'touchgrass_state' });
+const _mmkv = new MMKV({ id: 'touchgrass_state', mode: Mode.MULTI_PROCESS });
 
 export const fastStorage = {
-  getTodayDistance: (): number => _mmkv.getNumber('today_distance_meters') ?? 0,
-  getTodayElapsed:  (): number => _mmkv.getNumber('today_elapsed_seconds') ?? 0,
+  getTodayDistance: (): number  => _mmkv.getNumber('today_distance_meters') ?? 0,
+  getTodayElapsed:  (): number  => _mmkv.getNumber('today_elapsed_seconds') ?? 0,
   getGoalsReached:  (): boolean => _mmkv.getBoolean('today_goals_reached') ?? false,
   isAutoTracking:   (): boolean => _mmkv.getBoolean('is_auto_tracking') ?? false,
+
+  /** Write the aggregated goal so TrackingService can display correct progress in the notification. */
+  setGoal(type: 'distance' | 'time' | 'none', value: number, unit: string): void {
+    _mmkv.set('goal_type', type);
+    _mmkv.set('goal_value', value);
+    _mmkv.set('goal_unit', unit);
+  },
 };
 
 export const PLANS_CHANGED_EVENT = 'plans_changed';

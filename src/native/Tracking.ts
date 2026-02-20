@@ -65,6 +65,11 @@ export const Tracking = {
     return emitter.addListener('onTrackingStarted', callback);
   },
 
+  onTrackingStopped(callback: () => void): EmitterSubscription | null {
+    if (!emitter) return null;
+    return emitter.addListener('onTrackingStopped', callback);
+  },
+
   async getUnsavedSession(): Promise<{
     date: string;
     distanceMeters: number;

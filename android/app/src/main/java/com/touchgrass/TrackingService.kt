@@ -121,6 +121,7 @@ class TrackingService : Service() {
 
     private var onProgressUpdate: ((Double, Long, Boolean) -> Unit)? = null
     private var onGoalReachedCallback: (() -> Unit)? = null
+    private var onTrackingStoppedCallback: (() -> Unit)? = null
     private var lastNotificationUpdateMs: Long = 0
 
     // Set to true while AppBlockerService is running so the shared notification
@@ -168,6 +169,8 @@ class TrackingService : Service() {
         consecutiveIdleFixes = 0
         startTimeMs = 0
         MMKVStore.setAutoTracking(false)
+        // Notify JS so it can update isTracking without requiring an app restart.
+        if (wasTracking) onTrackingStoppedCallback?.invoke()
         // Stay on the same notification ID — no second notification appears.
         val notification = buildNotification()
         val manager = getSystemService(NotificationManager::class.java)
@@ -330,6 +333,10 @@ class TrackingService : Service() {
 
     fun setGoalReachedListener(listener: (() -> Unit)?) {
         onGoalReachedCallback = listener
+    }
+
+    fun setTrackingStoppedListener(listener: (() -> Unit)?) {
+        onTrackingStoppedCallback = listener
     }
 
     // ---- GPS power management ----
@@ -548,34 +555,50 @@ class TrackingService : Service() {
     }
 
     private fun getNotificationContent(): Triple<String, Int, Int> {
-        // Always show today's cumulative totals so the notification is useful even while idle.
-        val todayDistanceM = MMKVStore.getTodayDistance()
+        // Goal comes from MMKV — written by JS whenever active plans change.
+        // This ensures the notification always reflects the real aggregated goal,
+        // regardless of what value was passed when startTracking() was called.
+        val goalType  = MMKVStore.getGoalType()
+        val goalValue = MMKVStore.getGoalValue()
+
         return when (goalType) {
             "distance" -> {
-                val goalMeters = if (goalUnit == "mi") goalValue * 1609.34 else goalValue * 1000.0
-                val displayDist = if (serviceState == ServiceState.TRACKING) distanceMeters else todayDistanceM
+                // goalValue is in meters (JS writes totalDistanceMeters)
+                val goalMeters = goalValue
+                val todayDistanceM = MMKVStore.getTodayDistance()
+                val displayDist = if (serviceState == ServiceState.TRACKING) {
+                    todayDistanceM + distanceMeters
+                } else {
+                    todayDistanceM
+                }
                 val currentDisplay = if (displayDist >= 1000) {
                     String.format("%.1fkm", displayDist / 1000.0)
                 } else {
                     String.format("%.0fm", displayDist)
                 }
-                val goalDisplay = if (goalUnit == "mi") {
-                    String.format("%.1fmi", goalValue)
+                val goalDisplay = if (goalMeters >= 1000) {
+                    String.format("%.1fkm", goalMeters / 1000.0)
                 } else {
-                    String.format("%.1fkm", goalValue)
+                    String.format("%.0fm", goalMeters)
                 }
                 val progressVal = displayDist.toInt().coerceAtMost(goalMeters.toInt())
                 Triple("$currentDisplay / $goalDisplay", progressVal, goalMeters.toInt())
             }
             "time" -> {
-                val goalMinutes = goalValue.toInt()
+                // goalValue is in seconds (JS writes totalTimeSeconds)
+                val goalSec = goalValue.toLong()
                 val todayElapsedSec = MMKVStore.getTodayElapsed()
-                val displayElapsed = if (serviceState == ServiceState.TRACKING) elapsedSeconds else todayElapsedSec
+                val displayElapsed = if (serviceState == ServiceState.TRACKING) {
+                    todayElapsedSec + elapsedSeconds
+                } else {
+                    todayElapsedSec
+                }
                 val elapsedMin = (displayElapsed / 60).toInt()
+                val goalMin = (goalSec / 60).toInt()
                 Triple(
-                    "${elapsedMin}min / ${goalMinutes}min",
-                    elapsedMin.coerceAtMost(goalMinutes),
-                    goalMinutes
+                    "${elapsedMin}min / ${goalMin}min",
+                    elapsedMin.coerceAtMost(goalMin),
+                    goalMin
                 )
             }
             else -> Triple("Watching for movement...", 0, 0)
