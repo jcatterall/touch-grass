@@ -3,34 +3,25 @@ package com.touchgrass.motion
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.touchgrass.tracking.TrackingConstants
 import com.touchgrass.tracking.TrackingService
 
 /**
- * Bridge between MotionTracker and TrackingService.
+ * Native-to-native bridge between MotionService and TrackingService.
  *
- * When MotionSessionController emits state changes (MOVING/STOPPED),
- * this bridge signals TrackingService to start or stop its GPS session
- * without any JS involvement — pure native-to-native communication.
+ * When MotionSessionController transitions to MOVING, [onMotionStarted] fires an
+ * ACTION_MOTION_STARTED intent at TrackingService, carrying the activity type as
+ * an integer extra (matching the encoding in MotionIntentParser):
+ *   0 = IN_VEHICLE, 1 = ON_BICYCLE, 2 = RUNNING, 3 = WALKING, 4 = STILL
  *
- * This preserves the background operation requirement: when the app is
- * backgrounded or terminated, motion detection continues via MotionService
- * and TrackingService responds to these intent signals.
+ * When motion stops, [onMotionStopped] fires ACTION_MOTION_STOPPED.
+ * TrackingService's new controller handles both signals deterministically.
+ *
+ * No JS involvement — all signalling is pure Kotlin IPC.
  */
 object MotionTrackingBridge {
 
     private const val TAG = "MotionTrackingBridge"
-
-    /** Intent action sent to TrackingService when motion starts. */
-    const val ACTION_MOTION_STARTED = "com.touchgrass.action.MOTION_STARTED"
-
-    /** Intent action sent to TrackingService when motion stops or is auto-paused long enough. */
-    const val ACTION_MOTION_STOPPED = "com.touchgrass.action.MOTION_STOPPED"
-
-    /** Extras key for the detected activity type (walking/running/cycling). */
-    const val EXTRA_ACTIVITY_TYPE = "activity_type"
-
-    /** Extras key for the stop reason (inactivity_timeout/vehicle_detected/manual). */
-    const val EXTRA_STOP_REASON = "stop_reason"
 
     @Volatile
     private var appContext: Context? = null
@@ -41,38 +32,69 @@ object MotionTrackingBridge {
 
     /**
      * Called when MotionSessionController transitions to MOVING.
-     * Signals TrackingService to start or continue a GPS tracking session.
+     *
+     * @param activityType String name as emitted by MotionEngine:
+     *   "walking", "running", "cycling", "vehicle", "still", or "unknown".
      */
     fun onMotionStarted(activityType: String) {
         val ctx = appContext ?: return
-        Log.d(TAG, "onMotionStarted: $activityType → signalling TrackingService")
+        Log.d(TAG, "onMotionStarted: $activityType")
+
+        val typeCode = activityTypeToCode(activityType)
         val intent = Intent(ctx, TrackingService::class.java).apply {
-            action = ACTION_MOTION_STARTED
-            putExtra(EXTRA_ACTIVITY_TYPE, activityType)
+            action = TrackingConstants.ACTION_MOTION_STARTED
+            putExtra(TrackingConstants.EXTRA_ACTIVITY_TYPE, typeCode)
+            putExtra(TrackingConstants.EXTRA_ACTIVITY_CONFIDENCE, 80) // MotionEngine confirmed
+            putExtra(TrackingConstants.EXTRA_ACTIVITY_TIMESTAMP, System.currentTimeMillis())
         }
         try {
             ctx.startService(intent)
         } catch (e: Exception) {
-            Log.w(TAG, "Could not signal TrackingService (service may not be running)", e)
+            Log.w(TAG, "Could not signal TrackingService (may not be running)", e)
         }
     }
 
     /**
      * Called when MotionSessionController transitions to STOPPED.
-     * Signals TrackingService to end the GPS tracking session.
+     *
+     * @param activityType The last known activity type string.
+     * @param reason       Stop reason: "inactivity_timeout", "vehicle_detected", "manual".
      */
     fun onMotionStopped(activityType: String, reason: String) {
         val ctx = appContext ?: return
-        Log.d(TAG, "onMotionStopped: $activityType reason=$reason → signalling TrackingService")
+        Log.d(TAG, "onMotionStopped: $activityType reason=$reason")
+
+        // Map reason to a STILL signal so TrackingController ends the session cleanly.
+        val typeCode = if (reason == "vehicle_detected") {
+            activityTypeToCode("vehicle")
+        } else {
+            activityTypeToCode(activityType)
+        }
+
         val intent = Intent(ctx, TrackingService::class.java).apply {
-            action = ACTION_MOTION_STOPPED
-            putExtra(EXTRA_ACTIVITY_TYPE, activityType)
-            putExtra(EXTRA_STOP_REASON, reason)
+            action = TrackingConstants.ACTION_MOTION_STOPPED
+            putExtra(TrackingConstants.EXTRA_ACTIVITY_TYPE, typeCode)
+            putExtra(TrackingConstants.EXTRA_ACTIVITY_CONFIDENCE, 80)
+            putExtra(TrackingConstants.EXTRA_ACTIVITY_TIMESTAMP, System.currentTimeMillis())
         }
         try {
             ctx.startService(intent)
         } catch (e: Exception) {
-            Log.w(TAG, "Could not signal TrackingService (service may not be running)", e)
+            Log.w(TAG, "Could not signal TrackingService (may not be running)", e)
         }
+    }
+
+    /**
+     * Maps the string activity names used by MotionEngine to the integer codes
+     * expected by MotionIntentParser (mirrors Google Activity Recognition API):
+     *   0 = IN_VEHICLE, 1 = ON_BICYCLE, 2 = RUNNING, 3 = WALKING, 4 = STILL, -1 = UNKNOWN
+     */
+    private fun activityTypeToCode(type: String): Int = when (type.lowercase()) {
+        "vehicle", "in_vehicle" -> 0
+        "cycling", "on_bicycle" -> 1
+        "running"               -> 2
+        "walking"               -> 3
+        "still"                 -> 4
+        else                    -> -1  // UNKNOWN
     }
 }

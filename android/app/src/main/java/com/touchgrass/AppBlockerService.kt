@@ -13,14 +13,15 @@ import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import org.json.JSONArray
+import com.touchgrass.tracking.TrackingConstants
 import com.touchgrass.tracking.TrackingService
 
 class AppBlockerService : Service() {
 
     companion object {
         // Reuse TrackingService's notification slot so only one notification appears.
-        private const val CHANNEL_ID = TrackingService.CHANNEL_ID
-        private const val NOTIFICATION_ID = TrackingService.NOTIFICATION_ID
+        private const val CHANNEL_ID = TrackingConstants.NOTIFICATION_CHANNEL
+        private const val NOTIFICATION_ID = TrackingConstants.NOTIFICATION_ID
         const val PREFS_NAME = "touchgrass_blocker_prefs"
         const val PREF_BLOCKED_PACKAGES = "blocked_packages"
         const val PREF_GOALS_REACHED = "goals_reached"
@@ -58,7 +59,7 @@ class AppBlockerService : Service() {
         polling = true
         handler.post(pollRunnable)
         // Tell TrackingService the blocker is active so it can update the shared notification.
-        notifyTrackingService(TrackingService.ACTION_BLOCKER_STARTED)
+        notifyTrackingService(TrackingConstants.ACTION_BLOCKER_STARTED)
         return START_STICKY
     }
 
@@ -225,7 +226,7 @@ class AppBlockerService : Service() {
         handler.removeCallbacks(pollRunnable)
         hideGestureBlocker()
         clearBlockedApp()
-        notifyTrackingService(TrackingService.ACTION_BLOCKER_STOPPED)
+        notifyTrackingService(TrackingConstants.ACTION_BLOCKER_STOPPED)
         super.onDestroy()
     }
 

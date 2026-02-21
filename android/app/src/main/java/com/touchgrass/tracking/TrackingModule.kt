@@ -33,32 +33,30 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     private var bound = false
 
     /**
-     * Called by RN after the module is attached to the React context.
-     * If TrackingService is already running (e.g. started while the app was backgrounded),
-     * bind to it so progress events flow to JS and getProgress() works.
+     * If TrackingService is already running when the module initialises (e.g. app
+     * re-foregrounded while a background session is active), bind to it so that
+     * progress events flow to JS immediately.
      */
     override fun initialize() {
         super.initialize()
         try {
             val intent = Intent(reactApplicationContext, TrackingService::class.java)
-            // Flag 0 = bind only if already running; never creates the service.
             val didBind = reactApplicationContext.bindService(intent, connection, 0)
-            if (didBind) {
-                Log.d(TAG, "initialize: bound to already-running TrackingService")
-            }
+            if (didBind) Log.d(TAG, "initialize: bound to already-running TrackingService")
         } catch (e: Exception) {
-            Log.w(TAG, "initialize: could not attempt bind to running service", e)
+            Log.w(TAG, "initialize: could not bind to running service", e)
         }
     }
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as TrackingService.TrackingBinder
-            trackingService = binder.getService()
+            val svc = binder.getService()
+            trackingService = svc
             bound = true
             Log.d(TAG, "Service connected")
 
-            trackingService?.setProgressListener { distance, elapsed, goalReached ->
+            svc.onProgressUpdate = { distance, elapsed, goalReached ->
                 val params = Arguments.createMap().apply {
                     putDouble("distanceMeters", distance)
                     putDouble("elapsedSeconds", elapsed.toDouble())
@@ -67,13 +65,12 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                 sendEvent("onTrackingProgress", params)
             }
 
-            trackingService?.setGoalReachedListener {
-                val params = Arguments.createMap()
-                sendEvent("onGoalReached", params)
+            svc.onGoalReachedCallback = {
+                sendEvent("onGoalReached", Arguments.createMap())
                 unbindService()
             }
 
-            trackingService?.setTrackingStoppedListener {
+            svc.onTrackingStoppedCallback = {
                 sendEvent("onTrackingStopped", Arguments.createMap())
             }
         }
@@ -96,9 +93,9 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         try {
             val context = reactApplicationContext
             val intent = Intent(context, TrackingService::class.java).apply {
-                putExtra(TrackingService.EXTRA_GOAL_TYPE, goalType)
-                putExtra(TrackingService.EXTRA_GOAL_VALUE, goalValue)
-                putExtra(TrackingService.EXTRA_GOAL_UNIT, goalUnit)
+                putExtra(TrackingConstants.EXTRA_GOAL_TYPE, goalType)
+                putExtra(TrackingConstants.EXTRA_GOAL_VALUE, goalValue)
+                putExtra(TrackingConstants.EXTRA_GOAL_UNIT, goalUnit)
             }
 
             Log.d(TAG, "Starting tracking: type=$goalType value=$goalValue unit=$goalUnit")
@@ -106,7 +103,6 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
 
             sendEvent("onTrackingStarted", Arguments.createMap())
-
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start tracking", e)
@@ -118,14 +114,10 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     fun stopTracking(promise: Promise) {
         try {
             Log.d(TAG, "Stopping tracking")
+            trackingService?.stopTracking()
             val context = reactApplicationContext
-            val intent = Intent(context, TrackingService::class.java)
-            context.stopService(intent)
+            context.stopService(Intent(context, TrackingService::class.java))
             unbindService()
-
-            context.getSharedPreferences("touchgrass_tracking_prefs", Context.MODE_PRIVATE)
-                .edit().clear().apply()
-
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to stop tracking", e)
@@ -137,19 +129,10 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     fun getProgress(promise: Promise) {
         try {
             val service = trackingService
-            if (service == null) {
-                val result = Arguments.createMap().apply {
-                    putDouble("distanceMeters", 0.0)
-                    putDouble("elapsedSeconds", 0.0)
-                    putBoolean("goalReached", false)
-                }
-                promise.resolve(result)
-                return
-            }
             val result = Arguments.createMap().apply {
-                putDouble("distanceMeters", service.distanceMeters)
-                putDouble("elapsedSeconds", service.elapsedSeconds.toDouble())
-                putBoolean("goalReached", service.goalReached)
+                putDouble("distanceMeters", service?.distanceMeters ?: 0.0)
+                putDouble("elapsedSeconds", (service?.elapsedSeconds ?: 0L).toDouble())
+                putBoolean("goalReached", service?.goalReached ?: false)
             }
             promise.resolve(result)
         } catch (e: Exception) {
@@ -158,36 +141,13 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     /**
-     * Returns any unsaved session data from SharedPreferences and clears it.
+     * Returns any unsaved session data from a previous run.
+     * The new architecture holds sessions in-memory (SessionManager) with Room persistence
+     * planned as a future extension. Returns null until persistence is wired.
      */
     @ReactMethod
     fun getUnsavedSession(promise: Promise) {
-        try {
-            val prefs = reactApplicationContext.getSharedPreferences(
-                "touchgrass_tracking_prefs", Context.MODE_PRIVATE
-            )
-            val date = prefs.getString("unsaved_date", null)
-            if (date == null) {
-                promise.resolve(null)
-                return
-            }
-
-            val result = Arguments.createMap().apply {
-                putString("date", date)
-                putDouble("distanceMeters",
-                    java.lang.Double.longBitsToDouble(prefs.getLong("unsaved_distance", 0L)))
-                putDouble("elapsedSeconds", prefs.getLong("unsaved_elapsed", 0L).toDouble())
-                putBoolean("goalsReached", prefs.getBoolean("unsaved_goal_reached", false))
-            }
-
-            prefs.edit().clear().apply()
-            Log.d(TAG, "Retrieved and cleared unsaved session for $date")
-
-            promise.resolve(result)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get unsaved session", e)
-            promise.reject("ERROR", e.message)
-        }
+        promise.resolve(null)
     }
 
     /**
@@ -218,26 +178,22 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     /**
-     * Starts TrackingService in IDLE state and starts MotionService for motion detection.
-     * The MotionService will signal TrackingService via MotionTrackingBridge when motion is detected.
-     * Call this when the user enables background tracking.
+     * Starts TrackingService in IDLE state and MotionService for background motion detection.
+     * The MotionService signals TrackingService via MotionTrackingBridge when motion is detected.
      */
     @ReactMethod
     fun startIdleService(promise: Promise) {
         try {
             val context = reactApplicationContext
 
-            // Initialize the bridge so MotionTracker can signal TrackingService
             MotionTrackingBridge.init(context)
 
-            // Start TrackingService in IDLE state (foreground service, GPS off)
             val trackingIntent = Intent(context, TrackingService::class.java).apply {
-                action = TrackingService.ACTION_START_IDLE
+                action = TrackingConstants.ACTION_START_IDLE
             }
             ContextCompat.startForegroundService(context, trackingIntent)
             context.bindService(trackingIntent, connection, 0)
 
-            // Start MotionService (motion detection engine)
             MotionService.start(context)
 
             Log.d(TAG, "Idle service + MotionService started")
@@ -249,21 +205,18 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     /**
-     * Stops the background idle/tracking service and the motion detection service.
-     * Called when the user disables background tracking.
+     * Stops the background idle/tracking service and motion detection.
      */
     @ReactMethod
     fun stopIdleService(promise: Promise) {
         try {
             val context = reactApplicationContext
 
-            // Stop MotionService (stops motion detection)
             MotionService.stop(context)
             MotionSessionController.reset()
 
-            // Stop TrackingService background mode
             val intent = Intent(context, TrackingService::class.java).apply {
-                action = TrackingService.ACTION_STOP_BACKGROUND
+                action = TrackingConstants.ACTION_STOP_BACKGROUND
             }
             context.startService(intent)
             unbindService()
@@ -276,30 +229,23 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         }
     }
 
-    /**
-     * Synchronous MMKV-backed check of whether auto-tracking is active.
-     */
     @ReactMethod
     fun getIsAutoTracking(promise: Promise) {
         promise.resolve(MMKVStore.isAutoTracking())
     }
 
     @ReactMethod
-    fun addListener(eventName: String) {
-        // Required for NativeEventEmitter
-    }
+    fun addListener(eventName: String) { /* Required for NativeEventEmitter */ }
 
     @ReactMethod
-    fun removeListeners(count: Int) {
-        // Required for NativeEventEmitter
-    }
+    fun removeListeners(count: Int) { /* Required for NativeEventEmitter */ }
 
     private fun unbindService() {
         if (bound) {
             try {
-                trackingService?.setProgressListener(null)
-                trackingService?.setGoalReachedListener(null)
-                trackingService?.setTrackingStoppedListener(null)
+                trackingService?.onProgressUpdate = null
+                trackingService?.onGoalReachedCallback = null
+                trackingService?.onTrackingStoppedCallback = null
                 reactApplicationContext.unbindService(connection)
             } catch (e: Exception) {
                 Log.w(TAG, "Error unbinding service", e)

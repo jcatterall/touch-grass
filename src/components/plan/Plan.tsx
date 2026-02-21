@@ -71,11 +71,11 @@ export const Plan = ({ plan, onPlanChange }: PlanProps) => {
   const [from, setFrom] = useState(
     (plan?.duration.type === 'specific_hours'
       ? plan.duration.from
-      : undefined) ?? '09:00 AM',
+      : undefined) ?? '09:00',
   );
   const [to, setTo] = useState(
     (plan?.duration.type === 'specific_hours' ? plan.duration.to : undefined) ??
-      '05:00 PM',
+      '17:00',
   );
 
   const [criteria, setCriteria] = useState<CriteriaState>({

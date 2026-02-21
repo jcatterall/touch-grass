@@ -83,6 +83,22 @@ object MMKVStore {
 
     fun setGoalsReached(v: Boolean) = kv.encode(KEY_GOALS_REACHED, v)
     fun setAutoTracking(v: Boolean) = kv.encode(KEY_IS_AUTO_TRACKING, v)
+
+    /**
+     * Overwrites today's elapsed seconds with an absolute value.
+     * Used by TrackingService on each state update to keep elapsed current
+     * without double-counting (unlike [accumulateTodayElapsed] which adds a delta).
+     */
+    fun setTodayElapsed(v: Long) {
+        val today = todayDate()
+        if (kv.decodeString(KEY_CURRENT_DAY) != today) {
+            kv.encode(KEY_CURRENT_DAY, today)
+            kv.encode(KEY_TODAY_DISTANCE, 0.0)
+            kv.encode(KEY_GOALS_REACHED, false)
+        }
+        kv.encode(KEY_TODAY_ELAPSED, v)
+    }
+
     fun setGoal(type: String, value: Double, unit: String) {
         kv.encode(KEY_GOAL_TYPE, type)
         kv.encode(KEY_GOAL_VALUE, value)

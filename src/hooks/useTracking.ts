@@ -46,8 +46,7 @@ export function findActivePlansForToday(plans: BlockingPlan[]): BlockingPlan[] {
     plan =>
       plan.active &&
       plan.days.includes(today) &&
-      isWithinDuration(plan) &&
-      plan.criteria.type !== 'permanent',
+      isWithinDuration(plan),
   );
 }
 
