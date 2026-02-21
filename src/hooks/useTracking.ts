@@ -43,10 +43,7 @@ export function isWithinDuration(plan: BlockingPlan): boolean {
 export function findActivePlansForToday(plans: BlockingPlan[]): BlockingPlan[] {
   const today = getTodayKey();
   return plans.filter(
-    plan =>
-      plan.active &&
-      plan.days.includes(today) &&
-      isWithinDuration(plan),
+    plan => plan.active && plan.days.includes(today) && isWithinDuration(plan),
   );
 }
 
@@ -114,6 +111,9 @@ export interface DebugInfo {
   motionActivity: string;
   motionServiceRunning: boolean;
   nativeServiceRunning: boolean;
+  currentActivity: string;
+  stepDetected: boolean;
+  gpsActive: boolean;
 }
 
 export interface TrackingState {
@@ -165,6 +165,9 @@ export function useTracking(): TrackingState {
   const [debugMotionServiceRunning, setDebugMotionServiceRunning] =
     useState(false);
   const [debugNativeRunning, setDebugNativeRunning] = useState(false);
+  const [debugCurrentActivity, setDebugCurrentActivity] = useState('unknown');
+  const [debugStepDetected, setDebugStepDetected] = useState(false);
+  const [debugGpsActive, setDebugGpsActive] = useState(false);
 
   const progressSub = useRef<EmitterSubscription | null>(null);
   const trackingStarted = useRef(false);
@@ -182,6 +185,7 @@ export function useTracking(): TrackingState {
   const motionStoppedSub = useRef<EmitterSubscription | null>(null);
   const motionAutoPausedSub = useRef<EmitterSubscription | null>(null);
   const motionResumedSub = useRef<EmitterSubscription | null>(null);
+  const motionStateUpdateSub = useRef<EmitterSubscription | null>(null);
 
   const goals = useMemo(() => aggregateGoals(activePlans), [activePlans]);
 
@@ -538,10 +542,12 @@ export function useTracking(): TrackingState {
       motionStoppedSub.current?.remove();
       motionAutoPausedSub.current?.remove();
       motionResumedSub.current?.remove();
+      motionStateUpdateSub.current?.remove();
       motionStartedSub.current = null;
       motionStoppedSub.current = null;
       motionAutoPausedSub.current = null;
       motionResumedSub.current = null;
+      motionStateUpdateSub.current = null;
     } else {
       const granted = await TrackingPermissions.requestAll();
       setPermissionsGranted(granted);
@@ -561,6 +567,9 @@ export function useTracking(): TrackingState {
     if (!backgroundTrackingEnabled) {
       setDebugMotionState('STILL');
       setDebugMotionActivity('unknown');
+      setDebugCurrentActivity('unknown');
+      setDebugStepDetected(false);
+      setDebugGpsActive(false);
       return;
     }
 
@@ -613,14 +622,22 @@ export function useTracking(): TrackingState {
       },
     );
 
+    motionStateUpdateSub.current = MotionTracker.onMotionStateUpdate(update => {
+      setDebugCurrentActivity(update.activity);
+      setDebugStepDetected(update.stepDetected);
+      setDebugGpsActive(update.gpsActive);
+    });
+
     return () => {
       motionStartedSub.current?.remove();
       motionStoppedSub.current?.remove();
       motionAutoPausedSub.current?.remove();
       motionResumedSub.current?.remove();
+      motionStateUpdateSub.current?.remove();
       motionStartedSub.current = null;
       motionStoppedSub.current = null;
       motionAutoPausedSub.current = null;
+      motionStateUpdateSub.current = null;
       motionResumedSub.current = null;
     };
   }, [backgroundTrackingEnabled]);
@@ -631,12 +648,18 @@ export function useTracking(): TrackingState {
       motionActivity: debugMotionActivity,
       motionServiceRunning: debugMotionServiceRunning,
       nativeServiceRunning: debugNativeRunning,
+      currentActivity: debugCurrentActivity,
+      stepDetected: debugStepDetected,
+      gpsActive: debugGpsActive,
     }),
     [
       debugMotionState,
       debugMotionActivity,
       debugMotionServiceRunning,
       debugNativeRunning,
+      debugCurrentActivity,
+      debugStepDetected,
+      debugGpsActive,
     ],
   );
 

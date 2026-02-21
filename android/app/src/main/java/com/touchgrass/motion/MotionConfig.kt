@@ -19,17 +19,17 @@ data class MotionConfig(
 
     /**
      * Minimum confidence score (0.0–1.0) to transition from STILL to MOVING.
-     * Raised from 0.6 → 0.75 to reduce false positives from casual movement
+     * Raised from 0.6 → 0.80 to reduce false positives from casual movement
      * around the house. Requires stronger corroboration from multiple sensors.
      */
-    val movementConfidenceThreshold: Float = 0.75f,
+    val movementConfidenceThreshold: Float = 0.80f,
 
     /**
      * Accelerometer variance threshold above which motion is considered significant.
-     * Raised from 0.3 → 0.5 to require more substantial physical acceleration,
+     * Raised from 0.3 → 0.6 to require more substantial physical acceleration,
      * filtering out arm movements and slow ambling indoors.
      */
-    val varianceThreshold: Float = 0.5f,
+    val varianceThreshold: Float = 0.6f,
 
     /**
      * Minimum duration (ms) that movement must be sustained before STILL → MOVING

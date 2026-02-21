@@ -107,6 +107,12 @@ object MotionEngine : SensorEventListener {
 
     fun isRunning(): Boolean = running
 
+    /**
+     * Returns whether a step has been detected recently (within stepRecencyWindow).
+     * Useful for UI debug information.
+     */
+    fun isStepDetectedRecently(): Boolean = isStepRecent()
+
     // ── Battery optimization callbacks from MotionSessionController ─
 
     /** Reduce sensor rate when auto-paused. */

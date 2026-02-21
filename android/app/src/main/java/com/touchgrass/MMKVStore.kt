@@ -23,6 +23,11 @@ object MMKVStore {
     fun init(context: Context) {
         MMKV.initialize(context)
         kv = MMKV.mmkvWithID("touchgrass_state", MMKV.MULTI_PROCESS_MODE)
+        // Ensure numeric keys always have a typed value so decodeDouble/decodeLong
+        // never hits an uninitialized buffer (which logs "reach end" errors).
+        if (!kv.containsKey(KEY_TODAY_DISTANCE)) kv.encode(KEY_TODAY_DISTANCE, 0.0)
+        if (!kv.containsKey(KEY_TODAY_ELAPSED))  kv.encode(KEY_TODAY_ELAPSED, 0L)
+        if (!kv.containsKey(KEY_GOAL_VALUE))     kv.encode(KEY_GOAL_VALUE, 0.0)
     }
 
     // ---- Key constants (shared with JS side in src/storage.ts fastStorage) ----

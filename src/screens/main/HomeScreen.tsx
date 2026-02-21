@@ -197,12 +197,13 @@ export const HomeScreen = () => {
           goalsReached: {String(allGoalsReached)}
         </Typography>
         <Typography variant="body" style={styles.debugText}>
-          motion: {debugInfo.motionState} | service:{' '}
-          {String(debugInfo.motionServiceRunning)} | gps:{' '}
-          {String(debugInfo.nativeServiceRunning)}
+          Current motion: {debugInfo.currentActivity.toUpperCase()}
         </Typography>
         <Typography variant="body" style={styles.debugText}>
-          activity: {debugInfo.motionActivity}
+          Step detected: {String(debugInfo.stepDetected)}
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          GPS: {String(debugInfo.gpsActive)}
         </Typography>
       </View>
     </ScrollView>

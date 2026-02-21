@@ -32,6 +32,12 @@ export interface MotionEvent {
   reason?: string;
 }
 
+export interface MotionStateUpdate {
+  activity: MotionActivityType;
+  stepDetected: boolean;
+  gpsActive: boolean;
+}
+
 export interface MotionConfig {
   autoPauseDelayWalkRun?: number;
   autoPauseDelayCycling?: number;
@@ -156,5 +162,17 @@ export const MotionTracker = {
   ): EmitterSubscription | null {
     if (!emitter) return null;
     return emitter.addListener('MotionStopped', callback);
+  },
+
+  /**
+   * Fires periodically (every ~500ms) with current detailed motion state.
+   * Provides reactive updates for UI debug info without waiting for state transitions.
+   * Payload: { activity: string, stepDetected: boolean, gpsActive: boolean }
+   */
+  onMotionStateUpdate(
+    callback: (update: MotionStateUpdate) => void,
+  ): EmitterSubscription | null {
+    if (!emitter) return null;
+    return emitter.addListener('MotionStateUpdate', callback);
   },
 };

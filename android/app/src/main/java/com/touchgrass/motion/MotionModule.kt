@@ -3,6 +3,8 @@ package com.touchgrass.motion
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Arguments
@@ -33,18 +35,57 @@ class MotionModule(reactContext: ReactApplicationContext) :
     companion object {
         const val MODULE_NAME = "MotionModule"
         private const val TAG = "MotionModule"
+        // Interval (ms) to emit detailed motion state updates for UI reactivity
+        private const val STATE_UPDATE_INTERVAL_MS = 500L
     }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var stateUpdateRunnable: Runnable? = null
 
     override fun getName(): String = MODULE_NAME
 
     override fun initialize() {
         super.initialize()
         MotionEventEmitter.setReactContext(reactApplicationContext)
+        startStateUpdates()
     }
 
     override fun invalidate() {
         super.invalidate()
+        stopStateUpdates()
         MotionEventEmitter.setReactContext(null)
+    }
+
+    // ── State Update Polling ─────────────────────────────────────
+
+    /**
+     * Starts periodic emission of detailed motion state updates for UI reactivity.
+     * Emits MotionStateUpdate event at STATE_UPDATE_INTERVAL_MS frequency.
+     */
+    private fun startStateUpdates() {
+        stopStateUpdates()
+        stateUpdateRunnable = object : Runnable {
+            override fun run() {
+                val activity = MotionSessionController.currentActivityType
+                val stepDetected = MotionEngine.isStepDetectedRecently()
+                val gpsActive = MotionSessionController.currentState == MotionState.MOVING
+                MotionEventEmitter.emitStateUpdate(activity, stepDetected, gpsActive)
+                mainHandler.postDelayed(this, STATE_UPDATE_INTERVAL_MS)
+            }
+        }
+        mainHandler.postDelayed(stateUpdateRunnable!!, STATE_UPDATE_INTERVAL_MS)
+        Log.d(TAG, "State updates started (interval: ${STATE_UPDATE_INTERVAL_MS}ms)")
+    }
+
+    /**
+     * Stops periodic state updates.
+     */
+    private fun stopStateUpdates() {
+        stateUpdateRunnable?.let {
+            mainHandler.removeCallbacks(it)
+        }
+        stateUpdateRunnable = null
+        Log.d(TAG, "State updates stopped")
     }
 
     // ── React Methods ───────────────────────────────────────────
@@ -120,6 +161,31 @@ class MotionModule(reactContext: ReactApplicationContext) :
             putString("activityType", type)
         }
         promise.resolve(result)
+    }
+
+    /**
+     * Returns detailed motion state including activity type, step detection, and GPS active state.
+     * Useful for debug UI that needs reactive motion information.
+     *
+     * @return Map with keys: activity (string), stepDetected (boolean), gpsActive (boolean)
+     */
+    @ReactMethod
+    fun getDetailedMotionState(promise: Promise) {
+        try {
+            val activity = MotionSessionController.currentActivityType
+            val stepDetected = MotionEngine.isStepDetectedRecently()
+            val gpsActive = MotionSessionController.currentState == MotionState.MOVING
+            
+            val result = Arguments.createMap().apply {
+                putString("activity", activity)
+                putBoolean("stepDetected", stepDetected)
+                putBoolean("gpsActive", gpsActive)
+            }
+            promise.resolve(result)
+        } catch (e: Exception) {
+            Log.e(TAG, "getDetailedMotionState() failed", e)
+            promise.reject("GET_DETAILED_STATE_FAILED", e.message, e)
+        }
     }
 
     /**
