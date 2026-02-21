@@ -342,6 +342,14 @@ export function useTracking(): TrackingState {
     return () => sub.remove();
   }, [syncFromNativeService]);
 
+  // Periodic safety-net sync: catches cases where the native service stopped
+  // but the onTrackingStopped event was missed (e.g. background kill, bridge reset).
+  // Runs every 10 seconds while the app is mounted.
+  useEffect(() => {
+    const interval = setInterval(syncFromNativeService, 10_000);
+    return () => clearInterval(interval);
+  }, [syncFromNativeService]);
+
   // Subscribe to TrackingService progress events once on mount
   useEffect(() => {
     progressSub.current = Tracking.onProgress(p => {

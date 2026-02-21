@@ -43,6 +43,15 @@ object MotionSessionController {
     @Volatile
     private var lastMovementTime: Long = 0L
 
+    /**
+     * Timestamp when movement was first detected in the current STILL→MOVING
+     * attempt. Used to enforce [MotionConfig.minMotionDurationBeforeTracking]:
+     * movement must be sustained for this long before the transition fires.
+     * Reset to 0 whenever motion drops off.
+     */
+    @Volatile
+    private var firstMovementCandidateTime: Long = 0L
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private var autoPauseRunnable: Runnable? = null
     private var stopRunnable: Runnable? = null
@@ -91,6 +100,7 @@ object MotionSessionController {
             currentActivityType = "unknown"
             movementStartTime = 0L
             lastMovementTime = 0L
+            firstMovementCandidateTime = 0L
             Log.d(TAG, "Session reset to STILL")
         }
     }
@@ -106,8 +116,23 @@ object MotionSessionController {
         when (currentState) {
             MotionState.STILL -> {
                 if (confidence >= config.movementConfidenceThreshold) {
-                    transitionTo(MotionState.MOVING, activityType)
-                    movementStartTime = System.currentTimeMillis()
+                    val now = System.currentTimeMillis()
+                    if (firstMovementCandidateTime == 0L) {
+                        firstMovementCandidateTime = now
+                        Log.d(TAG, "Movement candidate started — waiting ${config.minMotionDurationBeforeTracking}ms to confirm")
+                    }
+                    val sustainedMs = now - firstMovementCandidateTime
+                    if (sustainedMs >= config.minMotionDurationBeforeTracking) {
+                        firstMovementCandidateTime = 0L
+                        transitionTo(MotionState.MOVING, activityType)
+                        movementStartTime = now
+                    }
+                } else {
+                    // Confidence dropped — reset the debounce window
+                    if (firstMovementCandidateTime != 0L) {
+                        Log.d(TAG, "Movement candidate reset (confidence too low: $confidence)")
+                        firstMovementCandidateTime = 0L
+                    }
                 }
             }
 

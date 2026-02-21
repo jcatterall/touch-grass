@@ -17,11 +17,26 @@ data class MotionConfig(
     /** Delay after auto-pause before fully stopping the session (ms). */
     val stopDelay: Long = 20_000L,
 
-    /** Minimum confidence score (0.0–1.0) to transition from STILL to MOVING. */
-    val movementConfidenceThreshold: Float = 0.6f,
+    /**
+     * Minimum confidence score (0.0–1.0) to transition from STILL to MOVING.
+     * Raised from 0.6 → 0.75 to reduce false positives from casual movement
+     * around the house. Requires stronger corroboration from multiple sensors.
+     */
+    val movementConfidenceThreshold: Float = 0.75f,
 
-    /** Accelerometer variance threshold above which motion is considered significant. */
-    val varianceThreshold: Float = 0.3f,
+    /**
+     * Accelerometer variance threshold above which motion is considered significant.
+     * Raised from 0.3 → 0.5 to require more substantial physical acceleration,
+     * filtering out arm movements and slow ambling indoors.
+     */
+    val varianceThreshold: Float = 0.5f,
+
+    /**
+     * Minimum duration (ms) that movement must be sustained before STILL → MOVING
+     * transition is allowed. Acts as a debounce: prevents a few quick steps from
+     * starting a full tracking session.
+     */
+    val minMotionDurationBeforeTracking: Long = 5_000L,
 
     /** Number of accelerometer samples in the rolling variance window.
      *  At SENSOR_DELAY_GAME (~50Hz): 50 samples ≈ 1 second. */

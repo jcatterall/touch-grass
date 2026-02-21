@@ -76,6 +76,10 @@ export const HomeScreen = () => {
 
   const motionMode = isTracking ? 'moving' : 'idle';
 
+  // Motion detected = MotionEngine sees movement but GPS session not yet started.
+  // Provides instant feedback (< 500ms) before the first TrackingService progress event.
+  const isMotionDetected = debugInfo.motionState === 'MOVING';
+
   const statusText = !hasPlans
     ? 'No active plan for today'
     : allGoalsReached
@@ -83,6 +87,8 @@ export const HomeScreen = () => {
     : backgroundTrackingEnabled
     ? isTracking
       ? 'Activity detected, automatically tracking'
+      : isMotionDetected
+      ? 'Motion detected, acquiring GPS...'
       : 'Watching for movement...'
     : isTracking
     ? "Keep going! You're making progress"
