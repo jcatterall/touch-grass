@@ -1,65 +1,94 @@
 package com.touchgrass.motion
 
 /**
- * Configurable thresholds and parameters for the motion tracking engine.
- * All durations are in milliseconds unless noted otherwise.
+ * Configurable thresholds and timing constants for the deterministic motion detection system.
+ * All durations are in milliseconds unless noted.
  *
- * These defaults are production-tuned but can be overridden via
- * MotionModule.configure() from React Native.
+ * These defaults match the plan specification and are production-tuned for urban walking.
+ * Can be overridden from React Native via MotionModule.configure().
  */
 data class MotionConfig(
-    /** Delay before auto-pausing for walking/running (ms). */
-    val autoPauseDelayWalkRun: Long = 5_000L,
 
-    /** Delay before auto-pausing for cycling — longer to allow coasting (ms). */
-    val autoPauseDelayCycling: Long = 12_000L,
-
-    /** Delay after auto-pause before fully stopping the session (ms). */
-    val stopDelay: Long = 20_000L,
+    // ── Movement start detection ────────────────────────────────────────────
 
     /**
-     * Minimum confidence score (0.0–1.0) to transition from STILL to MOVING.
-     * Raised from 0.6 → 0.80 to reduce false positives from casual movement
-     * around the house. Requires stronger corroboration from multiple sensors.
+     * Duration movement must be continuously detected before POTENTIAL_MOVEMENT → MOVING.
+     * Prevents false starts from a phone bump, brief shift, or casual arm movement.
+     * Plan: 3–5 seconds.
      */
-    val movementConfidenceThreshold: Float = 0.80f,
+    val movementConfirmWindowMs: Long = 4_000L,
 
     /**
-     * Accelerometer variance threshold above which motion is considered significant.
-     * Raised from 0.3 → 0.6 to require more substantial physical acceleration,
-     * filtering out arm movements and slow ambling indoors.
+     * Minimum confidence score (0.0–1.0) required to confirm POTENTIAL_MOVEMENT → MOVING.
+     * Step alone scores 0.30; step + variance ~0.35–0.40; with Activity Recognition ~0.80+.
+     * Threshold of 0.30 means any step event can confirm after the window elapses,
+     * while the movementConfirmWindowMs provides the false-positive protection.
      */
-    val varianceThreshold: Float = 0.6f,
+    val movementConfidenceThreshold: Float = 0.30f,
+
+    // ── Stop detection ──────────────────────────────────────────────────────
 
     /**
-     * Minimum duration (ms) that movement must be sustained before STILL → MOVING
-     * transition is allowed. Acts as a debounce: prevents a few quick steps from
-     * starting a full tracking session.
+     * Duration of step absence required before beginning POTENTIAL_STOP evaluation.
+     * Ignores short pauses (traffic lights, tying shoes).
+     * Plan: ~10 seconds.
      */
-    val minMotionDurationBeforeTracking: Long = 5_000L,
+    val stepStopTimeoutMs: Long = 10_000L,
 
-    /** Number of accelerometer samples in the rolling variance window.
-     *  At SENSOR_DELAY_GAME (~50Hz): 50 samples ≈ 1 second. */
+    /**
+     * Accelerometer variance below which the device is considered stationary.
+     * Plan: < 0.12.
+     */
+    val varianceStopThreshold: Float = 0.12f,
+
+    /**
+     * Duration POTENTIAL_STOP must be held before stop is confirmed → IDLE.
+     * Debounces micro-pauses at traffic lights and short bench sits.
+     * Plan: 8–15 seconds.
+     */
+    val stopConfirmWindowMs: Long = 10_000L,
+
+    /**
+     * Grace period after the last movement signal during which an activity EXIT
+     * transition is allowed to arrive before stop conditions are evaluated.
+     * Plan: 5 seconds.
+     */
+    val transitionGraceMs: Long = 5_000L,
+
+    // ── Cycling overrides ───────────────────────────────────────────────────
+
+    /**
+     * Extended step absence timeout for cycling (coasting = no pedal steps).
+     */
+    val stepStopTimeoutCyclingMs: Long = 20_000L,
+
+    // ── Vehicle detection ───────────────────────────────────────────────────
+    // IN_VEHICLE ENTER triggers an immediate forced stop regardless of other conditions.
+
+    // ── Sensor configuration ────────────────────────────────────────────────
+
+    /**
+     * Accelerometer variance threshold above which motion is considered significant
+     * for START detection (higher than stop threshold to require real locomotion).
+     */
+    val varianceStartThreshold: Float = 0.30f,
+
+    /** Rolling variance window size during MOVING state (~1 second at SENSOR_DELAY_GAME). */
     val accelWindowSize: Int = 50,
 
-    /** Reduced accelerometer window when auto-paused (battery saving). */
-    val accelWindowSizePaused: Int = 20,
+    /** Reduced variance window when IDLE or POTENTIAL_STOP (battery saving). */
+    val accelWindowSizeIdle: Int = 20,
 
-    /** Time window within which a step is considered "recent" (ms). */
-    val stepRecencyWindow: Long = 2_000L,
+    /** Time window within which a step is considered "recent" for confidence scoring (ms). */
+    val stepRecencyWindowMs: Long = 2_000L,
 
-    /** Inactivity polling interval (ms). */
-    val inactivityCheckInterval: Long = 2_000L,
+    /** Inactivity polling interval on the sensor thread (ms). */
+    val inactivityCheckIntervalMs: Long = 2_000L,
 
-    /** Notification channel ID for the foreground service. */
+    // ── Notification ────────────────────────────────────────────────────────
+
     val notificationChannelId: String = "touchgrass_tracking",
-
-    /** Notification channel name displayed in system settings. */
     val notificationChannelName: String = "Motion Tracking",
-
-    /** Foreground service notification title. */
     val notificationTitle: String = "TouchGrass is active",
-
-    /** Foreground service notification body. */
-    val notificationBody: String = "Watching for movement…"
+    val notificationBody: String = "Watching for movement…",
 )

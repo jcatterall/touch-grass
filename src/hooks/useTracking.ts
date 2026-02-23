@@ -6,7 +6,11 @@ import {
 } from 'react-native';
 import { storage, fastStorage, PLANS_CHANGED_EVENT } from '../storage';
 import { BlockingPlan, DayKey } from '../types';
-import { MotionTracker, MotionEvent } from '../tracking/MotionTracker';
+import {
+  MotionTracker,
+  MotionStateChangedEvent,
+  MotionState as MotionStateType,
+} from '../tracking/MotionTracker';
 import { Tracking, TrackingProgress } from '../tracking/Tracking';
 import { TrackingPermissions } from '../tracking/Permissions';
 import { AppBlocker } from '../native/AppBlocker';
@@ -107,13 +111,14 @@ function checkAllGoalsReached(
 export type TrackingMode = 'idle' | 'manual' | 'auto';
 
 export interface DebugInfo {
-  motionState: string;
+  motionState: MotionStateType;
   motionActivity: string;
   motionServiceRunning: boolean;
   nativeServiceRunning: boolean;
   currentActivity: string;
   stepDetected: boolean;
   gpsActive: boolean;
+  variance: number;
 }
 
 export interface TrackingState {
@@ -160,7 +165,7 @@ export function useTracking(): TrackingState {
     useState(false);
 
   // MotionTracker debug state
-  const [debugMotionState, setDebugMotionState] = useState('STILL');
+  const [debugMotionState, setDebugMotionState] = useState<MotionStateType>('UNKNOWN');
   const [debugMotionActivity, setDebugMotionActivity] = useState('unknown');
   const [debugMotionServiceRunning, setDebugMotionServiceRunning] =
     useState(false);
@@ -168,6 +173,7 @@ export function useTracking(): TrackingState {
   const [debugCurrentActivity, setDebugCurrentActivity] = useState('unknown');
   const [debugStepDetected, setDebugStepDetected] = useState(false);
   const [debugGpsActive, setDebugGpsActive] = useState(false);
+  const [debugVariance, setDebugVariance] = useState(0);
 
   const progressSub = useRef<EmitterSubscription | null>(null);
   const trackingStarted = useRef(false);
@@ -181,10 +187,7 @@ export function useTracking(): TrackingState {
   } | null>(null);
 
   // MotionTracker subscription refs
-  const motionStartedSub = useRef<EmitterSubscription | null>(null);
-  const motionStoppedSub = useRef<EmitterSubscription | null>(null);
-  const motionAutoPausedSub = useRef<EmitterSubscription | null>(null);
-  const motionResumedSub = useRef<EmitterSubscription | null>(null);
+  const motionStateChangedSub = useRef<EmitterSubscription | null>(null);
   const motionStateUpdateSub = useRef<EmitterSubscription | null>(null);
 
   const goals = useMemo(() => aggregateGoals(activePlans), [activePlans]);
@@ -538,15 +541,9 @@ export function useTracking(): TrackingState {
       setDebugMotionServiceRunning(false);
 
       // Clean up MotionTracker event subscriptions
-      motionStartedSub.current?.remove();
-      motionStoppedSub.current?.remove();
-      motionAutoPausedSub.current?.remove();
-      motionResumedSub.current?.remove();
+      motionStateChangedSub.current?.remove();
       motionStateUpdateSub.current?.remove();
-      motionStartedSub.current = null;
-      motionStoppedSub.current = null;
-      motionAutoPausedSub.current = null;
-      motionResumedSub.current = null;
+      motionStateChangedSub.current = null;
       motionStateUpdateSub.current = null;
     } else {
       const granted = await TrackingPermissions.requestAll();
@@ -563,62 +560,49 @@ export function useTracking(): TrackingState {
 
   // MotionTracker event subscriptions — update UI state in real time.
   // The actual TrackingService start/stop is handled natively via MotionTrackingBridge.
+  // React Native subscribes to MotionStateChanged (single source of truth) and
+  // MotionStateUpdate (live debug sensor readings).
   useEffect(() => {
     if (!backgroundTrackingEnabled) {
-      setDebugMotionState('STILL');
+      setDebugMotionState('UNKNOWN');
       setDebugMotionActivity('unknown');
       setDebugCurrentActivity('unknown');
       setDebugStepDetected(false);
       setDebugGpsActive(false);
+      setDebugVariance(0);
       return;
     }
 
-    motionStartedSub.current = MotionTracker.onMotionStarted(
-      (event: MotionEvent) => {
-        setDebugMotionState('MOVING');
+    motionStateChangedSub.current = MotionTracker.onMotionStateChanged(
+      (event: MotionStateChangedEvent) => {
+        setDebugMotionState(event.state);
         setDebugMotionActivity(event.activityType);
-        // UI sync: TrackingService auto-started via MotionTrackingBridge natively.
-        // Update JS isTracking state if not already set.
-        if (!trackingStarted.current) {
-          trackingStarted.current = true;
-          lastNativeUpdate.current = {
-            elapsedSeconds: 0,
-            distanceMeters: 0,
-            goalReached: false,
-            timestamp: Date.now(),
-          };
-          setSessionProgress({
-            distanceMeters: 0,
-            elapsedSeconds: 0,
-            goalReached: false,
-          });
-          setIsTracking(true);
-          setTrackingMode('auto');
-          setDebugNativeRunning(true);
+
+        if (event.state === 'MOVING') {
+          // TrackingService auto-started via MotionTrackingBridge natively.
+          // Update JS isTracking state if not already set.
+          if (!trackingStarted.current) {
+            trackingStarted.current = true;
+            lastNativeUpdate.current = {
+              elapsedSeconds: 0,
+              distanceMeters: 0,
+              goalReached: false,
+              timestamp: Date.now(),
+            };
+            setSessionProgress({
+              distanceMeters: 0,
+              elapsedSeconds: 0,
+              goalReached: false,
+            });
+            setIsTracking(true);
+            setTrackingMode('auto');
+            setDebugNativeRunning(true);
+          }
+        } else if (event.state === 'IDLE') {
+          // TrackingService will fire onTrackingStopped separately (via MotionTrackingBridge).
+          // That event resets isTracking/trackingMode.
+          setDebugNativeRunning(false);
         }
-      },
-    );
-
-    motionAutoPausedSub.current = MotionTracker.onMotionAutoPaused(
-      (event: MotionEvent) => {
-        setDebugMotionState('AUTO_PAUSED');
-        setDebugMotionActivity(event.activityType);
-      },
-    );
-
-    motionResumedSub.current = MotionTracker.onMotionResumed(
-      (event: MotionEvent) => {
-        setDebugMotionState('MOVING');
-        setDebugMotionActivity(event.activityType);
-      },
-    );
-
-    motionStoppedSub.current = MotionTracker.onMotionStopped(
-      (event: MotionEvent) => {
-        setDebugMotionState('STOPPED');
-        setDebugMotionActivity(event.activityType);
-        // TrackingService will fire onTrackingStopped separately (via MotionTrackingBridge).
-        // That event resets isTracking/trackingMode in the listener above.
       },
     );
 
@@ -626,19 +610,14 @@ export function useTracking(): TrackingState {
       setDebugCurrentActivity(update.activity);
       setDebugStepDetected(update.stepDetected);
       setDebugGpsActive(update.gpsActive);
+      setDebugVariance(update.variance);
     });
 
     return () => {
-      motionStartedSub.current?.remove();
-      motionStoppedSub.current?.remove();
-      motionAutoPausedSub.current?.remove();
-      motionResumedSub.current?.remove();
+      motionStateChangedSub.current?.remove();
       motionStateUpdateSub.current?.remove();
-      motionStartedSub.current = null;
-      motionStoppedSub.current = null;
-      motionAutoPausedSub.current = null;
+      motionStateChangedSub.current = null;
       motionStateUpdateSub.current = null;
-      motionResumedSub.current = null;
     };
   }, [backgroundTrackingEnabled]);
 
@@ -651,6 +630,7 @@ export function useTracking(): TrackingState {
       currentActivity: debugCurrentActivity,
       stepDetected: debugStepDetected,
       gpsActive: debugGpsActive,
+      variance: debugVariance,
     }),
     [
       debugMotionState,
@@ -660,6 +640,7 @@ export function useTracking(): TrackingState {
       debugCurrentActivity,
       debugStepDetected,
       debugGpsActive,
+      debugVariance,
     ],
   );
 

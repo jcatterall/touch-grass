@@ -5,178 +5,268 @@ import android.os.Looper
 import android.util.Log
 
 /**
- * Manages the motion session state machine and enforces transition rules.
+ * Central state machine and single source of truth for motion detection.
  *
- * State transitions:
- *   STILL ──(movement)──▸ MOVING
- *   MOVING ──(brief inactivity)──▸ AUTO_PAUSED
- *   MOVING ──(vehicle detected)──▸ STOPPED
- *   AUTO_PAUSED ──(movement resumes)──▸ MOVING
- *   AUTO_PAUSED ──(stop timeout)──▸ STOPPED
- *   AUTO_PAUSED ──(vehicle detected)──▸ STOPPED
+ * State machine:
+ *   UNKNOWN → IDLE → POTENTIAL_MOVEMENT → MOVING → POTENTIAL_STOP → IDLE
  *
- * Thread-safety: All state mutations are posted to the main looper to
- * serialize access and avoid data races between sensor callbacks,
- * broadcast receivers, and timer runnables.
+ * Movement start (IDLE → POTENTIAL_MOVEMENT → MOVING):
+ *   - Triggered by: step detected, activity ENTER, accelerometer variance spike
+ *   - Confirmed after movement sustained for [MotionConfig.movementConfirmWindowMs] (3–5s)
+ *
+ * Stop detection (MOVING → POTENTIAL_STOP → IDLE) — ALL must be true:
+ *   1. No steps for [MotionConfig.stepStopTimeoutMs] (~10s)
+ *   2. Accelerometer variance < [MotionConfig.varianceStopThreshold] (0.12)
+ *   3. Last movement signal older than [MotionConfig.transitionGraceMs] (5s)
+ *   4. Stop confirmed after [MotionConfig.stopConfirmWindowMs] (8–15s)
+ *
+ * Vehicle override:
+ *   - IN_VEHICLE ENTER → immediately transition to IDLE from any state
+ *
+ * Thread-safety: all state mutations are posted to the main looper.
  */
 object MotionSessionController {
 
     private const val TAG = "MotionSession"
 
+    // ── Configuration ────────────────────────────────────────────────────────
+
     var config: MotionConfig = MotionConfig()
         @Synchronized set
 
+    // ── State ────────────────────────────────────────────────────────────────
+
     @Volatile
-    var currentState: MotionState = MotionState.STILL
+    var currentState: MotionState = MotionState.UNKNOWN
         private set
 
     @Volatile
     var currentActivityType: String = "unknown"
         private set
 
-    /** Timestamp when the current movement bout started. */
+    /** Timestamp when the MOVING state began (used for distance context). */
     @Volatile
     var movementStartTime: Long = 0L
         private set
 
-    /** Timestamp of the last confirmed movement signal. */
+    /** Timestamp of the last movement signal (step, high variance, or activity ENTER). */
     @Volatile
-    private var lastMovementTime: Long = 0L
+    var lastMovementSignalTime: Long = 0L
+        private set
 
     /**
-     * Timestamp when movement was first detected in the current STILL→MOVING
-     * attempt. Used to enforce [MotionConfig.minMotionDurationBeforeTracking]:
-     * movement must be sustained for this long before the transition fires.
-     * Reset to 0 whenever motion drops off.
+     * Timestamp when the first movement candidate was observed in IDLE state.
+     * Reset to 0 when movement drops off before being confirmed.
      */
     @Volatile
-    private var firstMovementCandidateTime: Long = 0L
+    private var potentialMovementStartTime: Long = 0L
+
+    /**
+     * Timestamp when POTENTIAL_STOP was entered.
+     * 0 when not in POTENTIAL_STOP state.
+     */
+    @Volatile
+    private var potentialStopStartTime: Long = 0L
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var autoPauseRunnable: Runnable? = null
-    private var stopRunnable: Runnable? = null
+    private var stopEvalRunnable: Runnable? = null
 
-    // ─────────────────────────────────────────────
-    // Public API (called from MotionEngine threads)
-    // ─────────────────────────────────────────────
+    // ── Public API ───────────────────────────────────────────────────────────
 
     /**
-     * Called when sensors indicate movement above the confidence threshold.
-     * Must be safe to call from any thread.
+     * Called when sensors detect movement above confidence threshold.
+     * Safe to call from any thread.
      */
     fun onMovementDetected(confidence: Float, activityType: String) {
-        mainHandler.post {
-            handleMovement(confidence, activityType)
-        }
+        mainHandler.post { handleMovement(confidence, activityType) }
     }
 
     /**
-     * Called periodically or when Activity Recognition reports STILL.
-     * Must be safe to call from any thread.
+     * Called when an Activity Recognition EXIT transition fires for walking/running/cycling.
+     * Treated as a movement ended signal — feeds into stop condition evaluation.
+     * Safe to call from any thread.
      */
-    fun onInactivityDetected() {
+    fun onMovementEnded(reason: String) {
+        mainHandler.post { handleMovementEnded(reason) }
+    }
+
+    /**
+     * Called periodically by MotionEngine to evaluate stop conditions.
+     * Safe to call from any thread.
+     */
+    fun onInactivityCheck() {
         mainHandler.post {
-            handleInactivity()
+            // Cancel a stale POTENTIAL_MOVEMENT candidate if no movement signal arrived
+            // within the confirmation window (prevents permanent stuck-in-candidate state)
+            if (currentState == MotionState.POTENTIAL_MOVEMENT && potentialMovementStartTime > 0L) {
+                val candidateAge = System.currentTimeMillis() - potentialMovementStartTime
+                // Allow 2× the window before cancelling — gives Activity Recognition time to fire
+                if (candidateAge > config.movementConfirmWindowMs * 2) {
+                    Log.d(TAG, "POTENTIAL_MOVEMENT candidate expired (${candidateAge}ms) — returning to IDLE")
+                    potentialMovementStartTime = 0L
+                    transitionTo(MotionState.IDLE, currentActivityType)
+                }
+            }
+            evaluatePotentialStop()
         }
     }
 
     /**
-     * Called when IN_VEHICLE is detected. Immediately stops the session.
-     * Must be safe to call from any thread.
+     * Immediately transitions to IDLE (vehicle detected or manual stop).
+     * Safe to call from any thread.
      */
     fun forceStop(reason: String = "vehicle_detected") {
-        mainHandler.post {
-            handleForceStop(reason)
-        }
+        mainHandler.post { handleForceStop(reason) }
     }
 
     /**
-     * Resets the controller to initial state (called on manual stop or service teardown).
+     * Resets to IDLE state. Called on service teardown or manual restart.
      */
     fun reset() {
         mainHandler.post {
-            cancelTimers()
-            currentState = MotionState.STILL
+            cancelStopEval()
+            currentState = MotionState.IDLE
             currentActivityType = "unknown"
             movementStartTime = 0L
-            lastMovementTime = 0L
-            firstMovementCandidateTime = 0L
-            Log.d(TAG, "Session reset to STILL")
+            lastMovementSignalTime = 0L
+            potentialMovementStartTime = 0L
+            potentialStopStartTime = 0L
+            Log.d(TAG, "Session reset to IDLE")
         }
     }
 
-    // ─────────────────────────────────────────────
-    // State machine logic (always runs on main)
-    // ─────────────────────────────────────────────
+    // ── State machine logic (always on main looper) ───────────────────────────
 
     private fun handleMovement(confidence: Float, activityType: String) {
-        lastMovementTime = System.currentTimeMillis()
-        currentActivityType = activityType
+        lastMovementSignalTime = System.currentTimeMillis()
+
+        // Resolve UNKNOWN to IDLE on first signal (before main state machine)
+        if (currentState == MotionState.UNKNOWN) {
+            currentState = MotionState.IDLE
+            Log.d(TAG, "UNKNOWN → IDLE (first sensor signal)")
+        }
 
         when (currentState) {
-            MotionState.STILL -> {
-                if (confidence >= config.movementConfidenceThreshold) {
-                    val now = System.currentTimeMillis()
-                    if (firstMovementCandidateTime == 0L) {
-                        firstMovementCandidateTime = now
-                        Log.d(TAG, "Movement candidate started — waiting ${config.minMotionDurationBeforeTracking}ms to confirm")
-                    }
-                    val sustainedMs = now - firstMovementCandidateTime
-                    if (sustainedMs >= config.minMotionDurationBeforeTracking) {
-                        firstMovementCandidateTime = 0L
-                        transitionTo(MotionState.MOVING, activityType)
-                        movementStartTime = now
-                    }
+            MotionState.UNKNOWN -> { /* resolved above */ }
+
+            MotionState.IDLE -> {
+                // Any movement signal (step, activity ENTER, or high variance) can enter
+                // POTENTIAL_MOVEMENT. Full confidence is only required to confirm MOVING.
+                val now = System.currentTimeMillis()
+                if (potentialMovementStartTime == 0L) {
+                    potentialMovementStartTime = now
+                    currentActivityType = activityType
+                    transitionTo(MotionState.POTENTIAL_MOVEMENT, activityType)
+                    Log.d(TAG, "Movement candidate (confidence=$confidence) — waiting ${config.movementConfirmWindowMs}ms to confirm")
                 } else {
-                    // Confidence dropped — reset the debounce window
-                    if (firstMovementCandidateTime != 0L) {
-                        Log.d(TAG, "Movement candidate reset (confidence too low: $confidence)")
-                        firstMovementCandidateTime = 0L
+                    val sustainedMs = now - potentialMovementStartTime
+                    currentActivityType = activityType
+                    if (sustainedMs >= config.movementConfirmWindowMs && confidence >= config.movementConfidenceThreshold) {
+                        potentialMovementStartTime = 0L
+                        movementStartTime = now
+                        transitionTo(MotionState.MOVING, activityType)
+                    } else if (sustainedMs >= config.movementConfirmWindowMs) {
+                        // Sustained long enough but confidence still low — keep waiting
+                        Log.d(TAG, "Sustained ${sustainedMs}ms but confidence=$confidence < ${config.movementConfidenceThreshold}, waiting")
                     }
                 }
             }
 
-            MotionState.AUTO_PAUSED -> {
-                // Resume immediately
-                cancelTimers()
-                transitionTo(MotionState.MOVING, activityType)
-                Log.d(TAG, "Resumed from AUTO_PAUSED → MOVING ($activityType)")
+            MotionState.POTENTIAL_MOVEMENT -> {
+                val now = System.currentTimeMillis()
+                currentActivityType = activityType
+                if (potentialMovementStartTime > 0L) {
+                    val sustainedMs = now - potentialMovementStartTime
+                    if (sustainedMs >= config.movementConfirmWindowMs) {
+                        potentialMovementStartTime = 0L
+                        movementStartTime = now
+                        transitionTo(MotionState.MOVING, activityType)
+                    }
+                } else {
+                    // Shouldn't happen, but handle gracefully
+                    potentialMovementStartTime = now
+                }
             }
 
             MotionState.MOVING -> {
-                // Refresh auto-pause timer
-                cancelAutoPauseTimer()
-                scheduleAutoPause(activityType)
+                // Refresh movement signal — cancels any pending stop confirmation
+                currentActivityType = activityType
+                if (potentialStopStartTime != 0L) {
+                    Log.d(TAG, "Movement resumed — cancelling POTENTIAL_STOP")
+                    potentialStopStartTime = 0L
+                    cancelStopEval()
+                    transitionTo(MotionState.MOVING, activityType)
+                }
             }
 
-            MotionState.STOPPED -> {
-                // Must call startMonitoring() again to restart
-                Log.d(TAG, "Movement detected in STOPPED state — ignoring")
+            MotionState.POTENTIAL_STOP -> {
+                // Movement resumed — cancel stop confirmation and return to MOVING
+                Log.d(TAG, "Movement detected in POTENTIAL_STOP — returning to MOVING")
+                potentialStopStartTime = 0L
+                cancelStopEval()
+                transitionTo(MotionState.MOVING, activityType)
             }
         }
     }
 
-    private fun handleInactivity() {
+    private fun handleMovementEnded(reason: String) {
+        Log.d(TAG, "Movement ended signal: $reason")
+        // Treat as a nudge toward stop evaluation — evaluatePotentialStop() will
+        // check all conditions deterministically.
+        evaluatePotentialStop()
+    }
+
+    private fun evaluatePotentialStop() {
+        if (currentState != MotionState.MOVING && currentState != MotionState.POTENTIAL_STOP) return
+
+        val stepsHaveStopped = MotionEngine.hasStepsStopped()
+        val deviceIsStable = MotionEngine.isDeviceStable()
+        val gracePeriodElapsed = (System.currentTimeMillis() - lastMovementSignalTime) >= config.transitionGraceMs
+
         if (currentState == MotionState.MOVING) {
-            val elapsed = System.currentTimeMillis() - lastMovementTime
-            val delay = getAutoPauseDelay()
-            if (elapsed >= delay) {
-                transitionTo(MotionState.AUTO_PAUSED, currentActivityType)
-                scheduleStopTimer()
+            if (stepsHaveStopped && deviceIsStable && gracePeriodElapsed) {
+                Log.d(TAG, "Stop conditions met — entering POTENTIAL_STOP " +
+                        "(stepsHaveStopped=$stepsHaveStopped, stable=$deviceIsStable, graceElapsed=$gracePeriodElapsed)")
+                potentialStopStartTime = System.currentTimeMillis()
+                transitionTo(MotionState.POTENTIAL_STOP, currentActivityType)
+                scheduleStopConfirmEval()
+            } else {
+                Log.d(TAG, "Stop conditions not met: stepsHaveStopped=$stepsHaveStopped " +
+                        "stable=$deviceIsStable graceElapsed=$gracePeriodElapsed")
+            }
+        } else if (currentState == MotionState.POTENTIAL_STOP) {
+            if (!stepsHaveStopped || !deviceIsStable) {
+                // Conditions no longer met — movement resumed, cancel
+                Log.d(TAG, "POTENTIAL_STOP cancelled — conditions no longer met")
+                potentialStopStartTime = 0L
+                cancelStopEval()
+                transitionTo(MotionState.MOVING, currentActivityType)
+            } else {
+                val confirmedMs = System.currentTimeMillis() - potentialStopStartTime
+                if (confirmedMs >= config.stopConfirmWindowMs) {
+                    Log.i(TAG, "Stop confirmed after ${confirmedMs}ms — transitioning to IDLE")
+                    confirmStop()
+                }
             }
         }
+    }
+
+    private fun confirmStop() {
+        potentialStopStartTime = 0L
+        cancelStopEval()
+        transitionTo(MotionState.IDLE, currentActivityType, "inactivity_timeout")
     }
 
     private fun handleForceStop(reason: String) {
-        if (currentState == MotionState.STOPPED) return
-        cancelTimers()
+        if (currentState == MotionState.IDLE || currentState == MotionState.UNKNOWN) return
+        cancelStopEval()
+        potentialMovementStartTime = 0L
+        potentialStopStartTime = 0L
         Log.i(TAG, "Force stop: $reason")
-        transitionTo(MotionState.STOPPED, currentActivityType, reason)
+        transitionTo(MotionState.IDLE, currentActivityType, reason)
     }
 
-    // ─────────────────────────────────────────────
-    // State transitions
-    // ─────────────────────────────────────────────
+    // ── Transitions ──────────────────────────────────────────────────────────
 
     private fun transitionTo(newState: MotionState, activityType: String, reason: String? = null) {
         val oldState = currentState
@@ -185,87 +275,56 @@ object MotionSessionController {
         currentState = newState
         Log.i(TAG, "State: $oldState → $newState (type=$activityType, reason=$reason)")
 
-        // Emit events to React Native and signal TrackingService
-        when (newState) {
-            MotionState.MOVING -> {
-                if (oldState == MotionState.AUTO_PAUSED) {
-                    MotionEventEmitter.emitResumed(activityType)
-                    // Resume after auto-pause — TrackingService keeps GPS session alive
-                } else {
-                    MotionEventEmitter.emitStarted(activityType)
-                    MotionTrackingBridge.onMotionStarted(activityType)
-                }
+        // Emit unified MotionStateChanged event to React Native
+        MotionEventEmitter.emitStateChanged(
+            state = newState,
+            activityType = activityType,
+            confidence = 1.0f,
+            distanceMeters = 0.0,
+            timestamp = System.currentTimeMillis()
+        )
+
+        // Signal TrackingService via native IPC
+        when {
+            newState == MotionState.MOVING && (oldState == MotionState.POTENTIAL_MOVEMENT || oldState == MotionState.IDLE) -> {
+                MotionTrackingBridge.onMotionStarted(activityType)
             }
-            MotionState.AUTO_PAUSED -> {
-                MotionEventEmitter.emitAutoPaused(activityType)
-                // Don't stop TrackingService yet — wait for STOPPED transition
+            newState == MotionState.MOVING && oldState == MotionState.POTENTIAL_STOP -> {
+                // Resumed from POTENTIAL_STOP — no new start signal; GPS already running
             }
-            MotionState.STOPPED -> {
-                MotionEventEmitter.emitStopped(activityType, reason ?: "inactivity")
-                MotionTrackingBridge.onMotionStopped(activityType, reason ?: "inactivity")
-            }
-            MotionState.STILL -> {
-                // No event for initial/reset state
+            newState == MotionState.IDLE && oldState != MotionState.UNKNOWN -> {
+                MotionTrackingBridge.onMotionStopped(activityType, reason ?: "inactivity_timeout")
+                movementStartTime = 0L
             }
         }
 
-        // Notify MotionEngine to adjust sensor rates
+        // Notify MotionEngine to adjust sensor power
         when (newState) {
-            MotionState.AUTO_PAUSED -> MotionEngine.onAutoPaused()
+            MotionState.IDLE -> MotionEngine.onStopped()
+            MotionState.POTENTIAL_MOVEMENT -> MotionEngine.onResumed()  // full rate for confirmation
             MotionState.MOVING -> MotionEngine.onResumed()
-            MotionState.STOPPED -> MotionEngine.onStopped()
-            else -> {}
+            MotionState.POTENTIAL_STOP -> MotionEngine.onAutoPaused()   // reduce rate while evaluating stop
+            MotionState.UNKNOWN -> {}
         }
     }
 
-    // ─────────────────────────────────────────────
-    // Timers
-    // ─────────────────────────────────────────────
+    // ── Stop evaluation scheduling ───────────────────────────────────────────
 
-    private fun getAutoPauseDelay(): Long {
-        return when (currentActivityType) {
-            "cycling" -> config.autoPauseDelayCycling
-            else -> config.autoPauseDelayWalkRun
-        }
-    }
-
-    private fun scheduleAutoPause(activityType: String) {
-        cancelAutoPauseTimer()
-        val delay = getAutoPauseDelay()
-        autoPauseRunnable = Runnable {
-            if (currentState == MotionState.MOVING) {
-                val elapsed = System.currentTimeMillis() - lastMovementTime
-                if (elapsed >= delay) {
-                    transitionTo(MotionState.AUTO_PAUSED, activityType)
-                    scheduleStopTimer()
+    private fun scheduleStopConfirmEval() {
+        cancelStopEval()
+        stopEvalRunnable = object : Runnable {
+            override fun run() {
+                if (currentState == MotionState.POTENTIAL_STOP) {
+                    evaluatePotentialStop()
+                    mainHandler.postDelayed(this, 1_000L)
                 }
             }
         }
-        mainHandler.postDelayed(autoPauseRunnable!!, delay)
+        mainHandler.postDelayed(stopEvalRunnable!!, 1_000L)
     }
 
-    private fun scheduleStopTimer() {
-        cancelStopTimer()
-        stopRunnable = Runnable {
-            if (currentState == MotionState.AUTO_PAUSED) {
-                handleForceStop("inactivity_timeout")
-            }
-        }
-        mainHandler.postDelayed(stopRunnable!!, config.stopDelay)
-    }
-
-    private fun cancelAutoPauseTimer() {
-        autoPauseRunnable?.let { mainHandler.removeCallbacks(it) }
-        autoPauseRunnable = null
-    }
-
-    private fun cancelStopTimer() {
-        stopRunnable?.let { mainHandler.removeCallbacks(it) }
-        stopRunnable = null
-    }
-
-    private fun cancelTimers() {
-        cancelAutoPauseTimer()
-        cancelStopTimer()
+    private fun cancelStopEval() {
+        stopEvalRunnable?.let { mainHandler.removeCallbacks(it) }
+        stopEvalRunnable = null
     }
 }

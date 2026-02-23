@@ -1,25 +1,34 @@
 package com.touchgrass.motion
 
 /**
- * Represents the lifecycle states of the motion tracking session.
+ * Represents the lifecycle states of the deterministic motion tracking session.
  *
- * State transitions:
- *   STILL → MOVING → AUTO_PAUSED → MOVING (resumed)
- *                   → STOPPED
- *   AUTO_PAUSED → MOVING (resumed)
- *               → STOPPED (timeout or vehicle detected)
- *   Any state → STOPPED (vehicle detected or manual stop)
+ * State machine:
+ *   UNKNOWN → IDLE → POTENTIAL_MOVEMENT → MOVING → POTENTIAL_STOP → IDLE
+ *
+ * Transitions:
+ *   UNKNOWN      → IDLE              (first sensor signal received)
+ *   IDLE         → POTENTIAL_MOVEMENT (step detected OR activity ENTER OR variance spike)
+ *   POTENTIAL_MOVEMENT → MOVING      (movement sustained for MOVEMENT_CONFIRM_WINDOW_MS)
+ *   POTENTIAL_MOVEMENT → IDLE        (movement drops off before confirmed)
+ *   MOVING       → POTENTIAL_STOP    (no steps + low variance + no recent activity)
+ *   POTENTIAL_STOP → MOVING          (movement resumes during grace window)
+ *   POTENTIAL_STOP → IDLE            (confirmed stop after STOP_CONFIRM_WINDOW_MS)
+ *   Any          → IDLE              (vehicle detected)
  */
 enum class MotionState {
-    /** User is not moving. Initial state. */
-    STILL,
+    /** App just started; sensors not yet initialized. */
+    UNKNOWN,
 
-    /** Active walking, running, or cycling detected. */
+    /** User is not moving. Low-power passive listening. */
+    IDLE,
+
+    /** Movement candidate detected; waiting to confirm it is sustained. */
+    POTENTIAL_MOVEMENT,
+
+    /** Active walking, running, or cycling confirmed. Full sensors + GPS active. */
     MOVING,
 
-    /** Brief inactivity detected (traffic lights, short stops). Session preserved. */
-    AUTO_PAUSED,
-
-    /** Session ended due to prolonged inactivity, vehicle entry, or manual stop. */
-    STOPPED
+    /** Stop conditions met; waiting to confirm the stop is not just a brief pause. */
+    POTENTIAL_STOP,
 }

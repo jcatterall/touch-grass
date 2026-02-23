@@ -17,7 +17,13 @@ if (Platform.OS === 'android' && !MotionModule) {
   );
 }
 
-export type MotionState = 'STILL' | 'MOVING' | 'AUTO_PAUSED' | 'STOPPED';
+/** States from the deterministic motion state machine. */
+export type MotionState =
+  | 'UNKNOWN'
+  | 'IDLE'
+  | 'POTENTIAL_MOVEMENT'
+  | 'MOVING'
+  | 'POTENTIAL_STOP';
 
 export type MotionActivityType =
   | 'walking'
@@ -27,23 +33,46 @@ export type MotionActivityType =
   | 'still'
   | 'unknown';
 
-export interface MotionEvent {
+/**
+ * Payload for the unified MotionStateChanged event.
+ * Emitted on every state machine transition.
+ */
+export interface MotionStateChangedEvent {
+  state: MotionState;
   activityType: MotionActivityType;
-  reason?: string;
+  confidence: number;
+  distanceMeters: number;
+  timestamp: number;
 }
 
+/**
+ * Payload for the periodic MotionStateUpdate debug event.
+ * Emitted every ~500ms with live sensor readings.
+ */
 export interface MotionStateUpdate {
   activity: MotionActivityType;
   stepDetected: boolean;
   gpsActive: boolean;
+  variance: number;
 }
 
 export interface MotionConfig {
-  autoPauseDelayWalkRun?: number;
-  autoPauseDelayCycling?: number;
-  stopDelay?: number;
+  /** Duration movement must be sustained before POTENTIAL_MOVEMENT → MOVING (ms). Default: 4000 */
+  movementConfirmWindowMs?: number;
+  /** Minimum confidence score [0–1] for a signal to count as movement. Default: 0.60 */
   movementConfidenceThreshold?: number;
-  varianceThreshold?: number;
+  /** Step absence duration before stop evaluation begins (ms). Default: 10000 */
+  stepStopTimeoutMs?: number;
+  /** Accelerometer variance below which device is considered stationary. Default: 0.12 */
+  varianceStopThreshold?: number;
+  /** Duration POTENTIAL_STOP must hold before stop confirmed (ms). Default: 10000 */
+  stopConfirmWindowMs?: number;
+  /** Grace period after last movement signal before stop conditions are evaluated (ms). Default: 5000 */
+  transitionGraceMs?: number;
+  /** Extended step absence timeout for cycling (ms). Default: 20000 */
+  stepStopTimeoutCyclingMs?: number;
+  /** Accelerometer variance threshold for start detection. Default: 0.30 */
+  varianceStartThreshold?: number;
 }
 
 const emitter = isAvailable ? new NativeEventEmitter(MotionModule) : null;
@@ -83,7 +112,7 @@ export const MotionTracker = {
 
   /**
    * Starts motion monitoring. Requests permissions automatically.
-   * Resolves when the service has started.
+   * Resolves when the foreground service has started.
    */
   async startMonitoring(config?: MotionConfig): Promise<void> {
     if (!isAvailable) {
@@ -118,56 +147,32 @@ export const MotionTracker = {
     state: MotionState;
     activityType: MotionActivityType;
   }> {
-    if (!isAvailable) return { state: 'STILL', activityType: 'unknown' };
+    if (!isAvailable) return { state: 'IDLE', activityType: 'unknown' };
     return MotionModule.getState();
   },
 
   /**
-   * Fires when movement above threshold is detected for the first time.
-   * Payload: { activityType: 'walking' | 'running' | 'cycling' }
+   * Subscribes to the unified MotionStateChanged event.
+   * Emitted on every state machine transition with full payload.
+   * This is the single source of truth for motion state in React Native.
+   *
+   * States:
+   *   UNKNOWN            → app just started, sensors initializing
+   *   IDLE               → not moving, low-power passive listening
+   *   POTENTIAL_MOVEMENT → movement candidate detected, waiting to confirm (~4s)
+   *   MOVING             → confirmed movement, GPS active, foreground service on
+   *   POTENTIAL_STOP     → stop conditions met, waiting to confirm stop (~10s)
    */
-  onMotionStarted(
-    callback: (event: MotionEvent) => void,
+  onMotionStateChanged(
+    callback: (event: MotionStateChangedEvent) => void,
   ): EmitterSubscription | null {
     if (!emitter) return null;
-    return emitter.addListener('MotionStarted', callback);
+    return emitter.addListener('MotionStateChanged', callback);
   },
 
   /**
-   * Fires when brief inactivity is detected (e.g. traffic light pause).
-   */
-  onMotionAutoPaused(
-    callback: (event: MotionEvent) => void,
-  ): EmitterSubscription | null {
-    if (!emitter) return null;
-    return emitter.addListener('MotionAutoPaused', callback);
-  },
-
-  /**
-   * Fires when movement resumes after an auto-pause.
-   */
-  onMotionResumed(
-    callback: (event: MotionEvent) => void,
-  ): EmitterSubscription | null {
-    if (!emitter) return null;
-    return emitter.addListener('MotionResumed', callback);
-  },
-
-  /**
-   * Fires when the motion session ends.
-   * Payload: { activityType, reason: 'vehicle_detected' | 'inactivity_timeout' | 'manual' }
-   */
-  onMotionStopped(
-    callback: (event: MotionEvent) => void,
-  ): EmitterSubscription | null {
-    if (!emitter) return null;
-    return emitter.addListener('MotionStopped', callback);
-  },
-
-  /**
-   * Fires periodically (every ~500ms) with current detailed motion state.
-   * Provides reactive updates for UI debug info without waiting for state transitions.
-   * Payload: { activity: string, stepDetected: boolean, gpsActive: boolean }
+   * Subscribes to periodic debug state updates (~500ms).
+   * Includes live sensor readings: step detection, GPS active, variance.
    */
   onMotionStateUpdate(
     callback: (update: MotionStateUpdate) => void,

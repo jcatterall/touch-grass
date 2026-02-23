@@ -20,8 +20,13 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
- * Core sensor engine that monitors accelerometer, step detector, and
- * Activity Recognition API to produce movement confidence scores.
+ * Core sensor engine responsible for:
+ *   - Step detector monitoring
+ *   - Accelerometer variance calculation
+ *   - Gyroscope data collection (optional smoothing)
+ *   - Activity Recognition transition handling
+ *   - Movement confidence scoring
+ *   - Emitting signals to MotionSessionController
  *
  * Thread-safety:
  *   - Sensor callbacks run on a dedicated HandlerThread ("MotionSensorThread").
@@ -30,9 +35,9 @@ import kotlin.math.sqrt
  *     which serializes them on the main looper.
  *
  * Battery optimization:
- *   - AUTO_PAUSED reduces accelerometer to SENSOR_DELAY_NORMAL (~200ms).
- *   - STOPPED unregisters all sensors; only Activity Recognition remains.
- *   - The rolling variance window shrinks during AUTO_PAUSED.
+ *   - IDLE / POTENTIAL_STOP: accelerometer at SENSOR_DELAY_NORMAL (~5 Hz), gyroscope off.
+ *   - MOVING / POTENTIAL_MOVEMENT: accelerometer at SENSOR_DELAY_GAME (~50 Hz), gyroscope on.
+ *   - IDLE: sensors unregistered; only Activity Recognition passive listener remains.
  */
 object MotionEngine : SensorEventListener {
 
@@ -51,8 +56,9 @@ object MotionEngine : SensorEventListener {
     // Inactivity polling on the sensor thread
     private var inactivityRunnable: Runnable? = null
 
-    // ── Thread-safe shared state ────────────────────────────────
+    // ── Thread-safe shared state ──────────────────────────────────────────────
 
+    /** Timestamp of the most recent step detector event. */
     @Volatile
     private var lastStepTime: Long = 0L
 
@@ -65,7 +71,7 @@ object MotionEngine : SensorEventListener {
 
     private var config: MotionConfig = MotionConfig()
 
-    // ── Public API ──────────────────────────────────────────────
+    // ── Public API ────────────────────────────────────────────────────────────
 
     fun start(ctx: Context, motionConfig: MotionConfig = MotionConfig()) {
         if (running) {
@@ -81,7 +87,6 @@ object MotionEngine : SensorEventListener {
         accelSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         gyroSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
-        // Start sensor handler thread
         sensorThread = HandlerThread("MotionSensorThread").also { it.start() }
         sensorHandler = Handler(sensorThread!!.looper)
 
@@ -107,40 +112,73 @@ object MotionEngine : SensorEventListener {
 
     fun isRunning(): Boolean = running
 
+    // ── Stop condition helpers (called from MotionSessionController) ──────────
+
     /**
-     * Returns whether a step has been detected recently (within stepRecencyWindow).
-     * Useful for UI debug information.
+     * Returns true if no step has been detected for at least [MotionConfig.stepStopTimeoutMs].
+     * Cycling uses an extended timeout ([MotionConfig.stepStopTimeoutCyclingMs]).
      */
+    fun hasStepsStopped(): Boolean {
+        val timeout = if (MotionSessionController.currentActivityType == "cycling") {
+            config.stepStopTimeoutCyclingMs
+        } else {
+            config.stepStopTimeoutMs
+        }
+        val elapsed = System.currentTimeMillis() - lastStepTime
+        Log.d(TAG, "hasStepsStopped: lastStep=${elapsed}ms ago, timeout=${timeout}ms")
+        return elapsed > timeout
+    }
+
+    /**
+     * Returns true if the current accelerometer variance is below [MotionConfig.varianceStopThreshold].
+     * A stable device indicates the user is stationary.
+     */
+    fun isDeviceStable(): Boolean {
+        val variance = computeVariance()
+        Log.d(TAG, "isDeviceStable: variance=$variance threshold=${config.varianceStopThreshold}")
+        return variance < config.varianceStopThreshold
+    }
+
+    /** Returns the current accelerometer variance (public for debug logging). */
+    fun getVariance(): Float = computeVariance()
+
+    /** Returns whether a step has been detected recently (within [MotionConfig.stepRecencyWindowMs]). */
     fun isStepDetectedRecently(): Boolean = isStepRecent()
 
-    // ── Battery optimization callbacks from MotionSessionController ─
+    // ── Battery optimization callbacks from MotionSessionController ───────────
 
-    /** Reduce sensor rate when auto-paused. */
+    /** Reduce sensor rate when in POTENTIAL_STOP (device may be stopping). */
     fun onAutoPaused() {
         sensorManager?.unregisterListener(this)
         registerSensors(fullRate = false)
-        Log.d(TAG, "Sensors reduced to low-power mode (AUTO_PAUSED)")
+        Log.d(TAG, "Sensors reduced to low-power mode (POTENTIAL_STOP)")
     }
 
-    /** Restore full sensor rate when movement resumes. */
+    /** Restore full sensor rate when MOVING or confirming movement. */
     fun onResumed() {
         sensorManager?.unregisterListener(this)
         registerSensors(fullRate = true)
-        Log.d(TAG, "Sensors restored to full rate (MOVING)")
+        Log.d(TAG, "Sensors restored to full rate (MOVING/POTENTIAL_MOVEMENT)")
     }
 
-    /** Unregister sensors on stop. Activity Recognition stays active. */
+    /**
+     * Switch to low-power passive listening when IDLE.
+     * Keeps step detector and accelerometer active at low rate so the next
+     * bout of movement can be detected and start a new session.
+     * Activity Recognition also remains active.
+     * Full sensor shutdown only happens in [stop] (service teardown).
+     */
     fun onStopped() {
         sensorManager?.unregisterListener(this)
         accelWindow.clear()
-        Log.d(TAG, "Sensors unregistered (STOPPED). Activity Recognition still active.")
+        registerSensors(fullRate = false)
+        Log.d(TAG, "Sensors reduced to passive mode (IDLE). Monitoring for next movement.")
     }
 
-    // ── SensorEventListener ─────────────────────────────────────
+    // ── SensorEventListener ───────────────────────────────────────────────────
 
     override fun onSensorChanged(event: SensorEvent?) {
         event ?: return
-
         when (event.sensor.type) {
             Sensor.TYPE_STEP_DETECTOR -> handleStepDetected()
             Sensor.TYPE_ACCELEROMETER -> handleAccelerometer(event)
@@ -152,10 +190,11 @@ object MotionEngine : SensorEventListener {
         Log.d(TAG, "Sensor accuracy changed: ${sensor?.name} → $accuracy")
     }
 
-    // ── Sensor handlers ─────────────────────────────────────────
+    // ── Sensor handlers ───────────────────────────────────────────────────────
 
     private fun handleStepDetected() {
         lastStepTime = System.currentTimeMillis()
+        Log.d(TAG, "Step detected at $lastStepTime")
 
         val confidence = computeConfidence(
             activityRecognitionActive = isActiveActivityType(),
@@ -179,35 +218,38 @@ object MotionEngine : SensorEventListener {
 
         synchronized(accelWindow) {
             accelWindow.add(deviation)
-            val maxSize = if (MotionSessionController.currentState == MotionState.AUTO_PAUSED) {
-                config.accelWindowSizePaused
-            } else {
-                config.accelWindowSize
+            val maxSize = when (MotionSessionController.currentState) {
+                MotionState.IDLE, MotionState.POTENTIAL_STOP -> config.accelWindowSizeIdle
+                else -> config.accelWindowSize
             }
             while (accelWindow.size > maxSize) {
                 accelWindow.removeAt(0)
             }
         }
 
+        val variance = computeVariance()
         val confidence = computeConfidence(
             activityRecognitionActive = isActiveActivityType(),
             stepDetectedRecently = isStepRecent()
         )
 
-        if (confidence >= config.movementConfidenceThreshold) {
+        // Only emit start signals when variance is above the START threshold
+        if (variance >= config.varianceStartThreshold && confidence >= config.movementConfidenceThreshold) {
             MotionSessionController.onMovementDetected(
                 confidence,
                 MotionSessionController.currentActivityType
             )
         }
+
+        Log.d(TAG, "Accel: variance=$variance confidence=$confidence state=${MotionSessionController.currentState}")
     }
 
     private fun handleGyroscope(event: SensorEvent) {
-        // Gyroscope data can be used to filter out orientation changes vs. actual locomotion.
-        // Placeholder for future refinement.
+        // Gyroscope data available for orientation filtering if needed.
+        // Placeholder for future refinement — not currently used in confidence scoring.
     }
 
-    // ── Activity Recognition ────────────────────────────────────
+    // ── Activity Recognition ──────────────────────────────────────────────────
 
     private fun startActivityRecognition() {
         try {
@@ -220,7 +262,7 @@ object MotionEngine : SensorEventListener {
                 activityTransition(DetectedActivity.ON_BICYCLE, ActivityTransition.ACTIVITY_TRANSITION_ENTER),
                 activityTransition(DetectedActivity.ON_BICYCLE, ActivityTransition.ACTIVITY_TRANSITION_EXIT),
                 activityTransition(DetectedActivity.IN_VEHICLE, ActivityTransition.ACTIVITY_TRANSITION_ENTER),
-                activityTransition(DetectedActivity.STILL, ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                activityTransition(DetectedActivity.STILL, ActivityTransition.ACTIVITY_TRANSITION_ENTER),
             )
             val request = ActivityTransitionRequest(transitions)
             val pendingIntent = getActivityPendingIntent()
@@ -265,6 +307,7 @@ object MotionEngine : SensorEventListener {
 
     /**
      * Called from [ActivityTransitionReceiver] when a transition event fires.
+     * Maps Activity Recognition events to MotionSessionController signals.
      */
     fun onActivityTransitionDetected(type: Int, isEntering: Boolean) {
         Log.d(TAG, "Activity transition: type=$type, entering=$isEntering")
@@ -274,44 +317,52 @@ object MotionEngine : SensorEventListener {
                 if (isEntering) {
                     val conf = computeConfidence(activityRecognitionActive = true, stepDetectedRecently = isStepRecent())
                     MotionSessionController.onMovementDetected(conf, "walking")
+                } else {
+                    MotionSessionController.onMovementEnded("walking_exit")
                 }
             }
             DetectedActivity.RUNNING -> {
                 if (isEntering) {
                     val conf = computeConfidence(activityRecognitionActive = true, stepDetectedRecently = isStepRecent())
                     MotionSessionController.onMovementDetected(conf, "running")
+                } else {
+                    MotionSessionController.onMovementEnded("running_exit")
                 }
             }
             DetectedActivity.ON_BICYCLE -> {
                 if (isEntering) {
                     val conf = computeConfidence(activityRecognitionActive = true, stepDetectedRecently = false)
                     MotionSessionController.onMovementDetected(conf, "cycling")
+                } else {
+                    MotionSessionController.onMovementEnded("cycling_exit")
                 }
             }
             DetectedActivity.IN_VEHICLE -> {
                 if (isEntering) {
-                    Log.i(TAG, "IN_VEHICLE detected — forcing stop")
+                    Log.i(TAG, "IN_VEHICLE detected — forcing stop immediately")
                     MotionSessionController.forceStop("vehicle_detected")
                 }
             }
             DetectedActivity.STILL -> {
                 if (isEntering) {
-                    MotionSessionController.onInactivityDetected()
+                    // STILL is an optional confirmation signal, not a standalone trigger.
+                    // Nudge inactivity evaluation to check stop conditions.
+                    MotionSessionController.onInactivityCheck()
                 }
             }
         }
     }
 
-    // ── Inactivity polling ──────────────────────────────────────
+    // ── Inactivity polling ────────────────────────────────────────────────────
 
     private fun scheduleInactivityCheck() {
         inactivityRunnable = object : Runnable {
             override fun run() {
-                MotionSessionController.onInactivityDetected()
-                sensorHandler?.postDelayed(this, config.inactivityCheckInterval)
+                MotionSessionController.onInactivityCheck()
+                sensorHandler?.postDelayed(this, config.inactivityCheckIntervalMs)
             }
         }
-        sensorHandler?.postDelayed(inactivityRunnable!!, config.inactivityCheckInterval)
+        sensorHandler?.postDelayed(inactivityRunnable!!, config.inactivityCheckIntervalMs)
     }
 
     private fun cancelInactivityCheck() {
@@ -319,7 +370,7 @@ object MotionEngine : SensorEventListener {
         inactivityRunnable = null
     }
 
-    // ── Sensor registration ─────────────────────────────────────
+    // ── Sensor registration ───────────────────────────────────────────────────
 
     private fun registerSensors(fullRate: Boolean) {
         val accelDelay = if (fullRate) {
@@ -337,22 +388,20 @@ object MotionEngine : SensorEventListener {
             sensorManager?.registerListener(this, it, accelDelay, handler)
         }
         gyroSensor?.let {
-            // Gyroscope only useful at full rate
             if (fullRate) {
                 sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME, handler)
             }
+            // Gyroscope disabled at low power
         }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun isStepRecent(): Boolean {
-        return (System.currentTimeMillis() - lastStepTime) < config.stepRecencyWindow
-    }
+    private fun isStepRecent(): Boolean =
+        (System.currentTimeMillis() - lastStepTime) < config.stepRecencyWindowMs
 
-    private fun isActiveActivityType(): Boolean {
-        return MotionSessionController.currentActivityType in listOf("walking", "running", "cycling")
-    }
+    private fun isActiveActivityType(): Boolean =
+        MotionSessionController.currentActivityType in listOf("walking", "running", "cycling")
 
     private fun computeVariance(): Float {
         synchronized(accelWindow) {
@@ -377,7 +426,7 @@ object MotionEngine : SensorEventListener {
             activityRecognitionActive = activityRecognitionActive,
             stepDetectedRecently = stepDetectedRecently,
             accelerometerVariance = variance,
-            varianceThreshold = config.varianceThreshold,
+            varianceThreshold = config.varianceStartThreshold,
             sustainedDurationMs = sustainedMs
         )
     }
