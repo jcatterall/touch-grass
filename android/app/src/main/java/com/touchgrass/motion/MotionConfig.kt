@@ -31,9 +31,9 @@ data class MotionConfig(
     /**
      * Duration of step absence required before beginning POTENTIAL_STOP evaluation.
      * Ignores short pauses (traffic lights, tying shoes).
-     * Plan: ~10 seconds.
+     * Reduced from 10s → 7s for faster stop detection.
      */
-    val stepStopTimeoutMs: Long = 10_000L,
+    val stepStopTimeoutMs: Long = 7_000L,
 
     /**
      * Accelerometer variance below which the device is considered stationary.
@@ -44,16 +44,16 @@ data class MotionConfig(
     /**
      * Duration POTENTIAL_STOP must be held before stop is confirmed → IDLE.
      * Debounces micro-pauses at traffic lights and short bench sits.
-     * Plan: 8–15 seconds.
+     * Reduced from 10s → 9s for slightly tighter confirmation.
      */
-    val stopConfirmWindowMs: Long = 10_000L,
+    val stopConfirmWindowMs: Long = 9_000L,
 
     /**
      * Grace period after the last movement signal during which an activity EXIT
      * transition is allowed to arrive before stop conditions are evaluated.
-     * Plan: 5 seconds.
+     * Reduced from 5s → 3.5s for faster stop response.
      */
-    val transitionGraceMs: Long = 5_000L,
+    val transitionGraceMs: Long = 3_500L,
 
     // ── Cycling overrides ───────────────────────────────────────────────────
 
@@ -69,9 +69,10 @@ data class MotionConfig(
 
     /**
      * Accelerometer variance threshold above which motion is considered significant
-     * for START detection (higher than stop threshold to require real locomotion).
+     * for START detection. Lowered from 0.30 → 0.18 to filter desk vibration
+     * (0.10–0.18 range). Real walking variance is 0.25+.
      */
-    val varianceStartThreshold: Float = 0.30f,
+    val varianceStartThreshold: Float = 0.18f,
 
     /** Rolling variance window size during MOVING state (~1 second at SENSOR_DELAY_GAME). */
     val accelWindowSize: Int = 50,
@@ -84,6 +85,93 @@ data class MotionConfig(
 
     /** Inactivity polling interval on the sensor thread (ms). */
     val inactivityCheckIntervalMs: Long = 2_000L,
+
+    // ── Multi-signal corroboration ──────────────────────────────────────────
+
+    /**
+     * Minimum number of distinct signal types that must fire within [corroborationWindowMs]
+     * before IDLE → POTENTIAL_MOVEMENT is allowed.
+     * Signal types: step, accelerometer variance spike, Activity Recognition ENTER.
+     */
+    val corroborationMinSignals: Int = 2,
+
+    /**
+     * Time window (ms) within which [corroborationMinSignals] distinct signal types
+     * must have fired to trigger IDLE → POTENTIAL_MOVEMENT.
+     */
+    val corroborationWindowMs: Long = 3_000L,
+
+    // ── Cadence validation ──────────────────────────────────────────────────
+
+    /**
+     * Minimum cadence (steps/sec) required before POTENTIAL_MOVEMENT → MOVING is confirmed.
+     * 0.8 steps/sec ≈ 4 steps in 5 seconds. Prevents phantom steps or desk bumps from confirming.
+     */
+    val cadenceConfirmMinStepsSec: Float = 0.8f,
+
+    /**
+     * Rolling window (ms) used to compute cadence from the step ring buffer.
+     */
+    val cadenceMeasureWindowMs: Long = 5_000L,
+
+    // ── Stationary surface lock ─────────────────────────────────────────────
+
+    /**
+     * Accelerometer variance below which the surface is considered ultra-stable.
+     * Must be sustained for [stationaryLockDurationMs] with zero cadence to engage lock.
+     */
+    val stationaryLockVariance: Float = 0.08f,
+
+    /**
+     * Duration (ms) of ultra-low variance + zero cadence required to engage stationary lock.
+     * Once engaged, movement candidates are rejected until variance spikes above [stationaryUnlockVariance].
+     */
+    // Shorten the stationary lock so users can re-trigger more quickly after brief stops.
+    val stationaryLockDurationMs: Long = 10_000L,
+
+    /**
+     * Variance must exceed this to release the stationary lock.
+     * Slightly reduced to make it easier to exit a locked state on real movement.
+     */
+    val stationaryUnlockVariance: Float = 0.25f,
+
+    // ── Cadence drop detection ──────────────────────────────────────────────
+
+    /**
+     * Cadence (steps/sec) below which cadence is considered "dropped".
+     * If sustained for [cadenceDropDurationMs], triggers early POTENTIAL_STOP evaluation.
+     */
+    val cadenceDropThreshold: Float = 0.3f,
+
+    /**
+     * Duration (ms) cadence must stay below [cadenceDropThreshold] before
+     * cadence drop triggers POTENTIAL_STOP evaluation (alternative to step timeout).
+     */
+    val cadenceDropDurationMs: Long = 5_000L,
+
+    // ── Micro-movement guard ────────────────────────────────────────────────
+
+    /**
+     * During POTENTIAL_STOP, if variance exceeds this threshold, the device is
+     * still moving and the state returns to MOVING (prevents stopping at traffic lights
+     * or other brief pauses with residual motion).
+     */
+    val microMovementVarianceGuard: Float = 0.20f,
+
+    // ── Failsafe stop ───────────────────────────────────────────────────────
+
+    /**
+     * Maximum duration (ms) the session can remain MOVING or POTENTIAL_STOP with
+     * zero step activity. If no step is detected for this long, a failsafe stop is
+     * triggered regardless of Activity Recognition state.
+     *
+     * This catches the case where AR is stuck reporting WALKING but sensors show
+     * the device is fully stationary (elevator, escalator, urban queue).
+     *
+     * Must be longer than [stepStopTimeoutMs] + [stopConfirmWindowMs] combined so
+     * normal stop detection fires first. 45s is a safe ceiling.
+     */
+    val maxNoStepMovementMs: Long = 45_000L,
 
     // ── Notification ────────────────────────────────────────────────────────
 

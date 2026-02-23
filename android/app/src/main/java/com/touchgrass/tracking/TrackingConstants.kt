@@ -30,6 +30,14 @@ object TrackingConstants {
     /** Throttle notification updates so we don't spam the NotificationManager. */
     const val NOTIFICATION_THROTTLE_MS = 15_000L
 
+    /**
+     * Minimum GPS speed (m/s) required before a distance delta is accumulated.
+     * Rejects stationary GPS noise: real walking is ~1.2–1.8 m/s; 0.5 m/s is a
+     * conservative floor that still captures slow movement.
+     * Only applied when the location fix includes speed metadata (hasSpeed() == true).
+     */
+    const val MIN_ACCUMULATE_SPEED_MS = 0.5f
+
     // Intent actions — MotionTrackingBridge → TrackingService
     const val ACTION_MOTION_STARTED = "com.touchgrass.action.MOTION_STARTED"
     const val ACTION_MOTION_STOPPED = "com.touchgrass.action.MOTION_STOPPED"

@@ -44,6 +44,16 @@ object MotionSessionController {
     var currentActivityType: String = "unknown"
         private set
 
+    /**
+     * Last real activity type received from Activity Recognition or sensors.
+     * Unlike [currentActivityType], this is NOT reset to "unknown" when transitioning
+     * to IDLE. It is used internally so that re-trigger logic (e.g. step detected while
+     * AR is still in WALKING) works correctly even after a stop.
+     */
+    @Volatile
+    var lastKnownRealActivityType: String = "unknown"
+        private set
+
     /** Timestamp when the MOVING state began (used for distance context). */
     @Volatile
     var movementStartTime: Long = 0L
@@ -127,6 +137,7 @@ object MotionSessionController {
             cancelStopEval()
             currentState = MotionState.IDLE
             currentActivityType = "unknown"
+            lastKnownRealActivityType = "unknown"
             movementStartTime = 0L
             lastMovementSignalTime = 0L
             potentialMovementStartTime = 0L
@@ -150,18 +161,28 @@ object MotionSessionController {
             MotionState.UNKNOWN -> { /* resolved above */ }
 
             MotionState.IDLE -> {
-                // Any movement signal (step, activity ENTER, or high variance) can enter
-                // POTENTIAL_MOVEMENT. Full confidence is only required to confirm MOVING.
+                // Movement candidate requires ≥2 distinct signal types within 3s (corroboration).
+                // This prevents desk vibration, typing, or single phantom steps from triggering.
                 val now = System.currentTimeMillis()
                 if (potentialMovementStartTime == 0L) {
+                    if (!MotionEngine.hasCorroboration()) {
+                        Log.d(TAG, "Movement candidate rejected — insufficient corroboration (need ${config.corroborationMinSignals} signals within ${config.corroborationWindowMs}ms)")
+                        return
+                    }
                     potentialMovementStartTime = now
                     currentActivityType = activityType
+                    lastKnownRealActivityType = activityType
                     transitionTo(MotionState.POTENTIAL_MOVEMENT, activityType)
-                    Log.d(TAG, "Movement candidate (confidence=$confidence) — waiting ${config.movementConfirmWindowMs}ms to confirm")
+                    Log.d(TAG, "Movement candidate with corroboration (confidence=$confidence) — waiting ${config.movementConfirmWindowMs}ms to confirm")
                 } else {
                     val sustainedMs = now - potentialMovementStartTime
                     currentActivityType = activityType
+                    lastKnownRealActivityType = activityType
                     if (sustainedMs >= config.movementConfirmWindowMs && confidence >= config.movementConfidenceThreshold) {
+                        if (!MotionEngine.isCadenceSufficientForStart()) {
+                            Log.d(TAG, "Sustained ${sustainedMs}ms, confidence OK, but cadence=${MotionEngine.getCadence()} < ${config.cadenceConfirmMinStepsSec} — waiting for cadence")
+                            return
+                        }
                         potentialMovementStartTime = 0L
                         movementStartTime = now
                         transitionTo(MotionState.MOVING, activityType)
@@ -175,9 +196,14 @@ object MotionSessionController {
             MotionState.POTENTIAL_MOVEMENT -> {
                 val now = System.currentTimeMillis()
                 currentActivityType = activityType
+                lastKnownRealActivityType = activityType
                 if (potentialMovementStartTime > 0L) {
                     val sustainedMs = now - potentialMovementStartTime
                     if (sustainedMs >= config.movementConfirmWindowMs) {
+                        if (!MotionEngine.isCadenceSufficientForStart()) {
+                            Log.d(TAG, "Confirm window elapsed but cadence=${MotionEngine.getCadence()} < ${config.cadenceConfirmMinStepsSec} — still waiting")
+                            return
+                        }
                         potentialMovementStartTime = 0L
                         movementStartTime = now
                         transitionTo(MotionState.MOVING, activityType)
@@ -191,6 +217,7 @@ object MotionSessionController {
             MotionState.MOVING -> {
                 // Refresh movement signal — cancels any pending stop confirmation
                 currentActivityType = activityType
+                lastKnownRealActivityType = activityType
                 if (potentialStopStartTime != 0L) {
                     Log.d(TAG, "Movement resumed — cancelling POTENTIAL_STOP")
                     potentialStopStartTime = 0L
@@ -204,6 +231,8 @@ object MotionSessionController {
                 Log.d(TAG, "Movement detected in POTENTIAL_STOP — returning to MOVING")
                 potentialStopStartTime = 0L
                 cancelStopEval()
+                currentActivityType = activityType
+                lastKnownRealActivityType = activityType
                 transitionTo(MotionState.MOVING, activityType)
             }
         }
@@ -219,22 +248,67 @@ object MotionSessionController {
     private fun evaluatePotentialStop() {
         if (currentState != MotionState.MOVING && currentState != MotionState.POTENTIAL_STOP) return
 
+        val now = System.currentTimeMillis()
         val stepsHaveStopped = MotionEngine.hasStepsStopped()
         val deviceIsStable = MotionEngine.isDeviceStable()
-        val gracePeriodElapsed = (System.currentTimeMillis() - lastMovementSignalTime) >= config.transitionGraceMs
+        val gracePeriodElapsed = (now - lastMovementSignalTime) >= config.transitionGraceMs
+        val cadenceDropped = MotionEngine.hasCadenceDropped()
+        val activityStillWalking = currentActivityType == "walking" || currentActivityType == "running"
+
+        Log.d(TAG, "StopEval: stepsStopped=$stepsHaveStopped stable=$deviceIsStable " +
+                "graceElapsed=$gracePeriodElapsed cadenceDrop=$cadenceDropped " +
+                "activity=$currentActivityType state=$currentState")
+
+        // ── Failsafe: no steps for maxNoStepMovementMs regardless of AR state ──────────
+        // Catches AR stuck in WALKING when device is physically stationary.
+        val silenceTimeoutExceeded =
+            (now - MotionEngine.getLastStepTime()) > config.maxNoStepMovementMs &&
+            MotionEngine.getLastStepTime() > 0L  // guard: 0 means engine just started
+        if (silenceTimeoutExceeded) {
+            Log.w(TAG, "Failsafe stop: no steps for ${now - MotionEngine.getLastStepTime()}ms " +
+                    "(limit ${config.maxNoStepMovementMs}ms), activity=$currentActivityType")
+            confirmStop()
+            return
+        }
+
+        // ── Sensor stop override: sensors confirm still, ignore AR walking/running ──────
+        // Sensors are ground truth for STOP. AR is not reliable for stop detection.
+        val sensorsIndicateStop = stepsHaveStopped && deviceIsStable && gracePeriodElapsed
+        val overrideActivityRecognition = sensorsIndicateStop &&
+                activityStillWalking &&
+                potentialStopStartTime > 0L &&
+                (now - potentialStopStartTime) >= config.stopConfirmWindowMs
+        if (overrideActivityRecognition) {
+            Log.i(TAG, "Sensor stop override: forcing stop despite AR=$currentActivityType " +
+                    "(confirmed ${now - potentialStopStartTime}ms)")
+            confirmStop()
+            return
+        }
 
         if (currentState == MotionState.MOVING) {
-            if (stepsHaveStopped && deviceIsStable && gracePeriodElapsed) {
-                Log.d(TAG, "Stop conditions met — entering POTENTIAL_STOP " +
-                        "(stepsHaveStopped=$stepsHaveStopped, stable=$deviceIsStable, graceElapsed=$gracePeriodElapsed)")
-                potentialStopStartTime = System.currentTimeMillis()
+            val primaryStop = stepsHaveStopped && deviceIsStable && gracePeriodElapsed
+            val cadenceDrop = cadenceDropped && deviceIsStable && gracePeriodElapsed
+            if (primaryStop || cadenceDrop) {
+                val reason = if (primaryStop) "step_timeout" else "cadence_drop"
+                Log.d(TAG, "Stop conditions met via $reason — entering POTENTIAL_STOP " +
+                        "(stepsHaveStopped=$stepsHaveStopped, stable=$deviceIsStable, graceElapsed=$gracePeriodElapsed, cadenceDrop=$cadenceDropped)")
+                potentialStopStartTime = now
                 transitionTo(MotionState.POTENTIAL_STOP, currentActivityType)
                 scheduleStopConfirmEval()
             } else {
                 Log.d(TAG, "Stop conditions not met: stepsHaveStopped=$stepsHaveStopped " +
-                        "stable=$deviceIsStable graceElapsed=$gracePeriodElapsed")
+                        "stable=$deviceIsStable graceElapsed=$gracePeriodElapsed cadenceDrop=$cadenceDropped")
             }
         } else if (currentState == MotionState.POTENTIAL_STOP) {
+            // Micro-movement guard: if variance spikes, user is still moving
+            val microMovement = MotionEngine.getVariance() > config.microMovementVarianceGuard
+            if (microMovement) {
+                Log.d(TAG, "Micro-movement guard triggered (variance=${MotionEngine.getVariance()} > ${config.microMovementVarianceGuard}) — returning to MOVING")
+                potentialStopStartTime = 0L
+                cancelStopEval()
+                transitionTo(MotionState.MOVING, currentActivityType)
+                return
+            }
             if (!stepsHaveStopped || !deviceIsStable) {
                 // Conditions no longer met — movement resumed, cancel
                 Log.d(TAG, "POTENTIAL_STOP cancelled — conditions no longer met")
@@ -242,7 +316,7 @@ object MotionSessionController {
                 cancelStopEval()
                 transitionTo(MotionState.MOVING, currentActivityType)
             } else {
-                val confirmedMs = System.currentTimeMillis() - potentialStopStartTime
+                val confirmedMs = now - potentialStopStartTime
                 if (confirmedMs >= config.stopConfirmWindowMs) {
                     Log.i(TAG, "Stop confirmed after ${confirmedMs}ms — transitioning to IDLE")
                     confirmStop()
@@ -275,28 +349,46 @@ object MotionSessionController {
         currentState = newState
         Log.i(TAG, "State: $oldState → $newState (type=$activityType, reason=$reason)")
 
-        // Emit unified MotionStateChanged event to React Native
-        MotionEventEmitter.emitStateChanged(
-            state = newState,
-            activityType = activityType,
-            confidence = 1.0f,
-            distanceMeters = 0.0,
-            timestamp = System.currentTimeMillis()
-        )
+        // When transitioning to IDLE, emit "unknown" activity type so the debug UI and
+        // AppBlocker never see a stale walking/running state after the session ends.
+        val emitActivityType = if (newState == MotionState.IDLE) "unknown" else activityType
 
-        // Signal TrackingService via native IPC
+        // Signal TrackingService via native IPC BEFORE emitting state so RN sees
+        // an event aligned with native tracking intent. Track whether we signalled
+        // the TrackingService to include in the emitted payload.
+        var trackingSignalled = false
         when {
             newState == MotionState.MOVING && (oldState == MotionState.POTENTIAL_MOVEMENT || oldState == MotionState.IDLE) -> {
                 MotionTrackingBridge.onMotionStarted(activityType)
+                trackingSignalled = true
             }
             newState == MotionState.MOVING && oldState == MotionState.POTENTIAL_STOP -> {
                 // Resumed from POTENTIAL_STOP — no new start signal; GPS already running
+                trackingSignalled = false
             }
             newState == MotionState.IDLE && oldState != MotionState.UNKNOWN -> {
                 MotionTrackingBridge.onMotionStopped(activityType, reason ?: "inactivity_timeout")
+                trackingSignalled = true
                 movementStartTime = 0L
+                // Reset currentActivityType to "unknown" so the debug UI and AppBlocker never
+                // see a stale walking/running state after the session ends.
+                // lastKnownRealActivityType is intentionally NOT reset here — it preserves the
+                // last real AR state so re-trigger logic works correctly when the user starts
+                // moving again before Android AR fires a new ENTER transition.
+                currentActivityType = "unknown"
             }
         }
+
+        // Emit unified MotionStateChanged event to React Native with extra context
+        MotionEventEmitter.emitStateChanged(
+            state = newState,
+            activityType = emitActivityType,
+            confidence = 1.0f,
+            distanceMeters = 0.0,
+            timestamp = System.currentTimeMillis(),
+            lastKnownActivity = lastKnownRealActivityType,
+            trackingSignalled = trackingSignalled
+        )
 
         // Notify MotionEngine to adjust sensor power
         when (newState) {

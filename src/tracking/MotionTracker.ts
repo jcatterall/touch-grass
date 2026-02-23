@@ -43,6 +43,10 @@ export interface MotionStateChangedEvent {
   confidence: number;
   distanceMeters: number;
   timestamp: number;
+  // Optional: native hint that TrackingService was signalled for this transition
+  trackingSignalled?: boolean;
+  // Optional: last known real activity (preserved across IDLE) for re-trigger heuristics
+  lastKnownActivity?: MotionActivityType;
 }
 
 /**
@@ -54,25 +58,46 @@ export interface MotionStateUpdate {
   stepDetected: boolean;
   gpsActive: boolean;
   variance: number;
+  cadence: number;
 }
 
 export interface MotionConfig {
   /** Duration movement must be sustained before POTENTIAL_MOVEMENT → MOVING (ms). Default: 4000 */
   movementConfirmWindowMs?: number;
-  /** Minimum confidence score [0–1] for a signal to count as movement. Default: 0.60 */
+  /** Minimum confidence score [0–1] for a signal to count as movement. Default: 0.30 */
   movementConfidenceThreshold?: number;
-  /** Step absence duration before stop evaluation begins (ms). Default: 10000 */
+  /** Step absence duration before stop evaluation begins (ms). Default: 7000 */
   stepStopTimeoutMs?: number;
   /** Accelerometer variance below which device is considered stationary. Default: 0.12 */
   varianceStopThreshold?: number;
-  /** Duration POTENTIAL_STOP must hold before stop confirmed (ms). Default: 10000 */
+  /** Duration POTENTIAL_STOP must hold before stop confirmed (ms). Default: 9000 */
   stopConfirmWindowMs?: number;
-  /** Grace period after last movement signal before stop conditions are evaluated (ms). Default: 5000 */
+  /** Grace period after last movement signal before stop conditions are evaluated (ms). Default: 3500 */
   transitionGraceMs?: number;
   /** Extended step absence timeout for cycling (ms). Default: 20000 */
   stepStopTimeoutCyclingMs?: number;
-  /** Accelerometer variance threshold for start detection. Default: 0.30 */
+  /** Accelerometer variance threshold for start detection. Default: 0.18 */
   varianceStartThreshold?: number;
+  /** Number of distinct signal types required within corroborationWindowMs to start tracking. Default: 2 */
+  corroborationMinSignals?: number;
+  /** Time window (ms) for corroboration signal counting. Default: 3000 */
+  corroborationWindowMs?: number;
+  /** Minimum cadence (steps/sec) before confirming MOVING. Default: 0.8 */
+  cadenceConfirmMinStepsSec?: number;
+  /** Rolling window (ms) for cadence calculation. Default: 5000 */
+  cadenceMeasureWindowMs?: number;
+  /** Variance below which stationary lock candidate begins. Default: 0.08 */
+  stationaryLockVariance?: number;
+  /** Duration (ms) of ultra-low variance + zero cadence to engage stationary lock. Default: 30000 */
+  stationaryLockDurationMs?: number;
+  /** Variance must spike above this to release stationary lock. Default: 0.35 */
+  stationaryUnlockVariance?: number;
+  /** Cadence (steps/sec) below which cadence is considered dropped. Default: 0.3 */
+  cadenceDropThreshold?: number;
+  /** Duration (ms) cadence must stay dropped to trigger early POTENTIAL_STOP. Default: 5000 */
+  cadenceDropDurationMs?: number;
+  /** Variance above which micro-movement guard fires during POTENTIAL_STOP. Default: 0.20 */
+  microMovementVarianceGuard?: number;
 }
 
 const emitter = isAvailable ? new NativeEventEmitter(MotionModule) : null;

@@ -125,6 +125,21 @@ class TrackingController(
 
     /** Process an incoming GPS location fix. */
     fun onLocation(location: Location) {
+        // GPS drift guard: only accumulate while actively tracking.
+        if (state.mode != TrackingMode.TRACKING_AUTO) {
+            lastLocation = location  // keep last position fresh for when tracking resumes
+            return
+        }
+
+        // GPS drift guard: require meaningful speed (≥ 0.5 m/s) to filter stationary GPS noise.
+        // location.speed is in m/s; it is 0 when not available, so we skip the guard only if
+        // the fix has no speed metadata (hasSpeed == false).
+        if (location.hasSpeed() && location.speed < TrackingConstants.MIN_ACCUMULATE_SPEED_MS) {
+            Log.d(TAG, "GPS drift guard: speed=${location.speed} m/s < ${TrackingConstants.MIN_ACCUMULATE_SPEED_MS} — skipping")
+            lastLocation = location
+            return
+        }
+
         // Build a transient snapshot for the processor (uses current activity state).
         val activitySnap = ActivitySnapshot(
             type = state.activityType,
@@ -136,7 +151,7 @@ class TrackingController(
         val delta = processor.process(lastLocation, location, activitySnap)
         lastLocation = location
 
-        if (delta > 0f && state.mode == TrackingMode.TRACKING_AUTO) {
+        if (delta > 0f) {
             sessions.addDistance(delta)
             MMKVStore.accumulateTodayDistance(delta.toDouble())
             state = state.copy(

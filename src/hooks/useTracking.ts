@@ -119,6 +119,7 @@ export interface DebugInfo {
   stepDetected: boolean;
   gpsActive: boolean;
   variance: number;
+  cadence: number;
 }
 
 export interface TrackingState {
@@ -165,7 +166,8 @@ export function useTracking(): TrackingState {
     useState(false);
 
   // MotionTracker debug state
-  const [debugMotionState, setDebugMotionState] = useState<MotionStateType>('UNKNOWN');
+  const [debugMotionState, setDebugMotionState] =
+    useState<MotionStateType>('UNKNOWN');
   const [debugMotionActivity, setDebugMotionActivity] = useState('unknown');
   const [debugMotionServiceRunning, setDebugMotionServiceRunning] =
     useState(false);
@@ -174,6 +176,7 @@ export function useTracking(): TrackingState {
   const [debugStepDetected, setDebugStepDetected] = useState(false);
   const [debugGpsActive, setDebugGpsActive] = useState(false);
   const [debugVariance, setDebugVariance] = useState(0);
+  const [debugCadence, setDebugCadence] = useState(0);
 
   const progressSub = useRef<EmitterSubscription | null>(null);
   const trackingStarted = useRef(false);
@@ -353,7 +356,7 @@ export function useTracking(): TrackingState {
   // but the onTrackingStopped event was missed (e.g. background kill, bridge reset).
   // Runs every 10 seconds while the app is mounted.
   useEffect(() => {
-    const interval = setInterval(syncFromNativeService, 10_000);
+    const interval = setInterval(syncFromNativeService, 3_000);
     return () => clearInterval(interval);
   }, [syncFromNativeService]);
 
@@ -570,6 +573,7 @@ export function useTracking(): TrackingState {
       setDebugStepDetected(false);
       setDebugGpsActive(false);
       setDebugVariance(0);
+      setDebugCadence(0);
       return;
     }
 
@@ -577,8 +581,11 @@ export function useTracking(): TrackingState {
       (event: MotionStateChangedEvent) => {
         setDebugMotionState(event.state);
         setDebugMotionActivity(event.activityType);
-
-        if (event.state === 'MOVING') {
+        // Only consider MotionStateChanged as authoritative for starting/stopping
+        // when the native side explicitly signalled TrackingService. Otherwise
+        // treat these events as debug-only and rely on Tracking.onTrackingStarted
+        // / onTrackingStopped or Tracking.getIsAutoTracking() for authoritative state.
+        if (event.state === 'MOVING' && event.trackingSignalled) {
           // TrackingService auto-started via MotionTrackingBridge natively.
           // Update JS isTracking state if not already set.
           if (!trackingStarted.current) {
@@ -598,9 +605,14 @@ export function useTracking(): TrackingState {
             setTrackingMode('auto');
             setDebugNativeRunning(true);
           }
+
+          // Ensure we sync immediately with native TrackingService to pick up
+          // any progress/delta that might have started in native code.
+          syncFromNativeService().catch(() => {});
         } else if (event.state === 'IDLE') {
-          // TrackingService will fire onTrackingStopped separately (via MotionTrackingBridge).
-          // That event resets isTracking/trackingMode.
+          // The authoritative stop event comes from Tracking.onTrackingStopped.
+          // Keep the debug flag for sensor/GPS activity but do not flip isTracking
+          // here — wait for the Tracking service event or MMKV poll.
           setDebugNativeRunning(false);
         }
       },
@@ -611,7 +623,19 @@ export function useTracking(): TrackingState {
       setDebugStepDetected(update.stepDetected);
       setDebugGpsActive(update.gpsActive);
       setDebugVariance(update.variance);
+      setDebugCadence(update.cadence);
     });
+
+    // Fetch current state immediately — native addListener() also emits a replay
+    // event, but this covers the case where it fires before the subscription is active.
+    MotionTracker.getState()
+      .then(s => {
+        setDebugMotionState(s.state);
+        setDebugMotionActivity(s.activityType);
+      })
+      .catch(() => {
+        // Non-critical; event-driven updates will correct state shortly
+      });
 
     return () => {
       motionStateChangedSub.current?.remove();
@@ -631,6 +655,7 @@ export function useTracking(): TrackingState {
       stepDetected: debugStepDetected,
       gpsActive: debugGpsActive,
       variance: debugVariance,
+      cadence: debugCadence,
     }),
     [
       debugMotionState,
@@ -641,6 +666,7 @@ export function useTracking(): TrackingState {
       debugStepDetected,
       debugGpsActive,
       debugVariance,
+      debugCadence,
     ],
   );
 

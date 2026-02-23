@@ -80,12 +80,17 @@ export const HomeScreen = () => {
   // Provides instant feedback (< 500ms) before the first TrackingService progress event.
   const isMotionDetected = debugInfo.motionState === 'MOVING';
 
+  // Actively tracking = GPS session running AND motion state confirms we're still moving.
+  // This prevents the "automatically tracking" message from showing during the 5-second
+  // stationary buffer drain window after the user stops (isTracking stays true briefly).
+  const isActivelyTracking = isTracking && isMotionDetected;
+
   const statusText = !hasPlans
     ? 'No active plan for today'
     : allGoalsReached
     ? 'Goal reached! Apps unlocked'
     : backgroundTrackingEnabled
-    ? isTracking
+    ? isActivelyTracking
       ? 'Activity detected, automatically tracking'
       : isMotionDetected
       ? 'Motion detected, acquiring GPS...'
@@ -208,6 +213,9 @@ export const HomeScreen = () => {
         </Typography>
         <Typography variant="body" style={styles.debugText}>
           Variance: {debugInfo.variance.toFixed(4)}
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          Cadence: {debugInfo.cadence.toFixed(2)} steps/sec
         </Typography>
       </View>
     </ScrollView>

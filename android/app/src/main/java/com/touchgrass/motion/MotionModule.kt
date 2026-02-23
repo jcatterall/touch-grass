@@ -67,7 +67,8 @@ class MotionModule(reactContext: ReactApplicationContext) :
                 val stepDetected = MotionEngine.isStepDetectedRecently()
                 val gpsActive = MotionSessionController.currentState == MotionState.MOVING
                 val variance = MotionEngine.getVariance()
-                MotionEventEmitter.emitStateUpdate(activity, stepDetected, gpsActive, variance)
+                val cadence = MotionEngine.getCadence()
+                MotionEventEmitter.emitStateUpdate(activity, stepDetected, gpsActive, variance, cadence)
                 mainHandler.postDelayed(this, STATE_UPDATE_INTERVAL_MS)
             }
         }
@@ -144,12 +145,14 @@ class MotionModule(reactContext: ReactApplicationContext) :
             val stepDetected = MotionEngine.isStepDetectedRecently()
             val gpsActive = MotionSessionController.currentState == MotionState.MOVING
             val variance = MotionEngine.getVariance()
+            val cadence = MotionEngine.getCadence()
 
             val result = Arguments.createMap().apply {
                 putString("activity", activity)
                 putBoolean("stepDetected", stepDetected)
                 putBoolean("gpsActive", gpsActive)
                 putDouble("variance", variance.toDouble())
+                putDouble("cadence", cadence.toDouble())
             }
             promise.resolve(result)
         } catch (e: Exception) {
@@ -167,7 +170,24 @@ class MotionModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun addListener(eventName: String) {
-        // No-op: required for RN NativeEventEmitter
+        // When subscribing to MotionStateChanged, immediately replay current state so the
+        // subscriber doesn't miss state that existed before it subscribed.
+        if (eventName == MotionEventEmitter.EVENT_STATE_CHANGED) {
+            val state = MotionSessionController.currentState
+            val activityType = MotionSessionController.currentActivityType
+            mainHandler.post {
+                MotionEventEmitter.emitStateChanged(
+                    state = state,
+                    activityType = activityType,
+                    confidence = 1.0f,
+                    distanceMeters = 0.0,
+                    timestamp = System.currentTimeMillis(),
+                    lastKnownActivity = MotionSessionController.lastKnownRealActivityType,
+                    trackingSignalled = false
+                )
+                Log.d(TAG, "State replay on subscribe: $state ($activityType)")
+            }
+        }
     }
 
     @ReactMethod
@@ -211,17 +231,37 @@ class MotionModule(reactContext: ReactApplicationContext) :
             movementConfidenceThreshold = if (map.hasKey("movementConfidenceThreshold"))
                 map.getDouble("movementConfidenceThreshold").toFloat() else 0.30f,
             stepStopTimeoutMs = if (map.hasKey("stepStopTimeoutMs"))
-                map.getDouble("stepStopTimeoutMs").toLong() else 10_000L,
+                map.getDouble("stepStopTimeoutMs").toLong() else 7_000L,
             varianceStopThreshold = if (map.hasKey("varianceStopThreshold"))
                 map.getDouble("varianceStopThreshold").toFloat() else 0.12f,
             stopConfirmWindowMs = if (map.hasKey("stopConfirmWindowMs"))
-                map.getDouble("stopConfirmWindowMs").toLong() else 10_000L,
+                map.getDouble("stopConfirmWindowMs").toLong() else 9_000L,
             transitionGraceMs = if (map.hasKey("transitionGraceMs"))
-                map.getDouble("transitionGraceMs").toLong() else 5_000L,
+                map.getDouble("transitionGraceMs").toLong() else 3_500L,
             stepStopTimeoutCyclingMs = if (map.hasKey("stepStopTimeoutCyclingMs"))
                 map.getDouble("stepStopTimeoutCyclingMs").toLong() else 20_000L,
             varianceStartThreshold = if (map.hasKey("varianceStartThreshold"))
-                map.getDouble("varianceStartThreshold").toFloat() else 0.30f,
+                map.getDouble("varianceStartThreshold").toFloat() else 0.18f,
+            corroborationMinSignals = if (map.hasKey("corroborationMinSignals"))
+                map.getInt("corroborationMinSignals") else 2,
+            corroborationWindowMs = if (map.hasKey("corroborationWindowMs"))
+                map.getDouble("corroborationWindowMs").toLong() else 3_000L,
+            cadenceConfirmMinStepsSec = if (map.hasKey("cadenceConfirmMinStepsSec"))
+                map.getDouble("cadenceConfirmMinStepsSec").toFloat() else 0.8f,
+            cadenceMeasureWindowMs = if (map.hasKey("cadenceMeasureWindowMs"))
+                map.getDouble("cadenceMeasureWindowMs").toLong() else 5_000L,
+            stationaryLockVariance = if (map.hasKey("stationaryLockVariance"))
+                map.getDouble("stationaryLockVariance").toFloat() else 0.08f,
+            stationaryLockDurationMs = if (map.hasKey("stationaryLockDurationMs"))
+                map.getDouble("stationaryLockDurationMs").toLong() else 30_000L,
+            stationaryUnlockVariance = if (map.hasKey("stationaryUnlockVariance"))
+                map.getDouble("stationaryUnlockVariance").toFloat() else 0.35f,
+            cadenceDropThreshold = if (map.hasKey("cadenceDropThreshold"))
+                map.getDouble("cadenceDropThreshold").toFloat() else 0.3f,
+            cadenceDropDurationMs = if (map.hasKey("cadenceDropDurationMs"))
+                map.getDouble("cadenceDropDurationMs").toLong() else 5_000L,
+            microMovementVarianceGuard = if (map.hasKey("microMovementVarianceGuard"))
+                map.getDouble("microMovementVarianceGuard").toFloat() else 0.20f,
         )
     }
 }

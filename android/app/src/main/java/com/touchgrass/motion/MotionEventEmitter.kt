@@ -57,7 +57,9 @@ object MotionEventEmitter {
         activityType: String,
         confidence: Float,
         distanceMeters: Double,
-        timestamp: Long
+        timestamp: Long,
+        lastKnownActivity: String,
+        trackingSignalled: Boolean
     ) {
         val params = Arguments.createMap().apply {
             putString("state", state.name)
@@ -65,6 +67,8 @@ object MotionEventEmitter {
             putDouble("confidence", confidence.toDouble())
             putDouble("distanceMeters", distanceMeters)
             putDouble("timestamp", timestamp.toDouble())
+            putString("lastKnownActivity", lastKnownActivity)
+            putBoolean("trackingSignalled", trackingSignalled)
         }
         emit(EVENT_STATE_CHANGED, params)
     }
@@ -76,18 +80,21 @@ object MotionEventEmitter {
      * @param stepDetected  Whether a step was detected recently.
      * @param gpsActive     Whether GPS tracking is currently active.
      * @param variance      Current accelerometer variance.
+     * @param cadence       Current cadence in steps/sec.
      */
     fun emitStateUpdate(
         activity: String,
         stepDetected: Boolean,
         gpsActive: Boolean,
-        variance: Float = 0f
+        variance: Float = 0f,
+        cadence: Float = 0f
     ) {
         val params = Arguments.createMap().apply {
             putString("activity", activity)
             putBoolean("stepDetected", stepDetected)
             putBoolean("gpsActive", gpsActive)
             putDouble("variance", variance.toDouble())
+            putDouble("cadence", cadence.toDouble())
         }
         emit(EVENT_STATE_UPDATE, params)
     }

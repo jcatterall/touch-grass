@@ -21,11 +21,14 @@ import kotlin.math.sqrt
 
 /**
  * Core sensor engine responsible for:
- *   - Step detector monitoring
+ *   - Step detector monitoring + cadence ring buffer
  *   - Accelerometer variance calculation
  *   - Gyroscope data collection (optional smoothing)
  *   - Activity Recognition transition handling
  *   - Movement confidence scoring
+ *   - Multi-signal corroboration tracking
+ *   - Stationary surface lock (suppresses phantom triggers from desk vibration)
+ *   - Cadence drop detection (early POTENTIAL_STOP trigger)
  *   - Emitting signals to MotionSessionController
  *
  * Thread-safety:
@@ -42,6 +45,7 @@ import kotlin.math.sqrt
 object MotionEngine : SensorEventListener {
 
     private const val TAG = "MotionEngine"
+    private const val CADENCE_BUFFER_SIZE = 32
 
     private lateinit var appContext: Context
     private var sensorManager: SensorManager? = null
@@ -62,12 +66,47 @@ object MotionEngine : SensorEventListener {
     @Volatile
     private var lastStepTime: Long = 0L
 
+    /** Timestamp of last accelerometer variance spike above varianceStartThreshold. */
+    @Volatile
+    private var lastVarianceSpikeTime: Long = 0L
+
+    /** Timestamp of last Activity Recognition ENTER transition (walking/running/cycling). */
+    @Volatile
+    private var lastActivityEnterTime: Long = 0L
+
     @Volatile
     private var running = false
 
     /** Synchronized rolling window of accelerometer deviation from gravity. */
     private val accelWindow: MutableList<Float> =
         Collections.synchronizedList(mutableListOf<Float>())
+
+    /**
+     * Ring buffer of recent step timestamps for cadence computation.
+     * Access is guarded by [stepTimestampsLock].
+     */
+    private val stepTimestamps: ArrayDeque<Long> = ArrayDeque(CADENCE_BUFFER_SIZE)
+    private val stepTimestampsLock = Any()
+
+    // ── Stationary surface lock ───────────────────────────────────────────────
+
+    /**
+     * When true, movement candidates from IDLE are rejected until variance spikes
+     * above [MotionConfig.stationaryUnlockVariance].
+     * Written only on sensor thread; read from main looper via @Volatile.
+     */
+    @Volatile
+    private var stationaryLockActive: Boolean = false
+
+    /** Timestamp when the ultra-low variance + zero-cadence period began. */
+    @Volatile
+    private var stationaryLockCandidateStart: Long = 0L
+
+    // ── Cadence drop detection ────────────────────────────────────────────────
+
+    /** Timestamp when cadence first dropped below [MotionConfig.cadenceDropThreshold]. */
+    @Volatile
+    private var cadenceDropStart: Long = 0L
 
     private var config: MotionConfig = MotionConfig()
 
@@ -106,6 +145,12 @@ object MotionEngine : SensorEventListener {
         sensorThread = null
         sensorHandler = null
         accelWindow.clear()
+        synchronized(stepTimestampsLock) { stepTimestamps.clear() }
+        stationaryLockActive = false
+        stationaryLockCandidateStart = 0L
+        cadenceDropStart = 0L
+        lastVarianceSpikeTime = 0L
+        lastActivityEnterTime = 0L
         running = false
         Log.i(TAG, "MotionEngine stopped")
     }
@@ -145,6 +190,71 @@ object MotionEngine : SensorEventListener {
     /** Returns whether a step has been detected recently (within [MotionConfig.stepRecencyWindowMs]). */
     fun isStepDetectedRecently(): Boolean = isStepRecent()
 
+    /**
+     * Returns current cadence in steps/sec, computed over the last [MotionConfig.cadenceMeasureWindowMs].
+     * Thread-safe: synchronizes on stepTimestampsLock.
+     */
+    fun getCadence(): Float {
+        val windowMs = config.cadenceMeasureWindowMs
+        val cutoff = System.currentTimeMillis() - windowMs
+        synchronized(stepTimestampsLock) {
+            val recentCount = stepTimestamps.count { it >= cutoff }
+            return recentCount.toFloat() / (windowMs / 1000f)
+        }
+    }
+
+    /** Returns whether stationary lock is currently active (for debug logging). */
+    fun isStationaryLocked(): Boolean = stationaryLockActive
+
+    /**
+     * Returns the timestamp of the most recent step detector event.
+     * Used by MotionSessionController for the failsafe no-step timeout check.
+     */
+    fun getLastStepTime(): Long = lastStepTime
+
+    /**
+     * Returns true if cadence meets the minimum threshold for movement start confirmation.
+     * Called by MotionSessionController during POTENTIAL_MOVEMENT → MOVING evaluation.
+     */
+    fun isCadenceSufficientForStart(): Boolean =
+        getCadence() >= config.cadenceConfirmMinStepsSec
+
+    /**
+     * Returns true if ≥[MotionConfig.corroborationMinSignals] distinct signal types fired
+     * within [MotionConfig.corroborationWindowMs].
+     * Signal types: step (lastStepTime), variance spike (lastVarianceSpikeTime),
+     *               Activity Recognition ENTER (lastActivityEnterTime).
+     */
+    fun hasCorroboration(): Boolean {
+        val now = System.currentTimeMillis()
+        val window = config.corroborationWindowMs
+        var count = 0
+        if ((now - lastStepTime) <= window) count++
+        if ((now - lastVarianceSpikeTime) <= window) count++
+        if ((now - lastActivityEnterTime) <= window) count++
+        Log.d(TAG, "hasCorroboration: count=$count (step=${now - lastStepTime}ms, variance=${now - lastVarianceSpikeTime}ms, activity=${now - lastActivityEnterTime}ms)")
+        return count >= config.corroborationMinSignals
+    }
+
+    /**
+     * Returns true if cadence has been below [MotionConfig.cadenceDropThreshold]
+     * continuously for at least [MotionConfig.cadenceDropDurationMs].
+     * Used by MotionSessionController as an early stop trigger.
+     */
+    fun hasCadenceDropped(): Boolean {
+        val cadence = getCadence()
+        val now = System.currentTimeMillis()
+        return if (cadence < config.cadenceDropThreshold) {
+            if (cadenceDropStart == 0L) cadenceDropStart = now
+            val dropDuration = now - cadenceDropStart
+            Log.d(TAG, "Cadence drop: cadence=$cadence for ${dropDuration}ms (threshold: ${config.cadenceDropDurationMs}ms)")
+            dropDuration >= config.cadenceDropDurationMs
+        } else {
+            cadenceDropStart = 0L
+            false
+        }
+    }
+
     // ── Battery optimization callbacks from MotionSessionController ───────────
 
     /** Reduce sensor rate when in POTENTIAL_STOP (device may be stopping). */
@@ -158,6 +268,7 @@ object MotionEngine : SensorEventListener {
     fun onResumed() {
         sensorManager?.unregisterListener(this)
         registerSensors(fullRate = true)
+        cadenceDropStart = 0L
         Log.d(TAG, "Sensors restored to full rate (MOVING/POTENTIAL_MOVEMENT)")
     }
 
@@ -171,8 +282,13 @@ object MotionEngine : SensorEventListener {
     fun onStopped() {
         sensorManager?.unregisterListener(this)
         accelWindow.clear()
+        synchronized(stepTimestampsLock) { stepTimestamps.clear() }
+        cadenceDropStart = 0L
+        stationaryLockCandidateStart = 0L
+        // stationaryLockActive intentionally NOT cleared here —
+        // the lock persists across IDLE re-entry until variance spikes above stationaryUnlockVariance.
         registerSensors(fullRate = false)
-        Log.d(TAG, "Sensors reduced to passive mode (IDLE). Monitoring for next movement.")
+        Log.d(TAG, "Sensors reduced to passive mode (IDLE). stationaryLock=$stationaryLockActive")
     }
 
     // ── SensorEventListener ───────────────────────────────────────────────────
@@ -193,17 +309,34 @@ object MotionEngine : SensorEventListener {
     // ── Sensor handlers ───────────────────────────────────────────────────────
 
     private fun handleStepDetected() {
-        lastStepTime = System.currentTimeMillis()
-        Log.d(TAG, "Step detected at $lastStepTime")
+        val now = System.currentTimeMillis()
+        lastStepTime = now
+
+        // Maintain cadence ring buffer
+        synchronized(stepTimestampsLock) {
+            stepTimestamps.addLast(now)
+            val cutoff = now - config.cadenceMeasureWindowMs
+            while (stepTimestamps.isNotEmpty() && stepTimestamps.first() < cutoff) {
+                stepTimestamps.removeFirst()
+            }
+            while (stepTimestamps.size > CADENCE_BUFFER_SIZE) {
+                stepTimestamps.removeFirst()
+            }
+        }
+
+        Log.d(TAG, "Step detected at $now, cadence=${getCadence()} steps/sec")
 
         val confidence = computeConfidence(
             activityRecognitionActive = isActiveActivityType(),
             stepDetectedRecently = true
         )
 
+        // Use lastKnownRealActivityType so that if the user stops and immediately starts again,
+        // the step signal carries the correct activity type (e.g. "walking") even before Android
+        // AR fires a new ENTER transition. currentActivityType is "unknown" during IDLE.
         MotionSessionController.onMovementDetected(
             confidence,
-            MotionSessionController.currentActivityType
+            MotionSessionController.lastKnownRealActivityType
         )
     }
 
@@ -228,25 +361,87 @@ object MotionEngine : SensorEventListener {
         }
 
         val variance = computeVariance()
+
+        // Track variance spike time for corroboration
+        if (variance >= config.varianceStartThreshold) {
+            lastVarianceSpikeTime = System.currentTimeMillis()
+        }
+
+        // Update stationary surface lock
+        updateStationaryLock(variance)
+
         val confidence = computeConfidence(
             activityRecognitionActive = isActiveActivityType(),
             stepDetectedRecently = isStepRecent()
         )
 
-        // Only emit start signals when variance is above the START threshold
-        if (variance >= config.varianceStartThreshold && confidence >= config.movementConfidenceThreshold) {
+        // Only emit start signals when not locked and variance is above the START threshold.
+        // Use lastKnownRealActivityType for the same reason as in handleStepDetected — so
+        // re-trigger works correctly after a stop when AR hasn't re-emitted an ENTER.
+        if (!stationaryLockActive
+            && variance >= config.varianceStartThreshold
+            && confidence >= config.movementConfidenceThreshold
+        ) {
             MotionSessionController.onMovementDetected(
                 confidence,
-                MotionSessionController.currentActivityType
+                MotionSessionController.lastKnownRealActivityType
             )
         }
 
-        Log.d(TAG, "Accel: variance=$variance confidence=$confidence state=${MotionSessionController.currentState}")
+        Log.d(TAG, "Accel: variance=$variance cadence=${getCadence()} locked=$stationaryLockActive confidence=$confidence state=${MotionSessionController.currentState}")
     }
 
     private fun handleGyroscope(event: SensorEvent) {
         // Gyroscope data available for orientation filtering if needed.
         // Placeholder for future refinement — not currently used in confidence scoring.
+    }
+
+    // ── Stationary surface lock ───────────────────────────────────────────────
+
+    /**
+     * Engages or releases the stationary surface lock.
+     *
+     * Lock engages when:
+     *   - Variance stays below [MotionConfig.stationaryLockVariance]
+     *   - Cadence is zero (no steps in the measurement window)
+     *   - Both conditions hold for [MotionConfig.stationaryLockDurationMs]
+     *
+     * Lock releases when:
+     *   - Variance exceeds [MotionConfig.stationaryUnlockVariance]
+     *
+     * Only evaluated when state is IDLE.
+     */
+    private fun updateStationaryLock(variance: Float) {
+        if (MotionSessionController.currentState != MotionState.IDLE) {
+            // Clear lock candidate when not in IDLE; lock itself persists until variance unlocks it
+            stationaryLockCandidateStart = 0L
+            return
+        }
+
+        // Release condition takes priority
+        if (stationaryLockActive) {
+            if (variance > config.stationaryUnlockVariance) {
+                stationaryLockActive = false
+                stationaryLockCandidateStart = 0L
+                Log.i(TAG, "Stationary lock released (variance=$variance)")
+            }
+            return
+        }
+
+        // Accumulate lock candidate time
+        val noCadence = getCadence() == 0f
+        val ultraLowVariance = variance < config.stationaryLockVariance
+
+        if (ultraLowVariance && noCadence) {
+            if (stationaryLockCandidateStart == 0L) {
+                stationaryLockCandidateStart = System.currentTimeMillis()
+            } else if (System.currentTimeMillis() - stationaryLockCandidateStart >= config.stationaryLockDurationMs) {
+                stationaryLockActive = true
+                Log.i(TAG, "Stationary lock engaged after ${config.stationaryLockDurationMs}ms of ultra-low variance + zero cadence")
+            }
+        } else {
+            stationaryLockCandidateStart = 0L
+        }
     }
 
     // ── Activity Recognition ──────────────────────────────────────────────────
@@ -315,24 +510,61 @@ object MotionEngine : SensorEventListener {
         when (type) {
             DetectedActivity.WALKING -> {
                 if (isEntering) {
+                    // If Activity Recognition reports WALKING, be more aggressive about
+                    // releasing the stationary lock and nudging the state machine so
+                    // re-trigger works even when sensors are still ramping up.
+                    if (stationaryLockActive) {
+                        stationaryLockActive = false
+                        stationaryLockCandidateStart = 0L
+                        Log.i(TAG, "Stationary lock force-released on AR WALKING ENTER")
+                    }
+                    lastActivityEnterTime = System.currentTimeMillis()
                     val conf = computeConfidence(activityRecognitionActive = true, stepDetectedRecently = isStepRecent())
-                    MotionSessionController.onMovementDetected(conf, "walking")
+                    if (!isDeviceStable()) {
+                        MotionSessionController.onMovementDetected(conf, "walking")
+                    } else {
+                        Log.d(TAG, "AR WALKING ENTER while device stable — nudging state machine (variance=${getVariance()})")
+                        // Use a slightly reduced confidence when device is stable to avoid false positives
+                        MotionSessionController.onMovementDetected(conf * 0.8f, "walking")
+                    }
                 } else {
                     MotionSessionController.onMovementEnded("walking_exit")
                 }
             }
             DetectedActivity.RUNNING -> {
                 if (isEntering) {
+                    if (stationaryLockActive) {
+                        stationaryLockActive = false
+                        stationaryLockCandidateStart = 0L
+                        Log.i(TAG, "Stationary lock force-released on AR RUNNING ENTER")
+                    }
+                    lastActivityEnterTime = System.currentTimeMillis()
                     val conf = computeConfidence(activityRecognitionActive = true, stepDetectedRecently = isStepRecent())
-                    MotionSessionController.onMovementDetected(conf, "running")
+                    if (!isDeviceStable()) {
+                        MotionSessionController.onMovementDetected(conf, "running")
+                    } else {
+                        Log.d(TAG, "AR RUNNING ENTER while device stable — nudging state machine (variance=${getVariance()})")
+                        MotionSessionController.onMovementDetected(conf * 0.8f, "running")
+                    }
                 } else {
                     MotionSessionController.onMovementEnded("running_exit")
                 }
             }
             DetectedActivity.ON_BICYCLE -> {
                 if (isEntering) {
+                    if (stationaryLockActive) {
+                        stationaryLockActive = false
+                        stationaryLockCandidateStart = 0L
+                        Log.i(TAG, "Stationary lock force-released on AR CYCLING ENTER")
+                    }
+                    lastActivityEnterTime = System.currentTimeMillis()
                     val conf = computeConfidence(activityRecognitionActive = true, stepDetectedRecently = false)
-                    MotionSessionController.onMovementDetected(conf, "cycling")
+                    if (!isDeviceStable()) {
+                        MotionSessionController.onMovementDetected(conf, "cycling")
+                    } else {
+                        Log.d(TAG, "AR CYCLING ENTER while device stable — nudging state machine (variance=${getVariance()})")
+                        MotionSessionController.onMovementDetected(conf * 0.8f, "cycling")
+                    }
                 } else {
                     MotionSessionController.onMovementEnded("cycling_exit")
                 }
@@ -401,7 +633,7 @@ object MotionEngine : SensorEventListener {
         (System.currentTimeMillis() - lastStepTime) < config.stepRecencyWindowMs
 
     private fun isActiveActivityType(): Boolean =
-        MotionSessionController.currentActivityType in listOf("walking", "running", "cycling")
+        MotionSessionController.lastKnownRealActivityType in listOf("walking", "running", "cycling")
 
     private fun computeVariance(): Float {
         synchronized(accelWindow) {

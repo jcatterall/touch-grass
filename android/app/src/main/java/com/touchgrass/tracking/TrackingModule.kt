@@ -73,6 +73,17 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             svc.onTrackingStoppedCallback = {
                 sendEvent("onTrackingStopped", Arguments.createMap())
             }
+
+            // If the native MMKV flag indicates autotracking is active, emit a
+            // start event so JS doesn't miss a start that happened while it was
+            // unbound. This is idempotent if JS already received the start.
+            try {
+                if (MMKVStore.isAutoTracking()) {
+                    sendEvent("onTrackingStarted", Arguments.createMap())
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to query MMKV for auto-tracking state", e)
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
