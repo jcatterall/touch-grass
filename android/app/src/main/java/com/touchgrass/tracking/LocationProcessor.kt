@@ -23,7 +23,8 @@ class LocationProcessor {
     fun process(
         prev: Location?,
         current: Location,
-        activity: ActivitySnapshot
+        activity: ActivitySnapshot,
+        isManual: Boolean = false
     ): Float {
         if (prev == null) return 0f
 
@@ -36,12 +37,13 @@ class LocationProcessor {
         val maxPlausible = max(200f, current.accuracy * TrackingConstants.MAX_PLAUSIBLE_MULTIPLIER)
         if (delta >= maxPlausible) return 0f
 
-        // Choose minimum threshold based on activity confidence.
+        // Choose minimum threshold. Manual sessions use a lower threshold so
+        // small/slow walking still accumulates distance.
         val activeTypes = setOf(ActivityType.WALKING, ActivityType.RUNNING, ActivityType.ON_BICYCLE)
-        val minDelta = if (activity.confirmed && activity.type in activeTypes) {
-            TrackingConstants.MIN_DELTA_METERS_ACTIVE
-        } else {
-            TrackingConstants.MIN_DELTA_METERS_FALLBACK
+        val minDelta = when {
+            isManual -> TrackingConstants.MIN_DELTA_METERS_MANUAL
+            activity.confirmed && activity.type in activeTypes -> TrackingConstants.MIN_DELTA_METERS_ACTIVE
+            else -> TrackingConstants.MIN_DELTA_METERS_FALLBACK
         }
 
         return if (delta >= minDelta) delta else 0f

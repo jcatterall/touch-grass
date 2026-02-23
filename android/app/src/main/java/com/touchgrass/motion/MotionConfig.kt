@@ -14,17 +14,17 @@ data class MotionConfig(
     /**
      * Duration movement must be continuously detected before POTENTIAL_MOVEMENT → MOVING.
      * Prevents false starts from a phone bump, brief shift, or casual arm movement.
-     * Plan: 3–5 seconds.
+        * Plan: 3–6 seconds. Increase slightly to avoid short shakes triggering movement.
      */
-    val movementConfirmWindowMs: Long = 4_000L,
+        val movementConfirmWindowMs: Long = 6_000L,
 
     /**
      * Minimum confidence score (0.0–1.0) required to confirm POTENTIAL_MOVEMENT → MOVING.
      * Step alone scores 0.30; step + variance ~0.35–0.40; with Activity Recognition ~0.80+.
-     * Threshold of 0.30 means any step event can confirm after the window elapses,
+        * Raised slightly from 0.30 to make brief shakes less likely to confirm.
      * while the movementConfirmWindowMs provides the false-positive protection.
      */
-    val movementConfidenceThreshold: Float = 0.30f,
+        val movementConfidenceThreshold: Float = 0.35f,
 
     // ── Stop detection ──────────────────────────────────────────────────────
 
@@ -69,10 +69,10 @@ data class MotionConfig(
 
     /**
      * Accelerometer variance threshold above which motion is considered significant
-     * for START detection. Lowered from 0.30 → 0.18 to filter desk vibration
-     * (0.10–0.18 range). Real walking variance is 0.25+.
+        * for START detection. Raised slightly to make short high-frequency shakes
+        * less likely to pass the start guard. Real walking variance is 0.25+.
      */
-    val varianceStartThreshold: Float = 0.18f,
+        val varianceStartThreshold: Float = 0.22f,
 
     /** Rolling variance window size during MOVING state (~1 second at SENSOR_DELAY_GAME). */
     val accelWindowSize: Int = 50,

@@ -21,6 +21,9 @@ object TrackingConstants {
     /** Minimum distance delta to accumulate when activity is UNKNOWN (GPS plausibility fallback). */
     const val MIN_DELTA_METERS_FALLBACK = 10f
 
+    /** Minimum distance delta to accumulate when the user explicitly started a manual session. */
+    const val MIN_DELTA_METERS_MANUAL = 1f
+
     /**
      * A location delta is considered implausible (GPS glitch) if it exceeds
      * this multiplier times the reported accuracy radius, capped at 200m.

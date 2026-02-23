@@ -53,6 +53,23 @@ class TrackingController(
         finaliseSession()
     }
 
+    // Runnable that publishes elapsed/distance every second while a manual
+    // session is active so the UI sees ticking time even if no GPS delta
+    // has yet been accepted.
+    private val manualTickerRunnable = object : Runnable {
+        override fun run() {
+            if (state.mode == TrackingMode.TRACKING_MANUAL && sessions.isActive()) {
+                state = state.copy(
+                    elapsedSeconds = sessions.elapsedSeconds(),
+                    distanceMeters = sessions.currentDistance(),
+                    lastUpdateMs = System.currentTimeMillis()
+                )
+                publishState()
+                handler.postDelayed(this, 1000L)
+            }
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
@@ -125,16 +142,15 @@ class TrackingController(
 
     /** Process an incoming GPS location fix. */
     fun onLocation(location: Location) {
-        // GPS drift guard: only accumulate while actively tracking.
-        if (state.mode != TrackingMode.TRACKING_AUTO) {
+        // GPS drift guard: only accumulate while actively tracking (auto or manual).
+        if (state.mode != TrackingMode.TRACKING_AUTO && state.mode != TrackingMode.TRACKING_MANUAL) {
             lastLocation = location  // keep last position fresh for when tracking resumes
             return
         }
 
         // GPS drift guard: require meaningful speed (≥ 0.5 m/s) to filter stationary GPS noise.
-        // location.speed is in m/s; it is 0 when not available, so we skip the guard only if
-        // the fix has no speed metadata (hasSpeed == false).
-        if (location.hasSpeed() && location.speed < TrackingConstants.MIN_ACCUMULATE_SPEED_MS) {
+        // Skip this guard for manual sessions so slow walking still accumulates.
+        if (state.mode != TrackingMode.TRACKING_MANUAL && location.hasSpeed() && location.speed < TrackingConstants.MIN_ACCUMULATE_SPEED_MS) {
             Log.d(TAG, "GPS drift guard: speed=${location.speed} m/s < ${TrackingConstants.MIN_ACCUMULATE_SPEED_MS} — skipping")
             lastLocation = location
             return
@@ -148,12 +164,21 @@ class TrackingController(
             confirmed = state.activityConfidence >= TrackingConstants.ACTIVITY_CONFIDENCE_THRESHOLD
         )
 
-        val delta = processor.process(lastLocation, location, activitySnap)
+        val delta = processor.process(lastLocation, location, activitySnap, state.mode == TrackingMode.TRACKING_MANUAL)
         lastLocation = location
 
         if (delta > 0f) {
             sessions.addDistance(delta)
             MMKVStore.accumulateTodayDistance(delta.toDouble())
+            state = state.copy(
+                distanceMeters = sessions.currentDistance(),
+                elapsedSeconds = sessions.elapsedSeconds(),
+                lastUpdateMs = System.currentTimeMillis()
+            )
+            publishState()
+        } else if (state.mode == TrackingMode.TRACKING_MANUAL) {
+            // No distance delta accepted, but in manual mode we should still
+            // publish elapsed time so the UI shows progress.
             state = state.copy(
                 distanceMeters = sessions.currentDistance(),
                 elapsedSeconds = sessions.elapsedSeconds(),
@@ -178,6 +203,10 @@ class TrackingController(
         )
         gps.setMode(GpsMode.HIGH_ACCURACY)
         publishState()
+        // Start a periodic ticker so elapsedSeconds updates even without
+        // an accepted GPS delta.
+        handler.removeCallbacks(manualTickerRunnable)
+        handler.postDelayed(manualTickerRunnable, 1000L)
         Log.d(TAG, "Manual session started")
     }
 
@@ -200,6 +229,8 @@ class TrackingController(
      */
     private fun ensureTracking() {
         if (state.mode == TrackingMode.TRACKING_AUTO || state.mode == TrackingMode.TRACKING_MANUAL) return
+        // Cancel any manual ticker when switching to auto tracking.
+        handler.removeCallbacks(manualTickerRunnable)
         sessions.start()
         state = state.copy(
             mode = TrackingMode.TRACKING_AUTO,
@@ -223,19 +254,31 @@ class TrackingController(
     /** Tear down the session: stop GPS, finalise SessionManager, reset state. */
     private fun finaliseSession() {
         val wasActive = sessions.isActive()
+        var finalDistance = 0.0
+        var finalElapsed = 0L
+
+        // Cancel the manual ticker before we snapshot/finish the session so
+        // no concurrent ticker run can publish an intermediate value.
+        handler.removeCallbacks(manualTickerRunnable)
+
         if (wasActive) {
             val (distance, elapsed) = sessions.finish()
+            finalDistance = distance
+            finalElapsed = elapsed
             Log.d(TAG, "Session finalised: distance=${distance}m elapsed=${elapsed}s")
         }
+
         gps.setMode(GpsMode.OFF)
         lastLocation = null
+
         state = state.copy(
             mode = TrackingMode.IDLE,
             gpsMode = GpsMode.OFF,
-            distanceMeters = if (wasActive) state.distanceMeters else 0.0,
-            elapsedSeconds = if (wasActive) state.elapsedSeconds else 0L,
+            distanceMeters = if (wasActive) finalDistance else 0.0,
+            elapsedSeconds = if (wasActive) finalElapsed else 0L,
             lastUpdateMs = System.currentTimeMillis()
         )
+
         publishState()
     }
 

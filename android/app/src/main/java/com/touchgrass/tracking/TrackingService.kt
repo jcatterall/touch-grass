@@ -187,6 +187,11 @@ class TrackingService : LifecycleService() {
                 MMKVStore.setGoal(goalType, goalValue, goalUnit)
 
                 controller.startManualSession()
+                // Ensure fast-path readers (JS, MotionModule) observe manual
+                // tracking immediately by writing the MMKV flag and elapsed.
+                MMKVStore.setAutoTracking(true)
+                MMKVStore.setTodayElapsed(controller.currentState().elapsedSeconds)
+                Log.d(TAG, "Manual start — MMKV set: is_auto_tracking=true elapsed=${controller.currentState().elapsedSeconds}")
                 HeartbeatManager.schedule(this)
                 return START_STICKY
             }

@@ -13,6 +13,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
+import com.touchgrass.MMKVStore
 import com.facebook.react.module.annotations.ReactModule
 
 /**
@@ -65,7 +66,11 @@ class MotionModule(reactContext: ReactApplicationContext) :
             override fun run() {
                 val activity = MotionSessionController.currentActivityType
                 val stepDetected = MotionEngine.isStepDetectedRecently()
-                val gpsActive = MotionSessionController.currentState == MotionState.MOVING
+                // Consider GPS active when the motion state is MOVING OR when the
+                // native TrackingService/MMKV indicates an active session. This
+                // ensures manual sessions (started from JS) show GPS active even
+                // when the motion detector is UNKNOWN.
+                val gpsActive = MotionSessionController.currentState == MotionState.MOVING || MMKVStore.isAutoTracking()
                 val variance = MotionEngine.getVariance()
                 val cadence = MotionEngine.getCadence()
                 MotionEventEmitter.emitStateUpdate(activity, stepDetected, gpsActive, variance, cadence)

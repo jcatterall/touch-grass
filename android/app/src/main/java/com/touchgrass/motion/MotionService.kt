@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import com.touchgrass.tracking.TrackingConstants
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 
@@ -32,7 +33,10 @@ class MotionService : Service() {
 
     companion object {
         private const val TAG = "MotionService"
-        private const val NOTIFICATION_ID = 9001
+
+        // Reuse the canonical TrackingService notification ID so MotionService and
+        // TrackingService don't create two persistent notifications when both run.
+        private val NOTIFICATION_ID = TrackingConstants.NOTIFICATION_ID
 
         @Volatile
         private var isRunning = false

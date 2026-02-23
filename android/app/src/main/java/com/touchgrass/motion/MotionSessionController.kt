@@ -137,7 +137,11 @@ object MotionSessionController {
             cancelStopEval()
             currentState = MotionState.IDLE
             currentActivityType = "unknown"
-            lastKnownRealActivityType = "unknown"
+            // Preserve lastKnownRealActivityType across a reset so that
+            // temporarily toggling motion monitoring off/on doesn't lose the
+            // most-recent real activity reported by AR. Clearing this value can
+            // prevent re-trigger when AR is still in an ENTER state.
+            // lastKnownRealActivityType = "unknown"
             movementStartTime = 0L
             lastMovementSignalTime = 0L
             potentialMovementStartTime = 0L
