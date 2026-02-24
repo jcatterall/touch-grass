@@ -1,20 +1,11 @@
 package com.touchgrass.tracking
 
 /**
- * Single source of truth for the tracking system's observable state.
+ * Legacy tracking state consumed by NotificationHelper and the RN bridge today.
  *
- * Exposed as a [kotlinx.coroutines.flow.StateFlow] from [TrackingService].
- * TrackingController produces new copies on every meaningful transition.
- * The React Native bridge (future work) will subscribe and push events to JS.
- *
- * @param mode               Current lifecycle mode (IDLE / TRACKING_AUTO / etc.).
- * @param gpsMode            Active GPS priority level.
- * @param distanceMeters     Accumulated distance for the current session.
- * @param elapsedSeconds     Elapsed seconds since the session started.
- * @param goalReached        Whether the user's goal has been satisfied.
- * @param activityType       Most recently detected activity type.
- * @param activityConfidence Raw confidence value (0-100) for the activity type.
- * @param lastUpdateMs       System time of the last state mutation (for staleness checks).
+ * Canonical state now lives in [TrackingSessionState]. This model is a projection
+ * where [distanceMeters]/[elapsedSeconds] represent *today's totals* (baseline +
+ * completed sessions + current session).
  */
 data class TrackingState(
     val mode: TrackingMode = TrackingMode.IDLE,

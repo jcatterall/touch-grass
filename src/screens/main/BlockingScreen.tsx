@@ -98,7 +98,9 @@ interface BlockingScreenProps {
   blockedPackage: string;
 }
 
-export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
+export const BlockingScreen = ({
+  blockedPackage: _blockedPackage,
+}: BlockingScreenProps) => {
   const insets = useSafeAreaInsets();
   const [progress, setProgress] = useState<TrackingProgress>({
     distanceMeters: 0,
@@ -138,24 +140,15 @@ export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
 
   // Read-only: load progress and goals from storage + native service
   const loadState = useCallback(async () => {
-    const [todayActivity, sessionProgress, plans] = await Promise.all([
-      storage.getTodayActivity(),
+    const [todayProgress, plans] = await Promise.all([
       Tracking.getProgress(),
       storage.getPlans(),
     ]);
 
-    const combined: TrackingProgress = {
-      distanceMeters:
-        todayActivity.distanceMeters + sessionProgress.distanceMeters,
-      elapsedSeconds:
-        todayActivity.elapsedSeconds + sessionProgress.elapsedSeconds,
-      goalReached: sessionProgress.goalReached,
-    };
-
-    setProgress(combined);
+    setProgress(todayProgress);
 
     const blockingPlans = findBlockingPlansForToday(plans);
-    setGoals(aggregateUnmetGoals(blockingPlans, combined));
+    setGoals(aggregateUnmetGoals(blockingPlans, todayProgress));
   }, []);
 
   useEffect(() => {

@@ -13,8 +13,11 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
-import com.touchgrass.MMKVStore
 import com.facebook.react.module.annotations.ReactModule
+import com.touchgrass.tracking.TrackingConstants
+import com.touchgrass.tracking.TrackingRuntimeState
+import com.touchgrass.tracking.TrackingService
+import android.content.Intent
 
 /**
  * React Native native module exposing the motion tracking API to JavaScript.
@@ -67,10 +70,8 @@ class MotionModule(reactContext: ReactApplicationContext) :
                 val activity = MotionSessionController.currentActivityType
                 val stepDetected = MotionEngine.isStepDetectedRecently()
                 // Consider GPS active when the motion state is MOVING OR when the
-                // native TrackingService/MMKV indicates an active session. This
-                // ensures manual sessions (started from JS) show GPS active even
-                // when the motion detector is UNKNOWN.
-                val gpsActive = MotionSessionController.currentState == MotionState.MOVING || MMKVStore.isAutoTracking()
+                // native TrackingService indicates an active session.
+                val gpsActive = MotionSessionController.currentState == MotionState.MOVING || TrackingRuntimeState.isTrackingActive
                 val variance = MotionEngine.getVariance()
                 val cadence = MotionEngine.getCadence()
                 MotionEventEmitter.emitStateUpdate(activity, stepDetected, gpsActive, variance, cadence)
@@ -104,7 +105,11 @@ class MotionModule(reactContext: ReactApplicationContext) :
             MotionSessionController.config = config
             MotionSessionController.reset()
 
-            MotionService.start(reactApplicationContext)
+            // Stage 5: motion monitoring is hosted by TrackingService (single orchestrator).
+            val intent = Intent(reactApplicationContext, TrackingService::class.java).apply {
+                action = TrackingConstants.ACTION_START_IDLE
+            }
+            ContextCompat.startForegroundService(reactApplicationContext, intent)
 
             Log.i(TAG, "startMonitoring() — service started")
             promise.resolve(null)
@@ -117,8 +122,11 @@ class MotionModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun stopMonitoring(promise: Promise) {
         try {
-            MotionService.stop(reactApplicationContext)
             MotionSessionController.reset()
+            val intent = Intent(reactApplicationContext, TrackingService::class.java).apply {
+                action = TrackingConstants.ACTION_STOP_BACKGROUND
+            }
+            reactApplicationContext.startService(intent)
             Log.i(TAG, "stopMonitoring() — service stopped")
             promise.resolve(null)
         } catch (e: Exception) {
@@ -129,7 +137,7 @@ class MotionModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun isMonitoring(promise: Promise) {
-        promise.resolve(MotionService.isServiceRunning() && MotionEngine.isRunning())
+        promise.resolve(MotionEngine.isRunning())
     }
 
     @ReactMethod

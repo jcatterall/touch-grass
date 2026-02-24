@@ -17,7 +17,20 @@ export const fastStorage = {
   getTodayElapsed: (): number => _mmkv.getNumber('today_elapsed_seconds') ?? 0,
   getGoalsReached: (): boolean =>
     _mmkv.getBoolean('today_goals_reached') ?? false,
+  setTodayDistance: (meters: number): void => {
+    _mmkv.set('today_distance_meters', meters);
+  },
+  setTodayElapsed: (seconds: number): void => {
+    _mmkv.set('today_elapsed_seconds', seconds);
+  },
+  setGoalsReached: (v: boolean): void => {
+    _mmkv.set('today_goals_reached', v);
+  },
   isAutoTracking: (): boolean => _mmkv.getBoolean('is_auto_tracking') ?? false,
+
+  getPlanDay: (): string => _mmkv.getString('plan_day') ?? '',
+  isPlanActiveToday: (): boolean =>
+    _mmkv.getBoolean('plan_active_today') ?? false,
 
   /** Write the aggregated goal so TrackingService can display correct progress in the notification. */
   setGoal(
@@ -47,6 +60,13 @@ export const fastStorage = {
   setGoalTime(value: number, unit: string) {
     _mmkv.set('goal_time_value', value);
     _mmkv.set('goal_time_unit', unit);
+  },
+
+  setPlanDay(day: string): void {
+    _mmkv.set('plan_day', day);
+  },
+  setPlanActiveToday(active: boolean): void {
+    _mmkv.set('plan_active_today', active);
   },
 };
 

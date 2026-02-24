@@ -1,6 +1,6 @@
 package com.touchgrass
 
-import android.app.*
+import android.app.Service
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -11,7 +11,7 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import com.touchgrass.tracking.TrackingConstants
 import com.touchgrass.tracking.TrackingService
@@ -19,9 +19,6 @@ import com.touchgrass.tracking.TrackingService
 class AppBlockerService : Service() {
 
     companion object {
-        // Reuse TrackingService's notification slot so only one notification appears.
-        private const val CHANNEL_ID = TrackingConstants.NOTIFICATION_CHANNEL
-        private const val NOTIFICATION_ID = TrackingConstants.NOTIFICATION_ID
         const val PREFS_NAME = "touchgrass_blocker_prefs"
         const val PREF_BLOCKED_PACKAGES = "blocked_packages"
         const val PREF_GOALS_REACHED = "goals_reached"
@@ -49,13 +46,7 @@ class AppBlockerService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onCreate() {
-        super.onCreate()
-        createNotificationChannel()
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification())
         polling = true
         handler.post(pollRunnable)
         // Tell TrackingService the blocker is active so it can update the shared notification.
@@ -191,36 +182,6 @@ class AppBlockerService : Service() {
         }
     }
 
-    // --- Notification ---
-    // The blocker shares notification ID 1001 with TrackingService (same channel).
-    // This buildNotification is only used for the initial startForeground() call;
-    // TrackingService will immediately overwrite it via ACTION_BLOCKER_STARTED.
-
-    private fun buildNotification(): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("TouchGrass is active")
-            .setContentText("App blocker on · Watching your goals")
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setOngoing(true)
-            .setColor(0xFF4F7942.toInt())
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .build()
-    }
-
-    private fun createNotificationChannel() {
-        // Channel is owned by TrackingService (created in TrackingService.createNotificationChannel).
-        // AppBlockerService may start before TrackingService, so ensure the channel exists here too.
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "TouchGrass",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Shows TouchGrass activity status and goal progress"
-            setShowBadge(false)
-        }
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-    }
-
     override fun onDestroy() {
         polling = false
         handler.removeCallbacks(pollRunnable)
@@ -233,7 +194,7 @@ class AppBlockerService : Service() {
     private fun notifyTrackingService(action: String) {
         try {
             val intent = Intent(this, TrackingService::class.java).apply { this.action = action }
-            startService(intent)
+            ContextCompat.startForegroundService(this, intent)
         } catch (_: Exception) {
             // TrackingService may not be running — safe to ignore
         }

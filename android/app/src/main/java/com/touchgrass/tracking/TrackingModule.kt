@@ -16,9 +16,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.touchgrass.storage.SessionRepository
-import com.touchgrass.motion.MotionService
 import com.touchgrass.motion.MotionSessionController
-import com.touchgrass.motion.MotionTrackingBridge
 import com.touchgrass.MMKVStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -150,10 +148,16 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     fun getProgress(promise: Promise) {
         try {
             val service = trackingService
+            // If the JS layer calls getProgress while the service is not bound
+            // (common on cold start / after background), fall back to MMKV's
+            // projected "today totals" so UI can still show current progress.
+            val distanceMeters = service?.distanceMeters ?: MMKVStore.getTodayDistance()
+            val elapsedSeconds = service?.elapsedSeconds ?: MMKVStore.getTodayElapsed()
+            val goalReached = service?.goalReached ?: MMKVStore.getGoalsReached()
             val result = Arguments.createMap().apply {
-                putDouble("distanceMeters", service?.distanceMeters ?: 0.0)
-                putDouble("elapsedSeconds", (service?.elapsedSeconds ?: 0L).toDouble())
-                putBoolean("goalReached", service?.goalReached ?: false)
+                putDouble("distanceMeters", distanceMeters)
+                putDouble("elapsedSeconds", elapsedSeconds.toDouble())
+                putBoolean("goalReached", goalReached)
             }
             promise.resolve(result)
         } catch (e: Exception) {
@@ -199,8 +203,8 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     /**
-     * Starts TrackingService in IDLE state and MotionService for background motion detection.
-     * The MotionService signals TrackingService via MotionTrackingBridge when motion is detected.
+        * Starts TrackingService in IDLE state. TrackingService hosts MotionEngine directly
+        * (Stage 5: no MotionService / intent IPC).
      */
     @ReactMethod
     fun startIdleService(promise: Promise) {
@@ -213,17 +217,13 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                 return
             }
 
-            MotionTrackingBridge.init(context)
-
             val trackingIntent = Intent(context, TrackingService::class.java).apply {
                 action = TrackingConstants.ACTION_START_IDLE
             }
             ContextCompat.startForegroundService(context, trackingIntent)
             context.bindService(trackingIntent, connection, 0)
 
-            MotionService.start(context)
-
-            Log.d(TAG, "Idle service + MotionService started")
+            Log.d(TAG, "Idle service started")
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start idle service", e)
@@ -238,8 +238,6 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     fun stopIdleService(promise: Promise) {
         try {
             val context = reactApplicationContext
-
-            MotionService.stop(context)
             MotionSessionController.reset()
 
             val intent = Intent(context, TrackingService::class.java).apply {
@@ -248,7 +246,7 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             context.startService(intent)
             unbindService()
 
-            Log.d(TAG, "Idle service + MotionService stopped")
+            Log.d(TAG, "Idle service stopped")
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to stop idle service", e)

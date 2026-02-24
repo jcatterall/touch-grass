@@ -18,6 +18,73 @@ import androidx.core.app.NotificationCompat
  */
 class NotificationHelper(private val context: Context) {
 
+    internal data class NotificationText(
+        val title: String,
+        val body: String
+    )
+
+    companion object {
+        internal fun computeText(
+            blockedCount: Int,
+            todayKey: String,
+            planDay: String,
+            planActiveFlag: Boolean,
+            goalDistanceValue: Double,
+            goalDistanceUnit: String,
+            goalTimeValue: Double,
+            goalTimeUnit: String,
+            state: TrackingState
+        ): NotificationText {
+            val planActiveToday = planDay == todayKey && planActiveFlag
+
+            val hasDistance = planActiveToday && goalDistanceUnit == "m" && goalDistanceValue > 0.0
+            val hasTime = planActiveToday && goalTimeUnit == "s" && goalTimeValue > 0.0
+
+            val title = if (!planActiveToday) {
+                "No active blocks for today"
+            } else if (blockedCount == 1) {
+                "1 application blocked"
+            } else {
+                "${blockedCount} applications blocked"
+            }
+
+            val body = if (!planActiveToday) {
+                ""
+            } else {
+                val parts = mutableListOf<String>()
+                if (hasDistance) {
+                    val current = state.distanceMeters
+                    parts.add("Progress: ${formatDistance(current)} / ${formatDistance(goalDistanceValue)}")
+                }
+                if (hasTime) {
+                    val current = state.elapsedSeconds
+                    parts.add("Progress: ${formatTime(current)} / ${formatTimeSeconds(goalTimeValue.toLong())}")
+                }
+                parts.joinToString(" | ")
+            }
+
+            return NotificationText(title = title, body = body)
+        }
+
+        private fun formatDistance(meters: Double): String {
+            return if (meters >= 1000.0) {
+                "%.2fkm".format(meters / 1000.0)
+            } else {
+                "%.0fm".format(meters)
+            }
+        }
+
+        private fun formatTime(seconds: Long): String {
+            return if (seconds < 60) {
+                "${seconds}s"
+            } else {
+                "${seconds / 60}m"
+            }
+        }
+
+        private fun formatTimeSeconds(sec: Long): String = formatTime(sec)
+    }
+
     fun ensureChannel() {
         val manager = context.getSystemService(NotificationManager::class.java)
         if (manager.getNotificationChannel(TrackingConstants.NOTIFICATION_CHANNEL) != null) return
@@ -37,57 +104,29 @@ class NotificationHelper(private val context: Context) {
         // Number of distinct blocked apps (fast-path via MMKV)
         val blockedCount = try { MMKVStore.getBlockedCount() } catch (e: Exception) { 0 }
 
-        // Build conditional progress subtitle. Support both distance and time
-        // aggregated goals so the notification can show combined progress like
-        // "Progress: 0 / 5.00km | 0 / 30m" when both are active.
-        val hasDistance = try { MMKVStore.getGoalDistanceValue() > 0.0 } catch (e: Exception) { false }
-        val hasTime = try { MMKVStore.getGoalTimeValue() > 0.0 } catch (e: Exception) { false }
+        val today = try { MMKVStore.todayKey() } catch (e: Exception) { "" }
+        val planDay = try { MMKVStore.getPlanDay() } catch (e: Exception) { "" }
+        val planActiveFlag = try { MMKVStore.isPlanActiveToday() } catch (e: Exception) { false }
+        val goalDistanceUnit = try { MMKVStore.getGoalDistanceUnit() } catch (e: Exception) { "m" }
+        val goalTimeUnit = try { MMKVStore.getGoalTimeUnit() } catch (e: Exception) { "s" }
+        val goalDistanceValue = try { MMKVStore.getGoalDistanceValue() } catch (e: Exception) { 0.0 }
+        val goalTimeValue = try { MMKVStore.getGoalTimeValue() } catch (e: Exception) { 0.0 }
 
-        // Heading: "{N} application(s) blocked" or special-case when there are
-        // no active blocks *and* no goals for today.
-        val title = if (blockedCount == 0 && !hasDistance && !hasTime) {
-            "No active blocks for today"
-        } else if (blockedCount == 1) {
-            "1 application blocked"
-        } else {
-            "${blockedCount} applications blocked"
-        }
-
-        val body = if (!hasDistance && !hasTime) {
-            // No active goals — if there are no blocked apps, show a brief
-            // friendly title and keep the body empty. If there are blocked
-            // apps but no goals, show the simple status line below.
-            if (blockedCount == 0) {
-                ""
-            } else {
-                when (state.mode) {
-                    TrackingMode.IDLE -> "Watching for movement…"
-                    TrackingMode.PAUSED_VEHICLE -> "Paused (in vehicle)"
-                    TrackingMode.TRACKING_AUTO,
-                    TrackingMode.TRACKING_MANUAL -> "Tracking…"
-                }
-            }
-        } else {
-            val parts = mutableListOf<String>()
-            if (hasDistance) {
-                val totalDist = try { MMKVStore.getGoalDistanceValue() } catch (e: Exception) { 0.0 }
-                val unit = try { MMKVStore.getGoalDistanceUnit() } catch (e: Exception) { "m" }
-                val current = state.distanceMeters
-                parts.add("Progress: ${formatDistance(current)} / ${formatDistanceFromUnit(totalDist, unit)}")
-            }
-            if (hasTime) {
-                val totalTime = try { MMKVStore.getGoalTimeValue() } catch (e: Exception) { 0.0 }
-                val unit = try { MMKVStore.getGoalTimeUnit() } catch (e: Exception) { "s" }
-                val current = state.elapsedSeconds
-                parts.add("Progress: ${formatTime(current)} / ${formatTimeSeconds(totalTime.toLong())}")
-            }
-
-            parts.joinToString(" | ")
-        }
+        val text = computeText(
+            blockedCount = blockedCount,
+            todayKey = today,
+            planDay = planDay,
+            planActiveFlag = planActiveFlag,
+            goalDistanceValue = goalDistanceValue,
+            goalDistanceUnit = goalDistanceUnit,
+            goalTimeValue = goalTimeValue,
+            goalTimeUnit = goalTimeUnit,
+            state = state
+        )
 
         return NotificationCompat.Builder(context, TrackingConstants.NOTIFICATION_CHANNEL)
-            .setContentTitle(title)
-            .setContentText(body)
+            .setContentTitle(text.title)
+            .setContentText(text.body)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)
             .setColor(0xFF4F7942.toInt())
@@ -104,27 +143,4 @@ class NotificationHelper(private val context: Context) {
             "%.0f m · %d min".format(state.distanceMeters, elMin)
         }
     }
-
-    private fun formatDistance(meters: Double): String {
-        return if (meters >= 1000.0) {
-            "%.2fkm".format(meters / 1000.0)
-        } else {
-            "%.0fm".format(meters)
-        }
-    }
-
-    private fun formatDistanceFromUnit(value: Double, unit: String): String {
-        // JS writes distances in meters with unit 'm'
-        return if (unit == "m") formatDistance(value) else "%.2f %s".format(value, unit)
-    }
-
-    private fun formatTime(seconds: Long): String {
-        return if (seconds < 60) {
-            "${seconds}s"
-        } else {
-            "${seconds / 60}m"
-        }
-    }
-
-    private fun formatTimeSeconds(sec: Long): String = formatTime(sec)
 }

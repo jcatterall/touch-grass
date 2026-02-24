@@ -30,6 +30,10 @@ export function getTodayKey(): DayKey {
   return DAY_MAP[new Date().getDay()];
 }
 
+function todayYyyyMmDd(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function isWithinDuration(plan: BlockingPlan): boolean {
   if (plan.duration.type === 'entire_day') return true;
 
@@ -143,23 +147,13 @@ export function useTracking(): TrackingState {
   const [isTracking, setIsTracking] = useState(false);
   const [trackingMode, setTrackingMode] = useState<TrackingMode>('idle');
 
-  // dailyBaseline holds distance/elapsed from sessions that have already *ended* today.
-  // It is intentionally NOT read from MMKV at init time because MMKV's today_distance
-  // accumulates live during an active session — reading it here while a session is running
-  // would double-count the current session (baseline + sessionProgress both include it).
-  // Instead we set it to zero and let recover() fill sessionProgress from the live service,
-  // or let onTrackingStopped fill it from MMKV after the session ends.
-  const [dailyBaseline, setDailyBaseline] = useState<TrackingProgress>({
-    distanceMeters: 0,
-    elapsedSeconds: 0,
-    goalReached: false,
-  });
-
-  const [sessionProgress, setSessionProgress] = useState<TrackingProgress>({
-    distanceMeters: 0,
-    elapsedSeconds: 0,
-    goalReached: false,
-  });
+  // Single source of truth for "today progress": native projects canonical totals into
+  // MMKV, and the TrackingModule progress/event stream exposes the same totals.
+  const [todayProgress, setTodayProgress] = useState<TrackingProgress>(() => ({
+    distanceMeters: fastStorage.getTodayDistance(),
+    elapsedSeconds: fastStorage.getTodayElapsed(),
+    goalReached: fastStorage.getGoalsReached(),
+  }));
 
   const [activePlans, setActivePlans] = useState<BlockingPlan[]>([]);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
@@ -182,19 +176,24 @@ export function useTracking(): TrackingState {
   const progressSub = useRef<EmitterSubscription | null>(null);
   const trackingStarted = useRef(false);
 
-  // Time interpolation: store the last native update so we can tick every second
-  const lastNativeUpdate = useRef<{
-    elapsedSeconds: number;
-    distanceMeters: number;
-    goalReached: boolean;
-    timestamp: number;
-  } | null>(null);
-
   // MotionTracker subscription refs
   const motionStateChangedSub = useRef<EmitterSubscription | null>(null);
   const motionStateUpdateSub = useRef<EmitterSubscription | null>(null);
 
   const goals = useMemo(() => aggregateGoals(activePlans), [activePlans]);
+
+  // Persist the native-readable notion of "active plan for today".
+  // Used by the Android notification renderer (strict two-state contract).
+  useEffect(() => {
+    try {
+      const hasActivePlanNow = activePlans.length > 0;
+      fastStorage.setPlanActiveToday(hasActivePlanNow);
+      fastStorage.setPlanDay(hasActivePlanNow ? todayYyyyMmDd() : '');
+      NativeModules.TrackingModule?.notifyGoalsUpdated?.()?.catch?.(() => {});
+    } catch {
+      // best-effort
+    }
+  }, [activePlans]);
 
   // Keep the native notification in sync with the real aggregated goal.
   // TrackingService reads these MMKV keys to display accurate progress.
@@ -214,24 +213,12 @@ export function useTracking(): TrackingState {
         fastStorage.setGoal('none', 0, '');
       }
       NativeModules.TrackingModule?.notifyGoalsUpdated?.()?.catch?.(() => {});
-    } catch (e) {
+    } catch {
       // best-effort
     }
   }, [goals]);
 
-  // Combined progress = daily baseline + current session.
-  // When tracking is active: sessionProgress comes from onProgress events (live GPS data).
-  // When not tracking: dailyBaseline holds today's total from completed sessions.
-  const progress = useMemo<TrackingProgress>(
-    () => ({
-      distanceMeters:
-        dailyBaseline.distanceMeters + sessionProgress.distanceMeters,
-      elapsedSeconds:
-        dailyBaseline.elapsedSeconds + sessionProgress.elapsedSeconds,
-      goalReached: dailyBaseline.goalReached || sessionProgress.goalReached,
-    }),
-    [dailyBaseline, sessionProgress],
-  );
+  const progress = todayProgress;
 
   const allGoalsReached = useMemo(
     () => checkAllGoalsReached(goals, progress),
@@ -270,7 +257,7 @@ export function useTracking(): TrackingState {
         // so native notification reflects that there are no active blocks.
         try {
           await AppBlocker.updateBlockerConfig([], true, false);
-        } catch (e) {
+        } catch {
           // best-effort
         }
         await AppBlocker.stopBlocker();
@@ -333,25 +320,42 @@ export function useTracking(): TrackingState {
     const isAutoTracking = await Tracking.getIsAutoTracking();
     if (isAutoTracking) {
       const current = await Tracking.getProgress();
-      setSessionProgress(current);
+      setTodayProgress(current);
       setIsTracking(true);
       setTrackingMode('auto');
       setDebugNativeRunning(true);
       trackingStarted.current = true;
-      lastNativeUpdate.current = {
-        elapsedSeconds: current.elapsedSeconds,
-        distanceMeters: current.distanceMeters,
-        goalReached: current.goalReached,
-        timestamp: Date.now(),
-      };
     } else {
-      // No active session — load today's completed totals from MMKV as the baseline.
-      // This only runs when not tracking, so there's no double-count risk.
-      setDailyBaseline({
+      setIsTracking(false);
+      setTrackingMode('idle');
+      setDebugNativeRunning(false);
+
+      // No active session — show MMKV totals immediately (fast path), then
+      // hydrate MMKV from Room (authoritative completed totals) in the background.
+      setTodayProgress({
         distanceMeters: fastStorage.getTodayDistance(),
         elapsedSeconds: fastStorage.getTodayElapsed(),
         goalReached: fastStorage.getGoalsReached(),
       });
+
+      try {
+        const daily = await Tracking.getDailyTotalNative();
+        // Only apply this if tracking still isn't active (Room totals do not
+        // include an in-flight session).
+        if (!daily) return;
+        if (fastStorage.isAutoTracking()) return;
+
+        fastStorage.setTodayDistance(daily.distanceMeters);
+        fastStorage.setTodayElapsed(daily.elapsedSeconds);
+        fastStorage.setGoalsReached(daily.goalsReached);
+        setTodayProgress({
+          distanceMeters: daily.distanceMeters,
+          elapsedSeconds: daily.elapsedSeconds,
+          goalReached: daily.goalsReached,
+        });
+      } catch {
+        // best-effort
+      }
     }
   }, []);
 
@@ -382,13 +386,7 @@ export function useTracking(): TrackingState {
   // Subscribe to TrackingService progress events once on mount
   useEffect(() => {
     progressSub.current = Tracking.onProgress(p => {
-      lastNativeUpdate.current = {
-        elapsedSeconds: p.elapsedSeconds,
-        distanceMeters: p.distanceMeters,
-        goalReached: p.goalReached,
-        timestamp: Date.now(),
-      };
-      setSessionProgress(p);
+      setTodayProgress(p);
     });
     return () => {
       progressSub.current?.remove();
@@ -400,69 +398,42 @@ export function useTracking(): TrackingState {
   useEffect(() => {
     const sub = Tracking.onTrackingStarted(() => {
       // Always update state on this event — it's the authoritative signal that a new
-      // GPS session has started. Reset trackingStarted guard so this always fires.
+      // GPS session has started.
       trackingStarted.current = true;
-      lastNativeUpdate.current = {
-        elapsedSeconds: 0,
-        distanceMeters: 0,
-        goalReached: false,
-        timestamp: Date.now(),
-      };
-      setSessionProgress({
-        distanceMeters: 0,
-        elapsedSeconds: 0,
-        goalReached: false,
-      });
       setIsTracking(true);
       setTrackingMode('auto');
       setDebugNativeRunning(true);
+
+      // Do not reset today totals to zero; native/MMKV already track today's totals.
+      syncFromNativeService().catch(() => {});
     });
     return () => sub?.remove();
-  }, []);
+  }, [syncFromNativeService]);
 
   // Listen for native tracking stopped events.
-  // After TrackingService stops, MMKV holds the completed day total (including the session
-  // that just ended). Read it into dailyBaseline and clear sessionProgress.
+  // After TrackingService stops, MMKV holds the canonical day total (including the session
+  // that just ended). Refresh UI from MMKV after a short grace period.
   useEffect(() => {
     const sub = Tracking.onTrackingStopped(() => {
       trackingStarted.current = false;
-      lastNativeUpdate.current = null;
       setIsTracking(false);
       setTrackingMode('idle');
       setDebugNativeRunning(false);
-      setDailyBaseline({
-        distanceMeters: fastStorage.getTodayDistance(),
-        elapsedSeconds: fastStorage.getTodayElapsed(),
-        goalReached: fastStorage.getGoalsReached(),
-      });
-      setSessionProgress({
-        distanceMeters: 0,
-        elapsedSeconds: 0,
-        goalReached: false,
-      });
+
+      // Allow a short grace period for native -> MMKV projection.
+      setTimeout(() => {
+        setTodayProgress({
+          distanceMeters: fastStorage.getTodayDistance(),
+          elapsedSeconds: fastStorage.getTodayElapsed(),
+          goalReached: fastStorage.getGoalsReached(),
+        });
+      }, 150);
     });
     return () => sub?.remove();
   }, []);
 
-  // 1-second interval to interpolate elapsed time between native updates.
-  useEffect(() => {
-    if (!isTracking) return;
-
-    const timer = setInterval(() => {
-      const last = lastNativeUpdate.current;
-      if (!last) return;
-
-      const elapsed = (Date.now() - last.timestamp) / 1000;
-      if (elapsed < 1) return;
-
-      setSessionProgress(prev => ({
-        ...prev,
-        elapsedSeconds: last.elapsedSeconds + elapsed,
-      }));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isTracking]);
+  // NOTE: Do not interpolate elapsed time in JS.
+  // Native is the single source of truth for elapsed (and it is eligibility-gated).
 
   // Start tracking — uses a large goal for the native service so JS handles goal-reached logic
   const startTracking = useCallback(
@@ -477,39 +448,31 @@ export function useTracking(): TrackingState {
         if (!granted) return;
       }
 
-      await Tracking.startTracking('distance', 999, 'km');
+      // Start a session using canonical units. Notification goals are driven
+      // exclusively by the aggregated-plan MMKV keys (set above).
+      if (goals.hasDistanceGoal) {
+        await Tracking.startTracking(
+          'distance',
+          goals.totalDistanceMeters,
+          'm',
+        );
+      } else if (goals.hasTimeGoal) {
+        await Tracking.startTracking('time', goals.totalTimeSeconds, 's');
+      } else {
+        // Permanent-only plans: allow a session without setting any goal.
+        await Tracking.startTracking('distance', 0, 'm');
+      }
 
       trackingStarted.current = true;
-      lastNativeUpdate.current = {
-        elapsedSeconds: 0,
-        distanceMeters: 0,
-        goalReached: false,
-        timestamp: Date.now(),
-      };
-      setSessionProgress({
-        distanceMeters: 0,
-        elapsedSeconds: 0,
-        goalReached: false,
-      });
       setIsTracking(true);
       setTrackingMode(mode);
       setDebugNativeRunning(true);
-    },
-    [activePlans],
-  );
 
-  const saveAndResetSession = useCallback(() => {
-    setDailyBaseline({
-      distanceMeters: fastStorage.getTodayDistance(),
-      elapsedSeconds: fastStorage.getTodayElapsed(),
-      goalReached: fastStorage.getGoalsReached(),
-    });
-    setSessionProgress({
-      distanceMeters: 0,
-      elapsedSeconds: 0,
-      goalReached: false,
-    });
-  }, []);
+      // Keep existing totals until native progress arrives.
+      syncFromNativeService().catch(() => {});
+    },
+    [activePlans, goals, syncFromNativeService],
+  );
 
   // Auto-stop when all goals reached
   useEffect(() => {
@@ -518,40 +481,34 @@ export function useTracking(): TrackingState {
       setIsTracking(false);
       setTrackingMode('idle');
       trackingStarted.current = false;
-      lastNativeUpdate.current = null;
-      saveAndResetSession();
+      setDebugNativeRunning(false);
+      setTimeout(() => {
+        setTodayProgress({
+          distanceMeters: fastStorage.getTodayDistance(),
+          elapsedSeconds: fastStorage.getTodayElapsed(),
+          goalReached: fastStorage.getGoalsReached(),
+        });
+      }, 150);
     }
-  }, [allGoalsReached, isTracking, saveAndResetSession]);
+  }, [allGoalsReached, isTracking]);
 
   const stop = useCallback(async () => {
-    const finalProgress = await Tracking.getProgress();
-    const dist = finalProgress.distanceMeters || sessionProgress.distanceMeters;
-    const elapsed =
-      finalProgress.elapsedSeconds || sessionProgress.elapsedSeconds;
-
     await Tracking.stopTracking();
     setIsTracking(false);
     setTrackingMode('idle');
     trackingStarted.current = false;
-    lastNativeUpdate.current = null;
     setDebugNativeRunning(false);
     // Read authoritative completed-today totals from MMKV (fastStorage) rather
     // than adding the session distance locally. This avoids double-counting
     // when native also persisted the same deltas to MMKV on stop.
     // Wait a short grace period to allow native -> MMKV sync to complete.
     await new Promise<void>(res => setTimeout(res, 150));
-    setDailyBaseline({
+    setTodayProgress({
       distanceMeters: fastStorage.getTodayDistance(),
       elapsedSeconds: fastStorage.getTodayElapsed(),
       goalReached: fastStorage.getGoalsReached(),
     });
-
-    setSessionProgress({
-      distanceMeters: 0,
-      elapsedSeconds: 0,
-      goalReached: false,
-    });
-  }, [sessionProgress, allGoalsReached]);
+  }, []);
 
   const startManual = useCallback(async () => {
     if (trackingMode === 'auto' && isTracking) return;
@@ -615,17 +572,6 @@ export function useTracking(): TrackingState {
           // Update JS isTracking state if not already set.
           if (!trackingStarted.current) {
             trackingStarted.current = true;
-            lastNativeUpdate.current = {
-              elapsedSeconds: 0,
-              distanceMeters: 0,
-              goalReached: false,
-              timestamp: Date.now(),
-            };
-            setSessionProgress({
-              distanceMeters: 0,
-              elapsedSeconds: 0,
-              goalReached: false,
-            });
             setIsTracking(true);
             setTrackingMode('auto');
             setDebugNativeRunning(true);
@@ -668,7 +614,7 @@ export function useTracking(): TrackingState {
       motionStateChangedSub.current = null;
       motionStateUpdateSub.current = null;
     };
-  }, [backgroundTrackingEnabled]);
+  }, [backgroundTrackingEnabled, syncFromNativeService]);
 
   const debugInfo = useMemo<DebugInfo>(
     () => ({

@@ -510,6 +510,7 @@ object MotionEngine : SensorEventListener {
         when (type) {
             DetectedActivity.WALKING -> {
                 if (isEntering) {
+                    MotionSessionController.onArTransition("walking", true)
                     // If Activity Recognition reports WALKING, be more aggressive about
                     // releasing the stationary lock and nudging the state machine so
                     // re-trigger works even when sensors are still ramping up.
@@ -528,11 +529,13 @@ object MotionEngine : SensorEventListener {
                         MotionSessionController.onMovementDetected(conf * 0.8f, "walking")
                     }
                 } else {
+                    MotionSessionController.onArTransition("walking", false)
                     MotionSessionController.onMovementEnded("walking_exit")
                 }
             }
             DetectedActivity.RUNNING -> {
                 if (isEntering) {
+                    MotionSessionController.onArTransition("running", true)
                     if (stationaryLockActive) {
                         stationaryLockActive = false
                         stationaryLockCandidateStart = 0L
@@ -547,11 +550,13 @@ object MotionEngine : SensorEventListener {
                         MotionSessionController.onMovementDetected(conf * 0.8f, "running")
                     }
                 } else {
+                    MotionSessionController.onArTransition("running", false)
                     MotionSessionController.onMovementEnded("running_exit")
                 }
             }
             DetectedActivity.ON_BICYCLE -> {
                 if (isEntering) {
+                    MotionSessionController.onArTransition("cycling", true)
                     if (stationaryLockActive) {
                         stationaryLockActive = false
                         stationaryLockCandidateStart = 0L
@@ -566,6 +571,7 @@ object MotionEngine : SensorEventListener {
                         MotionSessionController.onMovementDetected(conf * 0.8f, "cycling")
                     }
                 } else {
+                    MotionSessionController.onArTransition("cycling", false)
                     MotionSessionController.onMovementEnded("cycling_exit")
                 }
             }

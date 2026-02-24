@@ -178,5 +178,5 @@ data class MotionConfig(
     val notificationChannelId: String = "touchgrass_tracking",
     val notificationChannelName: String = "Motion Tracking",
     val notificationTitle: String = "TouchGrass is active",
-    val notificationBody: String = "Watching for movement…",
+   val notificationBody: String = "",
 )

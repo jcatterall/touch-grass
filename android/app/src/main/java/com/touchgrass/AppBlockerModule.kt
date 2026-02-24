@@ -88,7 +88,7 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
             }
             // Also notify TrackingService to refresh its persistent notification
             try {
-                if (MMKVStore.isAutoTracking()) {
+                if (MMKVStore.isAutoTracking() || MMKVStore.isIdleMonitoringEnabled()) {
                     val intent = Intent(reactApplicationContext, com.touchgrass.tracking.TrackingService::class.java).apply {
                         action = com.touchgrass.tracking.TrackingConstants.ACTION_GOALS_UPDATED
                     }
@@ -107,8 +107,19 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
     @ReactMethod
     fun startBlocker(promise: Promise) {
         try {
+            // Ensure TrackingService is running so there's a single sticky notification.
+            // ACTION_GOALS_UPDATED refreshes the existing notification without enabling motion.
+            try {
+                val trackingIntent = Intent(reactApplicationContext, com.touchgrass.tracking.TrackingService::class.java).apply {
+                    action = com.touchgrass.tracking.TrackingConstants.ACTION_GOALS_UPDATED
+                }
+                ContextCompat.startForegroundService(reactApplicationContext, trackingIntent)
+            } catch (_: Exception) {
+                // best-effort
+            }
+
             val intent = Intent(reactApplicationContext, AppBlockerService::class.java)
-            reactApplicationContext.startForegroundService(intent)
+            reactApplicationContext.startService(intent)
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("ERROR", e.message)

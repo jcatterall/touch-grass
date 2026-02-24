@@ -13,12 +13,14 @@ package com.touchgrass.tracking
 class SessionManager {
 
     private var distance = 0.0
-    private var startTimeMs = 0L
+    private var elapsedMs = 0L
+    private var lastTickMs = 0L
 
     /** Begin a new session, resetting all accumulators. */
     fun start() {
         distance = 0.0
-        startTimeMs = System.currentTimeMillis()
+        elapsedMs = 0L
+        lastTickMs = System.currentTimeMillis()
     }
 
     /** Add [meters] to the running distance total. */
@@ -26,10 +28,26 @@ class SessionManager {
         if (meters > 0f) distance += meters
     }
 
-    /** Elapsed seconds since [start] was called. */
-    fun elapsedSeconds(): Long =
-        if (startTimeMs == 0L) 0L
-        else (System.currentTimeMillis() - startTimeMs) / 1000
+    /**
+     * Advance elapsed time. If [eligible] is false, time does not accumulate.
+     *
+     * Caller controls the tick frequency (typically 1s and/or on GPS fixes).
+     */
+    fun tick(eligible: Boolean) {
+        if (lastTickMs == 0L) {
+            lastTickMs = System.currentTimeMillis()
+            return
+        }
+        val now = System.currentTimeMillis()
+        val delta = now - lastTickMs
+        lastTickMs = now
+        if (eligible && delta > 0) {
+            elapsedMs += delta
+        }
+    }
+
+    /** Elapsed whole seconds accumulated via [tick]. */
+    fun elapsedSeconds(): Long = elapsedMs / 1000
 
     /** Snapshot of the accumulated distance without ending the session. */
     fun currentDistance(): Double = distance
@@ -44,9 +62,10 @@ class SessionManager {
     fun finish(): Pair<Double, Long> {
         val result = distance to elapsedSeconds()
         distance = 0.0
-        startTimeMs = 0L
+        elapsedMs = 0L
+        lastTickMs = 0L
         return result
     }
 
-    fun isActive(): Boolean = startTimeMs > 0L
+    fun isActive(): Boolean = lastTickMs > 0L
 }

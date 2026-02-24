@@ -41,15 +41,6 @@ object TrackingConstants {
      */
     const val MIN_ACCUMULATE_SPEED_MS = 0.5f
 
-    // Intent actions — MotionTrackingBridge → TrackingService
-    const val ACTION_MOTION_STARTED = "com.touchgrass.action.MOTION_STARTED"
-    const val ACTION_MOTION_STOPPED = "com.touchgrass.action.MOTION_STOPPED"
-
-    // Intent extras on motion actions
-    const val EXTRA_ACTIVITY_TYPE       = "EXTRA_ACTIVITY_TYPE"
-    const val EXTRA_ACTIVITY_CONFIDENCE = "EXTRA_ACTIVITY_CONFIDENCE"
-    const val EXTRA_ACTIVITY_TIMESTAMP  = "EXTRA_ACTIVITY_TIMESTAMP_MS"
-
     // Lifecycle actions driven by JS / user
     const val ACTION_START_IDLE      = "com.touchgrass.action.START_IDLE"
     const val ACTION_STOP_BACKGROUND = "com.touchgrass.action.STOP_BACKGROUND"

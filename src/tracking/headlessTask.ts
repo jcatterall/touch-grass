@@ -1,5 +1,5 @@
 import { AppRegistry } from 'react-native';
-import { storage } from '../storage';
+import { storage, fastStorage } from '../storage';
 import { findActivePlansForToday, aggregateGoals } from '../hooks/useTracking';
 import { Tracking } from './Tracking';
 import { TrackingPermissions } from './Permissions';
@@ -7,6 +7,10 @@ import { TrackingPermissions } from './Permissions';
 interface TaskData {
   activity: string;
   transition: string;
+}
+
+function todayYyyyMmDd(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 // NOTE: console.log messages in a headless task are visible in Logcat
@@ -43,6 +47,12 @@ async function activityTask(data: TaskData): Promise<void> {
 
   const activePlans = findActivePlansForToday(plans);
   if (activePlans.length === 0) {
+    try {
+      fastStorage.setPlanActiveToday(false);
+      fastStorage.setPlanDay('');
+    } catch {
+      // best-effort
+    }
     console.error(
       '[HeadlessTask] FAILED: No active plans for today. Aborting.',
     );
@@ -84,6 +94,26 @@ async function activityTask(data: TaskData): Promise<void> {
 
   const goals = aggregateGoals(activePlans);
 
+  // Keep native notification in sync even when the UI process is not running.
+  try {
+    fastStorage.setPlanActiveToday(true);
+    fastStorage.setPlanDay(todayYyyyMmDd());
+
+    if (goals.hasDistanceGoal && goals.hasTimeGoal) {
+      fastStorage.setGoalDistance(goals.totalDistanceMeters, 'm');
+      fastStorage.setGoalTime(goals.totalTimeSeconds, 's');
+      fastStorage.setGoal('distance', goals.totalDistanceMeters, 'm');
+    } else if (goals.hasDistanceGoal) {
+      fastStorage.setGoal('distance', goals.totalDistanceMeters, 'm');
+    } else if (goals.hasTimeGoal) {
+      fastStorage.setGoal('time', goals.totalTimeSeconds, 's');
+    } else {
+      fastStorage.setGoal('none', 0, '');
+    }
+  } catch {
+    // best-effort
+  }
+
   try {
     if (goals.hasDistanceGoal) {
       const remainingMeters = Math.max(
@@ -99,7 +129,7 @@ async function activityTask(data: TaskData): Promise<void> {
       console.log(
         `[HeadlessTask] Starting distance tracking: ${remainingMeters}m remaining.`,
       );
-      await Tracking.startTracking('distance', remainingMeters / 1000, 'km');
+      await Tracking.startTracking('distance', remainingMeters, 'm');
     } else if (goals.hasTimeGoal) {
       const remainingSeconds = Math.max(
         0,
@@ -112,7 +142,7 @@ async function activityTask(data: TaskData): Promise<void> {
       console.log(
         `[HeadlessTask] Starting time tracking: ${remainingSeconds}s remaining.`,
       );
-      await Tracking.startTracking('time', remainingSeconds / 60, 'min');
+      await Tracking.startTracking('time', remainingSeconds, 's');
     } else {
       console.log('[HeadlessTask] No trackable goal found. Aborting.');
       return;

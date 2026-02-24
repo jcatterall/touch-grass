@@ -81,6 +81,36 @@ object MotionSessionController {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var stopEvalRunnable: Runnable? = null
 
+    private val eligibleArTypes = setOf("walking", "running", "cycling")
+
+    /**
+     * Tracks whether we've already signalled a tracking start for the current MOVING period.
+     * Reset when transitioning to IDLE or when a new MOVING period begins from IDLE/POTENTIAL_MOVEMENT.
+     */
+    @Volatile
+    private var trackingStartSignalled: Boolean = false
+
+    /**
+     * Destination for motion start/stop signals.
+     * Default is a no-op; TrackingService installs an in-process sink when running.
+     */
+    @Volatile
+    var trackingSink: MotionTrackingSink = object : MotionTrackingSink {
+        override fun onMotionStarted(activityType: String) {}
+        override fun onMotionStopped(activityType: String, reason: String) {}
+        override fun onArActivityChanged(activityType: String, isActive: Boolean) {}
+    }
+
+    // ── Activity Recognition latch (Option B: latched until EXIT) ───────────
+
+    @Volatile
+    var arActiveType: String = "unknown"
+        private set
+
+    @Volatile
+    var arIsActive: Boolean = false
+        private set
+
     // ── Public API ───────────────────────────────────────────────────────────
 
     /**
@@ -98,6 +128,31 @@ object MotionSessionController {
      */
     fun onMovementEnded(reason: String) {
         mainHandler.post { handleMovementEnded(reason) }
+    }
+
+    /**
+     * Called by MotionEngine on Activity Recognition ENTER/EXIT.
+     * Latches the AR activity type until an EXIT clears it.
+     */
+    fun onArTransition(activityType: String, isEntering: Boolean) {
+        mainHandler.post {
+            if (isEntering) {
+                arActiveType = activityType
+                arIsActive = true
+            } else {
+                if (arActiveType == activityType) {
+                    arActiveType = "unknown"
+                    arIsActive = false
+                }
+            }
+            trackingSink.onArActivityChanged(activityType, isEntering)
+
+            // If we are already MOVING and AR just became active with an eligible type,
+            // signal a delayed start (this covers AR arriving after sensor-based MOVING).
+            if (currentState == MotionState.MOVING && isEntering) {
+                maybeSignalTrackingStart()
+            }
+        }
     }
 
     /**
@@ -146,6 +201,7 @@ object MotionSessionController {
             lastMovementSignalTime = 0L
             potentialMovementStartTime = 0L
             potentialStopStartTime = 0L
+            trackingStartSignalled = false
             Log.d(TAG, "Session reset to IDLE")
         }
     }
@@ -222,6 +278,11 @@ object MotionSessionController {
                 // Refresh movement signal — cancels any pending stop confirmation
                 currentActivityType = activityType
                 lastKnownRealActivityType = activityType
+
+                // If we entered MOVING before AR became active, allow a delayed start once
+                // AR is eligible (but only once per MOVING period).
+                maybeSignalTrackingStart()
+
                 if (potentialStopStartTime != 0L) {
                     Log.d(TAG, "Movement resumed — cancelling POTENTIAL_STOP")
                     potentialStopStartTime = 0L
@@ -363,17 +424,23 @@ object MotionSessionController {
         var trackingSignalled = false
         when {
             newState == MotionState.MOVING && (oldState == MotionState.POTENTIAL_MOVEMENT || oldState == MotionState.IDLE) -> {
-                MotionTrackingBridge.onMotionStarted(activityType)
-                trackingSignalled = true
+                // New MOVING period — clear any previous start signal state.
+                trackingStartSignalled = false
+
+                // Only signal a tracking start when BOTH:
+                // - motion detection is MOVING (we are here), and
+                // - Activity Recognition is active in an eligible type.
+                trackingSignalled = maybeSignalTrackingStart()
             }
             newState == MotionState.MOVING && oldState == MotionState.POTENTIAL_STOP -> {
                 // Resumed from POTENTIAL_STOP — no new start signal; GPS already running
                 trackingSignalled = false
             }
             newState == MotionState.IDLE && oldState != MotionState.UNKNOWN -> {
-                MotionTrackingBridge.onMotionStopped(activityType, reason ?: "inactivity_timeout")
+                trackingSink.onMotionStopped(activityType, reason ?: "inactivity_timeout")
                 trackingSignalled = true
                 movementStartTime = 0L
+                trackingStartSignalled = false
                 // Reset currentActivityType to "unknown" so the debug UI and AppBlocker never
                 // see a stale walking/running state after the session ends.
                 // lastKnownRealActivityType is intentionally NOT reset here — it preserves the
@@ -401,6 +468,36 @@ object MotionSessionController {
             MotionState.MOVING -> MotionEngine.onResumed()
             MotionState.POTENTIAL_STOP -> MotionEngine.onAutoPaused()   // reduce rate while evaluating stop
             MotionState.UNKNOWN -> {}
+        }
+    }
+
+    /**
+     * Signals TrackingService to start auto tracking, but only when AR is currently active
+     * in an eligible activity type. Returns true if a start signal was emitted.
+     */
+    private fun maybeSignalTrackingStart(): Boolean {
+        if (trackingStartSignalled) return false
+        if (currentState != MotionState.MOVING) return false
+        if (!arIsActive) return false
+        if (arActiveType !in eligibleArTypes) return false
+
+        try {
+            // Use the AR-latched type as the canonical start type.
+            trackingSink.onMotionStarted(arActiveType)
+            trackingStartSignalled = true
+            // Emit an event even if there was no state transition (delayed start case).
+            MotionEventEmitter.emitStateChanged(
+                state = currentState,
+                activityType = currentActivityType,
+                confidence = 1.0f,
+                distanceMeters = 0.0,
+                timestamp = System.currentTimeMillis(),
+                lastKnownActivity = lastKnownRealActivityType,
+                trackingSignalled = true
+            )
+            return true
+        } catch (_: Exception) {
+            return false
         }
     }
 

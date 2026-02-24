@@ -4,13 +4,12 @@ import android.location.Location
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.touchgrass.MMKVStore
 
 /**
  * Core motion-driven state machine for tracking.
  *
  * Responsibilities:
- *  · Receive [ActivitySnapshot] events from MotionService via [onMotion].
+ *  · Receive [ActivitySnapshot] events from MotionEngine via [onMotion].
  *  · Receive GPS [Location] fixes via [onLocation].
  *  · Maintain a single [TrackingState] and publish updates through [onStateChanged].
  *  · Control [GpsManager] power modes based on activity type.
@@ -37,18 +36,24 @@ class TrackingController(
     private val gps: GpsManager,
     private val processor: LocationProcessor,
     private val sessions: SessionManager,
-    private val onStateChanged: (TrackingState) -> Unit
+    private val onStateChanged: (TrackingSessionState) -> Unit,
+    private val onSessionFinalised: (distanceMeters: Double, elapsedSeconds: Long, goalReached: Boolean) -> Unit = { _, _, _ -> }
 ) {
 
     private val TAG = "TrackingController"
     private val handler = Handler(Looper.getMainLooper())
 
-    private var state = TrackingState()
+    private var state = TrackingSessionState()
     private var lastLocation: Location? = null
-    private var lastNotificationMs = 0L
-    // Baseline offsets merged from persisted daily totals (not owned by SessionManager)
-    private var baselineDistanceOffset = 0.0
-    private var baselineElapsedOffset = 0L
+
+    // Motion + Activity Recognition gates for eligible time accumulation.
+    private var motionMoving: Boolean = false
+    private var arIsActive: Boolean = false
+    private var arActiveType: ActivityType = ActivityType.UNKNOWN
+
+    // Daily base (baseline + completed sessions) merged from persistence and updated on session finish.
+    private var baseDistanceMeters = 0.0
+    private var baseElapsedSeconds = 0L
 
     // Pending Runnable that ends the session after the stationary buffer expires.
     private val stationaryBufferRunnable = Runnable {
@@ -56,20 +61,27 @@ class TrackingController(
         finaliseSession()
     }
 
-    // Runnable that publishes elapsed/distance every second while a manual
-    // session is active so the UI sees ticking time even if no GPS delta
-    // has yet been accepted.
-    private val manualTickerRunnable = object : Runnable {
+    // Runnable that advances eligible elapsed time every second while a
+    // session is active so the UI/notification stays fresh even when GPS
+    // deltas are sparse.
+    private val sessionTickerRunnable = object : Runnable {
         override fun run() {
-            if (state.mode == TrackingMode.TRACKING_MANUAL && sessions.isActive()) {
-                state = state.copy(
-                    elapsedSeconds = sessions.elapsedSeconds() + baselineElapsedOffset,
-                    distanceMeters = sessions.currentDistance() + baselineDistanceOffset,
-                    lastUpdateMs = System.currentTimeMillis()
-                )
-                publishState()
-                handler.postDelayed(this, 1000L)
-            }
+            if (!sessions.isActive()) return
+            if (state.mode != TrackingMode.TRACKING_MANUAL && state.mode != TrackingMode.TRACKING_AUTO) return
+
+            sessions.tick(isTimeEligible())
+
+            val sessionElapsed = sessions.elapsedSeconds()
+            val sessionDistance = sessions.currentDistance()
+            state = state.copy(
+                sessionElapsedSeconds = sessionElapsed,
+                sessionDistanceMeters = sessionDistance,
+                todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
+                todayDistanceMeters = baseDistanceMeters + sessionDistance,
+                lastUpdateMs = System.currentTimeMillis()
+            )
+            publishState()
+            handler.postDelayed(this, 1000L)
         }
     }
 
@@ -77,7 +89,7 @@ class TrackingController(
     // Public API
     // -------------------------------------------------------------------------
 
-    /** Process a new activity snapshot from MotionService. */
+    /** Process a new activity snapshot from MotionEngine. */
     fun onMotion(snapshot: ActivitySnapshot) {
         Log.d(TAG, "onMotion: ${snapshot.type} confidence=${snapshot.confidence}")
 
@@ -92,6 +104,7 @@ class TrackingController(
             ActivityType.WALKING,
             ActivityType.RUNNING,
             ActivityType.ON_BICYCLE -> {
+                motionMoving = true
                 // Cancel any pending stationary buffer.
                 handler.removeCallbacks(stationaryBufferRunnable)
                 ensureTracking()
@@ -100,6 +113,7 @@ class TrackingController(
             }
 
             ActivityType.IN_VEHICLE -> {
+                motionMoving = false
                 // Pause accumulation; keep GPS alive at low power for plausibility.
                 handler.removeCallbacks(stationaryBufferRunnable)
                 gps.setMode(GpsMode.LOW_POWER)
@@ -131,16 +145,47 @@ class TrackingController(
     }
 
     /**
-     * Called when MotionService signals that motion has stopped
+    * Called when the motion engine signals that motion has stopped
      * (inactivity timeout, manual stop, etc.) without a specific activity type.
      * Arms the stationary buffer — if motion doesn't resume within the buffer
      * window the session is ended.
      */
     fun onMotionStopped() {
         Log.d(TAG, "Motion stopped — arming stationary buffer (${TrackingConstants.STATIONARY_BUFFER_MS}ms)")
+        motionMoving = false
         if (state.mode == TrackingMode.TRACKING_AUTO || state.mode == TrackingMode.TRACKING_MANUAL) {
             armStationaryBuffer()
         }
+    }
+
+    /** Update the Activity Recognition latch state (Option B: latched until EXIT). */
+    fun onArActivityChanged(activityType: ActivityType, isActive: Boolean) {
+        val allowed = activityType == ActivityType.WALKING ||
+                activityType == ActivityType.RUNNING ||
+                activityType == ActivityType.ON_BICYCLE
+
+        if (isActive && allowed) {
+            arIsActive = true
+            arActiveType = activityType
+            state = state.copy(
+                activityType = activityType,
+                activityConfidence = 80,
+                lastUpdateMs = System.currentTimeMillis()
+            )
+        } else {
+            // Clear only when the exiting type matches the currently latched type.
+            if (arActiveType == activityType) {
+                arIsActive = false
+                arActiveType = ActivityType.UNKNOWN
+                state = state.copy(
+                    activityType = ActivityType.UNKNOWN,
+                    activityConfidence = 0,
+                    lastUpdateMs = System.currentTimeMillis()
+                )
+            }
+        }
+
+        publishState()
     }
 
     /** Process an incoming GPS location fix. */
@@ -150,6 +195,9 @@ class TrackingController(
             lastLocation = location  // keep last position fresh for when tracking resumes
             return
         }
+
+        // Keep elapsed current even when GPS deltas are rejected.
+        sessions.tick(isTimeEligible())
 
         // GPS drift guard: require meaningful speed (≥ 0.5 m/s) to filter stationary GPS noise.
         // Skip this guard for manual sessions so slow walking still accumulates.
@@ -172,19 +220,26 @@ class TrackingController(
 
         if (delta > 0f) {
             sessions.addDistance(delta)
-            MMKVStore.accumulateTodayDistance(delta.toDouble())
+
+            val sessionDistance = sessions.currentDistance()
+            val sessionElapsed = sessions.elapsedSeconds()
             state = state.copy(
-                distanceMeters = sessions.currentDistance() + baselineDistanceOffset,
-                elapsedSeconds = sessions.elapsedSeconds() + baselineElapsedOffset,
+                sessionDistanceMeters = sessionDistance,
+                sessionElapsedSeconds = sessionElapsed,
+                todayDistanceMeters = baseDistanceMeters + sessionDistance,
+                todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
                 lastUpdateMs = System.currentTimeMillis()
             )
             publishState()
-        } else if (state.mode == TrackingMode.TRACKING_MANUAL) {
-            // No distance delta accepted, but in manual mode we should still
-            // publish elapsed time so the UI shows progress.
+        } else {
+            // Even if no distance delta was accepted, elapsed may have advanced.
+            val sessionDistance = sessions.currentDistance()
+            val sessionElapsed = sessions.elapsedSeconds()
             state = state.copy(
-                distanceMeters = sessions.currentDistance() + baselineDistanceOffset,
-                elapsedSeconds = sessions.elapsedSeconds() + baselineElapsedOffset,
+                sessionDistanceMeters = sessionDistance,
+                sessionElapsedSeconds = sessionElapsed,
+                todayDistanceMeters = baseDistanceMeters + sessionDistance,
+                todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
                 lastUpdateMs = System.currentTimeMillis()
             )
             publishState()
@@ -198,8 +253,10 @@ class TrackingController(
         sessions.start()
         state = state.copy(
             mode = TrackingMode.TRACKING_MANUAL,
-            distanceMeters = 0.0 + baselineDistanceOffset,
-            elapsedSeconds = 0 + baselineElapsedOffset,
+            sessionDistanceMeters = 0.0,
+            sessionElapsedSeconds = 0L,
+            todayDistanceMeters = baseDistanceMeters,
+            todayElapsedSeconds = baseElapsedSeconds,
             goalReached = false,
             gpsMode = GpsMode.HIGH_ACCURACY,
             lastUpdateMs = System.currentTimeMillis()
@@ -208,8 +265,8 @@ class TrackingController(
         publishState()
         // Start a periodic ticker so elapsedSeconds updates even without
         // an accepted GPS delta.
-        handler.removeCallbacks(manualTickerRunnable)
-        handler.postDelayed(manualTickerRunnable, 1000L)
+        handler.removeCallbacks(sessionTickerRunnable)
+        handler.postDelayed(sessionTickerRunnable, 1000L)
         Log.d(TAG, "Manual session started")
     }
 
@@ -219,8 +276,8 @@ class TrackingController(
         finaliseSession()
     }
 
-    /** Return the current state snapshot (used by the service on start). */
-    fun currentState(): TrackingState = state
+    /** Return the current session state snapshot (used by the service on start). */
+    fun currentState(): TrackingSessionState = state
 
     // -------------------------------------------------------------------------
     // Internal helpers
@@ -232,16 +289,19 @@ class TrackingController(
      */
     private fun ensureTracking() {
         if (state.mode == TrackingMode.TRACKING_AUTO || state.mode == TrackingMode.TRACKING_MANUAL) return
-        // Cancel any manual ticker when switching to auto tracking.
-        handler.removeCallbacks(manualTickerRunnable)
+        // Cancel any ticker before switching modes.
+        handler.removeCallbacks(sessionTickerRunnable)
         sessions.start()
         state = state.copy(
             mode = TrackingMode.TRACKING_AUTO,
-            distanceMeters = 0.0 + baselineDistanceOffset,
-            elapsedSeconds = 0 + baselineElapsedOffset,
+            sessionDistanceMeters = 0.0,
+            sessionElapsedSeconds = 0L,
+            todayDistanceMeters = baseDistanceMeters,
+            todayElapsedSeconds = baseElapsedSeconds,
             goalReached = false,
             lastUpdateMs = System.currentTimeMillis()
         )
+        handler.postDelayed(sessionTickerRunnable, 1000L)
         Log.d(TAG, "Tracking session started (auto)")
     }
 
@@ -260,15 +320,21 @@ class TrackingController(
         var finalDistance = 0.0
         var finalElapsed = 0L
 
-        // Cancel the manual ticker before we snapshot/finish the session so
+        // Cancel the ticker before we snapshot/finish the session so
         // no concurrent ticker run can publish an intermediate value.
-        handler.removeCallbacks(manualTickerRunnable)
+        handler.removeCallbacks(sessionTickerRunnable)
 
         if (wasActive) {
+            sessions.tick(isTimeEligible())
             val (distance, elapsed) = sessions.finish()
             finalDistance = distance
             finalElapsed = elapsed
             Log.d(TAG, "Session finalised: distance=${distance}m elapsed=${elapsed}s")
+
+            // Update the daily base and notify the owner so persistence can record session-scoped values.
+            baseDistanceMeters += finalDistance
+            baseElapsedSeconds += finalElapsed
+            onSessionFinalised(finalDistance, finalElapsed, state.goalReached)
         }
 
         gps.setMode(GpsMode.OFF)
@@ -277,12 +343,25 @@ class TrackingController(
         state = state.copy(
             mode = TrackingMode.IDLE,
             gpsMode = GpsMode.OFF,
-            distanceMeters = if (wasActive) finalDistance + baselineDistanceOffset else 0.0 + baselineDistanceOffset,
-            elapsedSeconds = if (wasActive) finalElapsed + baselineElapsedOffset else 0L + baselineElapsedOffset,
+            sessionDistanceMeters = 0.0,
+            sessionElapsedSeconds = 0L,
+            todayDistanceMeters = baseDistanceMeters,
+            todayElapsedSeconds = baseElapsedSeconds,
             lastUpdateMs = System.currentTimeMillis()
         )
 
         publishState()
+    }
+
+    private fun isTimeEligible(): Boolean {
+        return when (state.mode) {
+            TrackingMode.TRACKING_MANUAL -> true
+            TrackingMode.TRACKING_AUTO -> motionMoving && arIsActive &&
+                    (arActiveType == ActivityType.WALKING ||
+                            arActiveType == ActivityType.RUNNING ||
+                            arActiveType == ActivityType.ON_BICYCLE)
+            else -> false
+        }
     }
 
     /**
@@ -298,12 +377,17 @@ class TrackingController(
      * This is idempotent and can be called once at service startup.
      */
     fun applyBaseline(distanceOffset: Double, elapsedOffset: Long) {
-        baselineDistanceOffset = distanceOffset
-        baselineElapsedOffset = elapsedOffset
-        // Recompute state to include the baseline
+        baseDistanceMeters = distanceOffset
+        baseElapsedSeconds = elapsedOffset
+
+        // Recompute state to include the baseline.
+        val sessionDistance = if (sessions.isActive()) sessions.currentDistance() else 0.0
+        val sessionElapsed = if (sessions.isActive()) sessions.elapsedSeconds() else 0L
         state = state.copy(
-            distanceMeters = sessions.currentDistance() + baselineDistanceOffset,
-            elapsedSeconds = sessions.elapsedSeconds() + baselineElapsedOffset,
+            sessionDistanceMeters = sessionDistance,
+            sessionElapsedSeconds = sessionElapsed,
+            todayDistanceMeters = baseDistanceMeters + sessionDistance,
+            todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
             lastUpdateMs = System.currentTimeMillis()
         )
         publishState()

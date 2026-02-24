@@ -33,6 +33,9 @@ object MMKVStore {
         if (!kv.containsKey(KEY_GOAL_TIME_VALUE))     kv.encode(KEY_GOAL_TIME_VALUE, 0.0)
         if (!kv.containsKey(KEY_GOAL_TIME_UNIT))      kv.encode(KEY_GOAL_TIME_UNIT, "s")
         if (!kv.containsKey(KEY_BLOCKED_COUNT))  kv.encode(KEY_BLOCKED_COUNT, 0)
+        if (!kv.containsKey(KEY_PLAN_DAY))       kv.encode(KEY_PLAN_DAY, "")
+        if (!kv.containsKey(KEY_PLAN_ACTIVE_TODAY)) kv.encode(KEY_PLAN_ACTIVE_TODAY, false)
+        if (!kv.containsKey(KEY_IDLE_MONITORING_ENABLED)) kv.encode(KEY_IDLE_MONITORING_ENABLED, false)
     }
 
     // ---- Key constants (shared with JS side in src/storage.ts fastStorage) ----
@@ -54,6 +57,16 @@ object MMKVStore {
     const val KEY_GOAL_TIME_UNIT      = "goal_time_unit"
     // Number of distinct blocked packages currently configured by JS
     const val KEY_BLOCKED_COUNT = "blocked_count"
+
+    // Day scope for aggregated plan goals (YYYY-MM-DD). Written by JS alongside the aggregated goals.
+    const val KEY_PLAN_DAY = "plan_day"
+
+    // Whether there is at least one active plan for today (day + time window).
+    // Written by JS.
+    const val KEY_PLAN_ACTIVE_TODAY = "plan_active_today"
+
+    // Whether idle motion monitoring should be running even when no session is active.
+    const val KEY_IDLE_MONITORING_ENABLED = "idle_monitoring_enabled"
 
     // ---- Distance accumulation (called from TrackingService on each GPS fix) ----
 
@@ -105,6 +118,12 @@ object MMKVStore {
     // Blocked apps fast-path
     fun getBlockedCount(): Int = kv.decodeInt(KEY_BLOCKED_COUNT, 0)
 
+    fun getPlanDay(): String = kv.decodeString(KEY_PLAN_DAY) ?: ""
+
+    fun isPlanActiveToday(): Boolean = kv.decodeBool(KEY_PLAN_ACTIVE_TODAY, false)
+
+    fun isIdleMonitoringEnabled(): Boolean = kv.decodeBool(KEY_IDLE_MONITORING_ENABLED, false)
+
     // ---- Writers ----
 
     fun setGoalsReached(v: Boolean) = kv.encode(KEY_GOALS_REACHED, v)
@@ -123,6 +142,20 @@ object MMKVStore {
             kv.encode(KEY_GOALS_REACHED, false)
         }
         kv.encode(KEY_TODAY_ELAPSED, v)
+    }
+
+    /**
+     * Overwrites today's distance meters with an absolute value.
+     * Used by TrackingService to project canonical state into MMKV.
+     */
+    fun setTodayDistance(v: Double) {
+        val today = todayDate()
+        if (kv.decodeString(KEY_CURRENT_DAY) != today) {
+            kv.encode(KEY_CURRENT_DAY, today)
+            kv.encode(KEY_TODAY_ELAPSED, 0L)
+            kv.encode(KEY_GOALS_REACHED, false)
+        }
+        kv.encode(KEY_TODAY_DISTANCE, v)
     }
 
     fun setGoal(type: String, value: Double, unit: String) {
@@ -153,8 +186,22 @@ object MMKVStore {
         kv.encode(KEY_BLOCKED_COUNT, count)
     }
 
+    fun setPlanDay(day: String) {
+        kv.encode(KEY_PLAN_DAY, day)
+    }
+
+    fun setPlanActiveToday(v: Boolean) {
+        kv.encode(KEY_PLAN_ACTIVE_TODAY, v)
+    }
+
+    fun setIdleMonitoringEnabled(v: Boolean) {
+        kv.encode(KEY_IDLE_MONITORING_ENABLED, v)
+    }
+
     // ---- Helpers ----
 
     private fun todayDate(): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+    fun todayKey(): String = todayDate()
 }

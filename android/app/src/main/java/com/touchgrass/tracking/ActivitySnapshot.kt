@@ -1,7 +1,7 @@
 package com.touchgrass.tracking
 
 /**
- * Activity types that MotionService can report.
+ * Activity types that the motion engine can report.
  *
  * Maps 1:1 to Google Activity Recognition API types for clarity.
  * Integer codes used in intents:
@@ -17,7 +17,7 @@ enum class ActivityType {
 }
 
 /**
- * Snapshot of the current detected activity, as received from MotionService.
+ * Snapshot of the current detected activity, as received from the motion engine.
  *
  * @param type        The activity type.
  * @param confidence  Raw confidence in the 0-100 range.
