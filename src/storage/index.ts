@@ -28,6 +28,25 @@ export const fastStorage = {
     _mmkv.set('goal_type', type);
     _mmkv.set('goal_value', value);
     _mmkv.set('goal_unit', unit);
+    // Also write typed keys so native side can display both distance/time goals.
+    if (type === 'distance') {
+      _mmkv.set('goal_distance_value', value);
+      _mmkv.set('goal_distance_unit', unit);
+    } else if (type === 'time') {
+      _mmkv.set('goal_time_value', value);
+      _mmkv.set('goal_time_unit', unit);
+    } else {
+      _mmkv.set('goal_distance_value', 0);
+      _mmkv.set('goal_time_value', 0);
+    }
+  },
+  setGoalDistance(value: number, unit: string) {
+    _mmkv.set('goal_distance_value', value);
+    _mmkv.set('goal_distance_unit', unit);
+  },
+  setGoalTime(value: number, unit: string) {
+    _mmkv.set('goal_time_value', value);
+    _mmkv.set('goal_time_unit', unit);
   },
 };
 

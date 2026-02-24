@@ -66,6 +66,38 @@
 
 ---
 
+## 2.1 Current Implementation Mapping (repo-specific)
+
+This section maps the diagrammed architecture to the current TouchGrass repository and highlights practical differences.
+
+- **Single MMKV file:** The app uses one MMKV instance with id `touchgrass_state` (Kotlin: `MMKV.mmkvWithID("touchgrass_state", MMKV.MULTI_PROCESS_MODE)`, JS: `new MMKV({ id: 'touchgrass_state', mode: Mode.MULTI_PROCESS })`). Namespaced MMKV files are not currently used.
+
+- **Key set implemented today:**
+       - `current_day` — YYYY-MM-DD (Kotlin uses this for rollover)
+       - `today_distance_meters` — Double
+       - `today_elapsed_seconds` — Long
+       - `today_goals_reached` — Boolean
+       - `is_auto_tracking` — Boolean
+       - `goal_type`, `goal_value`, `goal_unit` — aggregated goal metadata (written by JS `fastStorage.setGoal`)
+       - `blocked_count` — Int (AppBlocker fast-path)
+
+- **Historical storage:** Daily/immutable snapshots and plan lists are kept in AsyncStorage (`daily_activity`, `blocking_plans`, `onboarding_complete`) rather than MMKV. JS `storage.saveDailyActivity()` persists day-level lists to AsyncStorage today.
+
+- **Runtime snapshot behaviour (current):** There is no single `live:activePlanSnapshot` JSON blob in MMKV. Instead, JS emits `PLANS_CHANGED_EVENT` and writes individual goal/blocked-count keys; native services read typed keys and receive blocker config via the native bridge when needed.
+
+- **Write frequency tradeoff:** The TrackingService writes MMKV frequently (on each GPS fix) to keep notification and UI realtime; Kotlin pre-encodes numeric keys at init to avoid decode buffer issues. The diagram recommendation to debounce writes (2–5s) is optional — current code favors immediacy and assumes MMKV can handle the load.
+
+- **JS double-count protection & restore flow:** `useTracking` avoids reading MMKV today's totals at boot when a session may be active. It uses `Tracking.getIsAutoTracking()` + `Tracking.getProgress()` to obtain live session state and reads MMKV for baseline only when not tracking or after stop events.
+
+- **Day rollover:** Implemented in `MMKVStore.accumulateTodayDistance()` and `setTodayElapsed()` by comparing `current_day`; the native side resets typed counters when the stored day differs from today's date.
+
+Implication: the diagrams remain a useful blueprint, but the repo uses a simpler, typed-key approach on a single MMKV id plus AsyncStorage for historical lists. Consider one of the following migration options if you want the diagram's namespaced key model implemented:
+
+- Migrate daily snapshots into MMKV (`metrics:daily:YYYY-MM-DD`) via a one-off migration that writes to a new MMKV id or encodes date-keyed JSON strings.
+- Keep `touchgrass_state` for fast counters and introduce a second MMKV id for `metrics` to avoid mixing high-frequency and historical keys.
+- Add an optional configurable throttle for TrackingService MMKV writes and validate performance on target devices.
+
+
 ### B. Runtime Snapshot Diagram
 
 ```

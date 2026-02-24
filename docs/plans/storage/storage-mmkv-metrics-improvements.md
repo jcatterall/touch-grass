@@ -150,6 +150,40 @@ type LiveProgress = {
 
 ---
 
+## 2.1 Current Implementation Mapping (repo-specific)
+
+This section maps the architectural plan to the current TouchGrass implementation and highlights where behaviour differs from the idealized plan.
+
+- **MMKV container (single id):** The app uses one MMKV instance with id `touchgrass_state` (Kotlin: `MMKV.mmkvWithID("touchgrass_state", MMKV.MULTI_PROCESS_MODE)`, JS: `new MMKV({ id: 'touchgrass_state', mode: Mode.MULTI_PROCESS })`).
+
+- **Implemented MMKV keys (Kotlin ↔ JS `fastStorage`):**
+   - `current_day` — YYYY-MM-DD (used for rollover)
+   - `today_distance_meters` — Double
+   - `today_elapsed_seconds` — Long
+   - `today_goals_reached` — Boolean
+   - `is_auto_tracking` — Boolean
+   - `goal_type`, `goal_value`, `goal_unit` — aggregated goal metadata
+   - `blocked_count` — Int (number of blocked packages)
+
+- **Where historical snapshots live today:** Daily/immutable snapshots remain in AsyncStorage under the `daily_activity` key (JS: `storage.saveDailyActivity`) rather than MMKV. Plans and onboarding data also remain in AsyncStorage (`blocking_plans`, `onboarding_complete`, etc.).
+
+- **Runtime snapshot model (current):** There is no single `live:activePlanSnapshot` JSON blob in MMKV. Instead the native side reads a small set of typed keys (`blocked_count`, `goal_*`, `is_auto_tracking`, today's totals) and the JS side emits `PLANS_CHANGED_EVENT` to coordinate plan changes. AppBlocker receives config over the native bridge.
+
+- **Write frequency vs debounce:** The TrackingService currently writes MMKV on each location/fix (high-frequency, often 1–2Hz) to keep notifications and the UI realtime-synced. The plan's suggestion to debounce (2–5s) is a recommendation; current code intentionally uses an unthrottled fast-path because MMKV writes are C++ mmap-backed and low-overhead. The code also pre-encodes numeric keys on init to avoid decode errors.
+
+- **JS initialization and double-count protection:** `useTracking` intentionally avoids reading `today_distance_meters` at init when a session may be active (to prevent double-counting). Instead it relies on `Tracking.getIsAutoTracking()` and `Tracking.getProgress()` to recover live session state, or reads MMKV after a session stops to obtain the completed baseline.
+
+- **Rollover handling:** Rollover logic for daily counters exists on the Kotlin side (`MMKVStore.accumulateTodayDistance()` and `setTodayElapsed()` check `current_day` and reset keys when the stored date differs). JS relies on these values for baseline reads.
+
+Notes / Implications:
+
+- The current implementation already matches the plan's core requirement: a native-first, synchronous MMKV fast-path for today's totals and flags. However, the plan's multi-namespace proposal (e.g., `metrics:daily:YYYY-MM-DD`, `live:progress` as separate namespace files) is not present — the app uses one MMKV id and typed keys plus AsyncStorage for historical lists.
+
+- If you want to migrate daily snapshots and rolling aggregates into MMKV (to match the time-bucketed key design), add a migration step that writes `metrics:daily:YYYY-MM-DD` entries into MMKV or a secondary MMKV file, and keep `touchgrass_state` for fast counters and flags.
+
+- Because the app intentionally writes high-frequency MMKV updates from the native TrackingService, the plan should record that unthrottled writes are acceptable in this implementation but note performance testing and a configurable throttle should be kept as an option.
+
+
 ## 3️⃣ Data Flow & Operational Details
 
 1. **Session Start / Motion Detected:**

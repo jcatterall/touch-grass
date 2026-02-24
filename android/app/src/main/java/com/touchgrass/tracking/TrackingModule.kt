@@ -4,9 +4,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.IBinder
 import android.util.Log
 import androidx.core.content.ContextCompat
+import android.Manifest
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -102,6 +104,14 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         }
 
         try {
+            if (!hasLocationPermission()) {
+                Log.w(TAG, "startTracking called without location permission; not starting TrackingService")
+                // Resolve "false" so JS can distinguish a no-op from success
+                // without surfacing an error.
+                promise.resolve(false)
+                return
+            }
+
             val context = reactApplicationContext
             val intent = Intent(context, TrackingService::class.java).apply {
                 putExtra(TrackingConstants.EXTRA_GOAL_TYPE, goalType)
@@ -197,6 +207,12 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         try {
             val context = reactApplicationContext
 
+            if (!hasLocationPermission()) {
+                Log.w(TAG, "startIdleService called without location permission; not starting TrackingService")
+                promise.resolve(false)
+                return
+            }
+
             MotionTrackingBridge.init(context)
 
             val trackingIntent = Intent(context, TrackingService::class.java).apply {
@@ -246,6 +262,23 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     @ReactMethod
+    fun notifyGoalsUpdated(promise: Promise) {
+        try {
+            val context = reactApplicationContext
+            if (MMKVStore.isAutoTracking() && hasLocationPermission()) {
+                val intent = Intent(context, TrackingService::class.java).apply {
+                    action = TrackingConstants.ACTION_GOALS_UPDATED
+                }
+                ContextCompat.startForegroundService(context, intent)
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.w(TAG, "notifyGoalsUpdated failed", e)
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun addListener(eventName: String) { /* Required for NativeEventEmitter */ }
 
     @ReactMethod
@@ -275,6 +308,13 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         } catch (e: Exception) {
             Log.w(TAG, "Failed to send event $eventName", e)
         }
+    }
+
+    private fun hasLocationPermission(): Boolean {
+        val context = reactApplicationContext
+        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+        return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
     }
 
     companion object {

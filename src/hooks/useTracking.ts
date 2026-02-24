@@ -5,6 +5,7 @@ import {
   EmitterSubscription,
 } from 'react-native';
 import { storage, fastStorage, PLANS_CHANGED_EVENT } from '../storage';
+import { NativeModules } from 'react-native';
 import { BlockingPlan, DayKey } from '../types';
 import {
   MotionTracker,
@@ -198,12 +199,23 @@ export function useTracking(): TrackingState {
   // Keep the native notification in sync with the real aggregated goal.
   // TrackingService reads these MMKV keys to display accurate progress.
   useEffect(() => {
-    if (goals.hasDistanceGoal) {
-      fastStorage.setGoal('distance', goals.totalDistanceMeters, 'm');
-    } else if (goals.hasTimeGoal) {
-      fastStorage.setGoal('time', goals.totalTimeSeconds, 's');
-    } else {
-      fastStorage.setGoal('none', 0, '');
+    try {
+      if (goals.hasDistanceGoal && goals.hasTimeGoal) {
+        // Write both typed keys so native notification can display both.
+        fastStorage.setGoalDistance(goals.totalDistanceMeters, 'm');
+        fastStorage.setGoalTime(goals.totalTimeSeconds, 's');
+        // Also update aggregated compatibility key (distance first)
+        fastStorage.setGoal('distance', goals.totalDistanceMeters, 'm');
+      } else if (goals.hasDistanceGoal) {
+        fastStorage.setGoal('distance', goals.totalDistanceMeters, 'm');
+      } else if (goals.hasTimeGoal) {
+        fastStorage.setGoal('time', goals.totalTimeSeconds, 's');
+      } else {
+        fastStorage.setGoal('none', 0, '');
+      }
+      NativeModules.TrackingModule?.notifyGoalsUpdated?.()?.catch?.(() => {});
+    } catch (e) {
+      // best-effort
     }
   }, [goals]);
 
@@ -254,6 +266,13 @@ export function useTracking(): TrackingState {
       const currentProgress = progressRef.current;
 
       if (blockingPlans.length === 0) {
+        // No active blocking plans today — clear native blocker config
+        // so native notification reflects that there are no active blocks.
+        try {
+          await AppBlocker.updateBlockerConfig([], true, false);
+        } catch (e) {
+          // best-effort
+        }
         await AppBlocker.stopBlocker();
         return;
       }
@@ -516,11 +535,17 @@ export function useTracking(): TrackingState {
     trackingStarted.current = false;
     lastNativeUpdate.current = null;
     setDebugNativeRunning(false);
-    setDailyBaseline(prev => ({
-      distanceMeters: prev.distanceMeters + dist,
-      elapsedSeconds: prev.elapsedSeconds + elapsed,
-      goalReached: prev.goalReached || allGoalsReached,
-    }));
+    // Read authoritative completed-today totals from MMKV (fastStorage) rather
+    // than adding the session distance locally. This avoids double-counting
+    // when native also persisted the same deltas to MMKV on stop.
+    // Wait a short grace period to allow native -> MMKV sync to complete.
+    await new Promise<void>(res => setTimeout(res, 150));
+    setDailyBaseline({
+      distanceMeters: fastStorage.getTodayDistance(),
+      elapsedSeconds: fastStorage.getTodayElapsed(),
+      goalReached: fastStorage.getGoalsReached(),
+    });
+
     setSessionProgress({
       distanceMeters: 0,
       elapsedSeconds: 0,

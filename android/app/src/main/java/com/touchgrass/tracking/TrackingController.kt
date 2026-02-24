@@ -46,6 +46,9 @@ class TrackingController(
     private var state = TrackingState()
     private var lastLocation: Location? = null
     private var lastNotificationMs = 0L
+    // Baseline offsets merged from persisted daily totals (not owned by SessionManager)
+    private var baselineDistanceOffset = 0.0
+    private var baselineElapsedOffset = 0L
 
     // Pending Runnable that ends the session after the stationary buffer expires.
     private val stationaryBufferRunnable = Runnable {
@@ -60,8 +63,8 @@ class TrackingController(
         override fun run() {
             if (state.mode == TrackingMode.TRACKING_MANUAL && sessions.isActive()) {
                 state = state.copy(
-                    elapsedSeconds = sessions.elapsedSeconds(),
-                    distanceMeters = sessions.currentDistance(),
+                    elapsedSeconds = sessions.elapsedSeconds() + baselineElapsedOffset,
+                    distanceMeters = sessions.currentDistance() + baselineDistanceOffset,
                     lastUpdateMs = System.currentTimeMillis()
                 )
                 publishState()
@@ -171,8 +174,8 @@ class TrackingController(
             sessions.addDistance(delta)
             MMKVStore.accumulateTodayDistance(delta.toDouble())
             state = state.copy(
-                distanceMeters = sessions.currentDistance(),
-                elapsedSeconds = sessions.elapsedSeconds(),
+                distanceMeters = sessions.currentDistance() + baselineDistanceOffset,
+                elapsedSeconds = sessions.elapsedSeconds() + baselineElapsedOffset,
                 lastUpdateMs = System.currentTimeMillis()
             )
             publishState()
@@ -180,8 +183,8 @@ class TrackingController(
             // No distance delta accepted, but in manual mode we should still
             // publish elapsed time so the UI shows progress.
             state = state.copy(
-                distanceMeters = sessions.currentDistance(),
-                elapsedSeconds = sessions.elapsedSeconds(),
+                distanceMeters = sessions.currentDistance() + baselineDistanceOffset,
+                elapsedSeconds = sessions.elapsedSeconds() + baselineElapsedOffset,
                 lastUpdateMs = System.currentTimeMillis()
             )
             publishState()
@@ -195,8 +198,8 @@ class TrackingController(
         sessions.start()
         state = state.copy(
             mode = TrackingMode.TRACKING_MANUAL,
-            distanceMeters = 0.0,
-            elapsedSeconds = 0,
+            distanceMeters = 0.0 + baselineDistanceOffset,
+            elapsedSeconds = 0 + baselineElapsedOffset,
             goalReached = false,
             gpsMode = GpsMode.HIGH_ACCURACY,
             lastUpdateMs = System.currentTimeMillis()
@@ -234,8 +237,8 @@ class TrackingController(
         sessions.start()
         state = state.copy(
             mode = TrackingMode.TRACKING_AUTO,
-            distanceMeters = 0.0,
-            elapsedSeconds = 0,
+            distanceMeters = 0.0 + baselineDistanceOffset,
+            elapsedSeconds = 0 + baselineElapsedOffset,
             goalReached = false,
             lastUpdateMs = System.currentTimeMillis()
         )
@@ -274,8 +277,8 @@ class TrackingController(
         state = state.copy(
             mode = TrackingMode.IDLE,
             gpsMode = GpsMode.OFF,
-            distanceMeters = if (wasActive) finalDistance else 0.0,
-            elapsedSeconds = if (wasActive) finalElapsed else 0L,
+            distanceMeters = if (wasActive) finalDistance + baselineDistanceOffset else 0.0 + baselineDistanceOffset,
+            elapsedSeconds = if (wasActive) finalElapsed + baselineElapsedOffset else 0L + baselineElapsedOffset,
             lastUpdateMs = System.currentTimeMillis()
         )
 
@@ -288,5 +291,21 @@ class TrackingController(
      */
     private fun publishState() {
         onStateChanged(state)
+    }
+
+    /**
+     * Apply a persisted daily baseline so the controller reports `baseline + session`.
+     * This is idempotent and can be called once at service startup.
+     */
+    fun applyBaseline(distanceOffset: Double, elapsedOffset: Long) {
+        baselineDistanceOffset = distanceOffset
+        baselineElapsedOffset = elapsedOffset
+        // Recompute state to include the baseline
+        state = state.copy(
+            distanceMeters = sessions.currentDistance() + baselineDistanceOffset,
+            elapsedSeconds = sessions.elapsedSeconds() + baselineElapsedOffset,
+            lastUpdateMs = System.currentTimeMillis()
+        )
+        publishState()
     }
 }

@@ -13,6 +13,7 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.UiThreadUtil
+import androidx.core.content.ContextCompat
 import org.json.JSONArray
 
 class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
@@ -77,6 +78,25 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
                 .putBoolean(AppBlockerService.PREF_GOALS_REACHED, goalsReached)
                 .putBoolean(AppBlockerService.PREF_HAS_PERMANENT, hasPermanent)
                 .apply()
+
+            // Mirror the blocked package count into MMKV so native notifications
+            // can synchronously read the number of blocked apps without bridge overhead.
+            try {
+                MMKVStore.setBlockedCount(blockedPackages.size())
+            } catch (e: Exception) {
+                // Non-fatal — log and continue
+            }
+            // Also notify TrackingService to refresh its persistent notification
+            try {
+                if (MMKVStore.isAutoTracking()) {
+                    val intent = Intent(reactApplicationContext, com.touchgrass.tracking.TrackingService::class.java).apply {
+                        action = com.touchgrass.tracking.TrackingConstants.ACTION_GOALS_UPDATED
+                    }
+                    ContextCompat.startForegroundService(reactApplicationContext, intent)
+                }
+            } catch (e: Exception) {
+                // best-effort
+            }
 
             promise.resolve(true)
         } catch (e: Exception) {

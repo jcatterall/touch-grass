@@ -62,4 +62,6 @@ object TrackingConstants {
     // AppBlocker coordination
     const val ACTION_BLOCKER_STARTED = "com.touchgrass.action.BLOCKER_STARTED"
     const val ACTION_BLOCKER_STOPPED = "com.touchgrass.action.BLOCKER_STOPPED"
+    // Notification / goals update — JS/native notify to refresh persistent notification
+    const val ACTION_GOALS_UPDATED = "com.touchgrass.action.GOALS_UPDATED"
 }

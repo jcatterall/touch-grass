@@ -2,16 +2,23 @@ package com.touchgrass.tracking
 
 import android.app.NotificationManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.Manifest
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.lifecycle.LifecycleService
+import androidx.core.content.ContextCompat
 import com.touchgrass.HeartbeatManager
 import com.touchgrass.MMKVStore
 import com.touchgrass.storage.SessionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -75,6 +82,9 @@ class TrackingService : LifecycleService() {
     // Track whether the AppBlocker overlay is running so we can append it to the notification.
     private var blockerActive = false
 
+    // Whether we've merged persisted daily totals into the controller state.
+    private var baselineMerged = false
+
     // ── Binder (for TrackingModule to access progress values) ─────────────────
 
     private val binder = TrackingBinder()
@@ -113,6 +123,32 @@ class TrackingService : LifecycleService() {
             }
         )
 
+        // Merge persisted daily totals into controller state before posting foreground
+        if (!baselineMerged) {
+            runBlocking {
+                try {
+                    val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                    val daily = repo.getDailyTotal(today)
+                    if (daily != null) {
+                        Log.d(TAG, "Merging persisted daily totals: distance=${daily.distanceMeters} elapsed=${daily.elapsedSeconds}")
+                        controller.applyBaseline(daily.distanceMeters, daily.elapsedSeconds)
+                        baselineMerged = true
+                    } else {
+                        // Fallback to MMKV fast-path if Room has no aggregate yet.
+                        val mmkvDist = MMKVStore.getTodayDistance()
+                        val mmkvElapsed = MMKVStore.getTodayElapsed()
+                        if (mmkvDist > 0.0 || mmkvElapsed > 0L) {
+                            Log.d(TAG, "Merging MMKV baseline: distance=$mmkvDist elapsed=$mmkvElapsed")
+                            controller.applyBaseline(mmkvDist, mmkvElapsed)
+                            baselineMerged = true
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed merging persisted totals: ${e.message}")
+                }
+            }
+        }
+
         // Must call startForeground before returning from onCreate.
         postForeground(controller.currentState())
         Log.d(TAG, "Service created")
@@ -148,6 +184,12 @@ class TrackingService : LifecycleService() {
 
             TrackingConstants.ACTION_BLOCKER_STOPPED -> {
                 blockerActive = false
+                refreshNotification()
+                return START_STICKY
+            }
+
+            TrackingConstants.ACTION_GOALS_UPDATED -> {
+                Log.d(TAG, "ACTION_GOALS_UPDATED — refreshing notification")
                 refreshNotification()
                 return START_STICKY
             }
@@ -277,6 +319,10 @@ class TrackingService : LifecycleService() {
     }
 
     private fun refreshNotification(s: TrackingState = _state.value) {
+        // If there are no active plans and nothing to display, cancel notification
+        // Always refresh the persistent notification; the builder will decide
+        // whether to show progress, a "no active blocks" message, or a
+        // blocked-apps count.
         val n = notificationHelper.build(s)
         getSystemService(NotificationManager::class.java).notify(TrackingConstants.NOTIFICATION_ID, n)
     }
@@ -284,14 +330,40 @@ class TrackingService : LifecycleService() {
     /** Call startForeground immediately — required before any async work. */
     private fun postForeground(s: TrackingState) {
         val notification = notificationHelper.build(s)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                TrackingConstants.NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            )
-        } else {
-            startForeground(TrackingConstants.NOTIFICATION_ID, notification)
+
+        // Starting a location-type foreground service without location
+        // permission will crash on Android 14+ with a SecurityException.
+        // If we don't currently hold runtime location permission, stop the
+        // service instead of attempting to enter the foreground.
+        if (!hasLocationPermission()) {
+            Log.w(TAG, "Missing location permission; stopping TrackingService instead of starting foreground")
+            stopSelf()
+            return
         }
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    TrackingConstants.NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                )
+            } else {
+                startForeground(TrackingConstants.NOTIFICATION_ID, notification)
+            }
+        } catch (se: SecurityException) {
+            // If the platform still rejects the foreground promotion (e.g. not
+            // in an eligible state), fail closed by stopping the service so the
+            // app process doesn't crash.
+            Log.e(TAG, "Failed to start foreground with location type; stopping self", se)
+            stopSelf()
+        }
+    }
+
+    private fun hasLocationPermission(): Boolean {
+        // Check for either fine or coarse location permission at runtime.
+        val fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+        val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+        return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
     }
 }

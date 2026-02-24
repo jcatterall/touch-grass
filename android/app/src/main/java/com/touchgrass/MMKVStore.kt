@@ -28,6 +28,11 @@ object MMKVStore {
         if (!kv.containsKey(KEY_TODAY_DISTANCE)) kv.encode(KEY_TODAY_DISTANCE, 0.0)
         if (!kv.containsKey(KEY_TODAY_ELAPSED))  kv.encode(KEY_TODAY_ELAPSED, 0L)
         if (!kv.containsKey(KEY_GOAL_VALUE))     kv.encode(KEY_GOAL_VALUE, 0.0)
+        if (!kv.containsKey(KEY_GOAL_DISTANCE_VALUE)) kv.encode(KEY_GOAL_DISTANCE_VALUE, 0.0)
+        if (!kv.containsKey(KEY_GOAL_DISTANCE_UNIT))  kv.encode(KEY_GOAL_DISTANCE_UNIT, "m")
+        if (!kv.containsKey(KEY_GOAL_TIME_VALUE))     kv.encode(KEY_GOAL_TIME_VALUE, 0.0)
+        if (!kv.containsKey(KEY_GOAL_TIME_UNIT))      kv.encode(KEY_GOAL_TIME_UNIT, "s")
+        if (!kv.containsKey(KEY_BLOCKED_COUNT))  kv.encode(KEY_BLOCKED_COUNT, 0)
     }
 
     // ---- Key constants (shared with JS side in src/storage.ts fastStorage) ----
@@ -42,6 +47,13 @@ object MMKVStore {
     const val KEY_GOAL_TYPE  = "goal_type"
     const val KEY_GOAL_VALUE = "goal_value"
     const val KEY_GOAL_UNIT  = "goal_unit"
+    // New: separate keys for distance/time so multiple goals can be active.
+    const val KEY_GOAL_DISTANCE_VALUE = "goal_distance_value"
+    const val KEY_GOAL_DISTANCE_UNIT  = "goal_distance_unit"
+    const val KEY_GOAL_TIME_VALUE     = "goal_time_value"
+    const val KEY_GOAL_TIME_UNIT      = "goal_time_unit"
+    // Number of distinct blocked packages currently configured by JS
+    const val KEY_BLOCKED_COUNT = "blocked_count"
 
     // ---- Distance accumulation (called from TrackingService on each GPS fix) ----
 
@@ -84,6 +96,15 @@ object MMKVStore {
     fun getGoalValue(): Double = kv.decodeDouble(KEY_GOAL_VALUE, 5000.0)
     fun getGoalUnit(): String  = kv.decodeString(KEY_GOAL_UNIT) ?: "m"
 
+    // ---- New: separate goal readers ----
+    fun getGoalDistanceValue(): Double = kv.decodeDouble(KEY_GOAL_DISTANCE_VALUE, 0.0)
+    fun getGoalDistanceUnit(): String  = kv.decodeString(KEY_GOAL_DISTANCE_UNIT) ?: "m"
+    fun getGoalTimeValue(): Double     = kv.decodeDouble(KEY_GOAL_TIME_VALUE, 0.0)
+    fun getGoalTimeUnit(): String      = kv.decodeString(KEY_GOAL_TIME_UNIT) ?: "s"
+
+    // Blocked apps fast-path
+    fun getBlockedCount(): Int = kv.decodeInt(KEY_BLOCKED_COUNT, 0)
+
     // ---- Writers ----
 
     fun setGoalsReached(v: Boolean) = kv.encode(KEY_GOALS_REACHED, v)
@@ -108,6 +129,28 @@ object MMKVStore {
         kv.encode(KEY_GOAL_TYPE, type)
         kv.encode(KEY_GOAL_VALUE, value)
         kv.encode(KEY_GOAL_UNIT, unit)
+        // Also write to the separate typed keys for compatibility when JS
+        // writes both distance and time goals. This keeps native readers
+        // in sync with the fast-path keys.
+        when (type) {
+            "distance" -> {
+                kv.encode(KEY_GOAL_DISTANCE_VALUE, value)
+                kv.encode(KEY_GOAL_DISTANCE_UNIT, unit)
+            }
+            "time" -> {
+                kv.encode(KEY_GOAL_TIME_VALUE, value)
+                kv.encode(KEY_GOAL_TIME_UNIT, unit)
+            }
+            else -> {
+                // clear typed keys
+                kv.encode(KEY_GOAL_DISTANCE_VALUE, 0.0)
+                kv.encode(KEY_GOAL_TIME_VALUE, 0.0)
+            }
+        }
+    }
+
+    fun setBlockedCount(count: Int) {
+        kv.encode(KEY_BLOCKED_COUNT, count)
     }
 
     // ---- Helpers ----

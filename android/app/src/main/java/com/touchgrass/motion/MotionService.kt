@@ -14,6 +14,8 @@ import android.util.Log
 import com.touchgrass.tracking.TrackingConstants
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import com.touchgrass.tracking.NotificationHelper
+import com.touchgrass.tracking.TrackingState
 
 /**
  * Foreground service that keeps the motion tracking engine alive when the
@@ -132,23 +134,8 @@ class MotionService : Service() {
     }
 
     private fun buildNotification(): Notification {
-        // Tapping the notification opens the main React Native activity
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            launchIntent ?: Intent(),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        return NotificationCompat.Builder(this, config.notificationChannelId)
-            .setContentTitle(config.notificationTitle)
-            .setContentText(config.notificationBody)
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setOngoing(true)
-            .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .build()
+        // Reuse NotificationHelper so MotionService and TrackingService show consistent content
+        val helper = NotificationHelper(this)
+        return helper.build(TrackingState())
     }
 }
