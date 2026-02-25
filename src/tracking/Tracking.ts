@@ -15,6 +15,20 @@ export interface TrackingProgress {
   goalReached: boolean;
 }
 
+export type NativeTrackingMode = 'idle' | 'manual' | 'auto';
+
+export interface TrackingAnchor {
+  todayDistanceMeters: number;
+  todayElapsedSeconds: number;
+  sessionDistanceMeters: number;
+  sessionElapsedSeconds: number;
+  goalReached: boolean;
+  isTracking: boolean;
+  mode: NativeTrackingMode;
+  shouldTick: boolean;
+  lastUpdateMs: number;
+}
+
 const emitter = isAvailable ? new NativeEventEmitter(TrackingModule) : null;
 
 export const Tracking = {
@@ -48,11 +62,35 @@ export const Tracking = {
     return TrackingModule.getProgress();
   },
 
+  async getTrackingAnchor(): Promise<TrackingAnchor> {
+    if (!isAvailable) {
+      return {
+        todayDistanceMeters: 0,
+        todayElapsedSeconds: 0,
+        sessionDistanceMeters: 0,
+        sessionElapsedSeconds: 0,
+        goalReached: false,
+        isTracking: false,
+        mode: 'idle',
+        shouldTick: false,
+        lastUpdateMs: Date.now(),
+      };
+    }
+    return TrackingModule.getTrackingAnchor();
+  },
+
   onProgress(
     callback: (progress: TrackingProgress) => void,
   ): EmitterSubscription | null {
     if (!emitter) return null;
     return emitter.addListener('onTrackingProgress', callback);
+  },
+
+  onAnchor(
+    callback: (anchor: TrackingAnchor) => void,
+  ): EmitterSubscription | null {
+    if (!emitter) return null;
+    return emitter.addListener('onTrackingAnchor', callback);
   },
 
   onGoalReached(callback: () => void): EmitterSubscription | null {

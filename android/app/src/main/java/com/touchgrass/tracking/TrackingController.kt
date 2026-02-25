@@ -69,7 +69,8 @@ class TrackingController(
             if (!sessions.isActive()) return
             if (state.mode != TrackingMode.TRACKING_MANUAL && state.mode != TrackingMode.TRACKING_AUTO) return
 
-            sessions.tick(isTimeEligible())
+            val eligible = isTimeEligible()
+            sessions.tick(eligible)
 
             val sessionElapsed = sessions.elapsedSeconds()
             val sessionDistance = sessions.currentDistance()
@@ -78,6 +79,7 @@ class TrackingController(
                 sessionDistanceMeters = sessionDistance,
                 todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
                 todayDistanceMeters = baseDistanceMeters + sessionDistance,
+                isTimeEligible = eligible,
                 lastUpdateMs = System.currentTimeMillis()
             )
             publishState()
@@ -197,7 +199,8 @@ class TrackingController(
         }
 
         // Keep elapsed current even when GPS deltas are rejected.
-        sessions.tick(isTimeEligible())
+        val eligible = isTimeEligible()
+        sessions.tick(eligible)
 
         // GPS drift guard: require meaningful speed (≥ 0.5 m/s) to filter stationary GPS noise.
         // Skip this guard for manual sessions so slow walking still accumulates.
@@ -228,6 +231,7 @@ class TrackingController(
                 sessionElapsedSeconds = sessionElapsed,
                 todayDistanceMeters = baseDistanceMeters + sessionDistance,
                 todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
+                isTimeEligible = eligible,
                 lastUpdateMs = System.currentTimeMillis()
             )
             publishState()
@@ -240,6 +244,7 @@ class TrackingController(
                 sessionElapsedSeconds = sessionElapsed,
                 todayDistanceMeters = baseDistanceMeters + sessionDistance,
                 todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
+                isTimeEligible = eligible,
                 lastUpdateMs = System.currentTimeMillis()
             )
             publishState()
@@ -257,6 +262,7 @@ class TrackingController(
             sessionElapsedSeconds = 0L,
             todayDistanceMeters = baseDistanceMeters,
             todayElapsedSeconds = baseElapsedSeconds,
+            isTimeEligible = true,
             goalReached = false,
             gpsMode = GpsMode.HIGH_ACCURACY,
             lastUpdateMs = System.currentTimeMillis()
@@ -298,6 +304,7 @@ class TrackingController(
             sessionElapsedSeconds = 0L,
             todayDistanceMeters = baseDistanceMeters,
             todayElapsedSeconds = baseElapsedSeconds,
+            isTimeEligible = isTimeEligible(),
             goalReached = false,
             lastUpdateMs = System.currentTimeMillis()
         )
@@ -347,6 +354,7 @@ class TrackingController(
             sessionElapsedSeconds = 0L,
             todayDistanceMeters = baseDistanceMeters,
             todayElapsedSeconds = baseElapsedSeconds,
+            isTimeEligible = false,
             lastUpdateMs = System.currentTimeMillis()
         )
 
@@ -369,6 +377,10 @@ class TrackingController(
      * also trigger a notification refresh (throttled to avoid spamming).
      */
     private fun publishState() {
+        val eligible = isTimeEligible()
+        if (state.isTimeEligible != eligible) {
+            state = state.copy(isTimeEligible = eligible)
+        }
         onStateChanged(state)
     }
 
@@ -388,6 +400,7 @@ class TrackingController(
             sessionElapsedSeconds = sessionElapsed,
             todayDistanceMeters = baseDistanceMeters + sessionDistance,
             todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
+            isTimeEligible = isTimeEligible(),
             lastUpdateMs = System.currentTimeMillis()
         )
         publishState()

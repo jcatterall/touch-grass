@@ -12,6 +12,9 @@ interface TrackingDao {
 
     // ---- Sessions ----
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertSession(session: SessionEntity)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertSession(session: SessionEntity)
 
@@ -28,6 +31,32 @@ interface TrackingDao {
 
     @Query("SELECT * FROM daily_totals WHERE date = :date LIMIT 1")
     suspend fun getDailyTotal(date: String): DailyTotalEntity?
+
+    /**
+     * Seeds the daily_totals row with absolute values if it doesn't exist.
+     * This must not be implemented via accumulateDaily, otherwise calling it
+     * multiple times would double-count.
+     */
+    @Transaction
+    suspend fun seedDailyTotalIfMissing(
+        date: String,
+        distanceMeters: Double,
+        elapsedSeconds: Long,
+        goalsReached: Boolean,
+    ) {
+        val existing = getDailyTotal(date)
+        if (existing != null) return
+        upsertDailyTotal(
+            DailyTotalEntity(
+                date = date,
+                distanceMeters = distanceMeters,
+                elapsedSeconds = elapsedSeconds,
+                goalsReached = goalsReached,
+                sessionCount = 0,
+                lastUpdatedMs = System.currentTimeMillis(),
+            )
+        )
+    }
 
     @Query("SELECT * FROM daily_totals ORDER BY date DESC LIMIT :limit")
     suspend fun getRecentDailyTotals(limit: Int): List<DailyTotalEntity>

@@ -1,5 +1,7 @@
 package com.touchgrass.tracking
 
+import android.os.SystemClock
+
 /**
  * In-memory session accumulator.
  *
@@ -14,13 +16,13 @@ class SessionManager {
 
     private var distance = 0.0
     private var elapsedMs = 0L
-    private var lastTickMs = 0L
+    private var lastTickElapsedRealtimeMs = 0L
 
     /** Begin a new session, resetting all accumulators. */
     fun start() {
         distance = 0.0
         elapsedMs = 0L
-        lastTickMs = System.currentTimeMillis()
+        lastTickElapsedRealtimeMs = SystemClock.elapsedRealtime()
     }
 
     /** Add [meters] to the running distance total. */
@@ -34,14 +36,14 @@ class SessionManager {
      * Caller controls the tick frequency (typically 1s and/or on GPS fixes).
      */
     fun tick(eligible: Boolean) {
-        if (lastTickMs == 0L) {
-            lastTickMs = System.currentTimeMillis()
+        if (lastTickElapsedRealtimeMs == 0L) {
+            lastTickElapsedRealtimeMs = SystemClock.elapsedRealtime()
             return
         }
-        val now = System.currentTimeMillis()
-        val delta = now - lastTickMs
-        lastTickMs = now
-        if (eligible && delta > 0) {
+        val now = SystemClock.elapsedRealtime()
+        val delta = now - lastTickElapsedRealtimeMs
+        lastTickElapsedRealtimeMs = now
+        if (eligible && delta > 0L) {
             elapsedMs += delta
         }
     }
@@ -63,9 +65,9 @@ class SessionManager {
         val result = distance to elapsedSeconds()
         distance = 0.0
         elapsedMs = 0L
-        lastTickMs = 0L
+        lastTickElapsedRealtimeMs = 0L
         return result
     }
 
-    fun isActive(): Boolean = lastTickMs > 0L
+    fun isActive(): Boolean = lastTickElapsedRealtimeMs > 0L
 }

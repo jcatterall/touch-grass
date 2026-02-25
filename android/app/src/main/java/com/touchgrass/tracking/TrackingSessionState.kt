@@ -10,6 +10,11 @@ data class TrackingSessionState(
     val mode: TrackingMode = TrackingMode.IDLE,
     val gpsMode: GpsMode = GpsMode.OFF,
 
+    // Whether elapsed time is currently eligible to accumulate.
+    // - Manual: true (always)
+    // - Auto: true only when AR + motion gates are active
+    val isTimeEligible: Boolean = false,
+
     // Session-scoped
     val sessionDistanceMeters: Double = 0.0,
     val sessionElapsedSeconds: Long = 0L,

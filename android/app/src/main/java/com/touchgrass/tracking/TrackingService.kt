@@ -73,6 +73,7 @@ class TrackingService : LifecycleService() {
     // ── Listener callbacks (used by TrackingModule while bound) ───────────────
 
     var onProgressUpdate: ((Double, Long, Boolean) -> Unit)? = null
+    var onSessionStateUpdate: ((TrackingSessionState) -> Unit)? = null
     var onGoalReachedCallback: (() -> Unit)? = null
     var onTrackingStoppedCallback: (() -> Unit)? = null
 
@@ -154,10 +155,12 @@ class TrackingService : LifecycleService() {
                         // from older versions), seed Room once so it becomes authoritative.
                         val mmkvDist = MMKVStore.getTodayDistance()
                         val mmkvElapsed = MMKVStore.getTodayElapsed()
-                        if (mmkvDist > 0.0 || mmkvElapsed > 0L) {
+                        // Never seed while a session is active; MMKV may include an in-flight session
+                        // which would be double-counted when the session later closes.
+                        if (!MMKVStore.isAutoTracking() && (mmkvDist > 0.0 || mmkvElapsed > 0L)) {
                             Log.d(TAG, "Merging MMKV baseline: distance=$mmkvDist elapsed=$mmkvElapsed")
                             controller.applyBaseline(mmkvDist, mmkvElapsed)
-                            repo.accumulateDaily(mmkvDist, mmkvElapsed, MMKVStore.getGoalsReached())
+                            repo.seedDailyTotalIfMissing(today, mmkvDist, mmkvElapsed, MMKVStore.getGoalsReached())
                             baselineMerged = true
                         }
                     }
@@ -175,6 +178,7 @@ class TrackingService : LifecycleService() {
         MotionSessionController.trackingSink = object : MotionTrackingSink {
             override fun onMotionStarted(activityType: String) {
                 if (!hasLocationPermission()) return
+                if (!MMKVStore.isIdleMonitoringEnabled()) return
                 controller.onMotion(activityType.toActivitySnapshotStarted())
             }
 
@@ -321,6 +325,8 @@ class TrackingService : LifecycleService() {
     val elapsedSeconds: Long   get() = _state.value.elapsedSeconds
     val goalReached: Boolean   get() = _state.value.goalReached
 
+    val currentSessionState: TrackingSessionState get() = _sessionState.value
+
     // ── Internal helpers ──────────────────────────────────────────────────────
 
     /**
@@ -358,6 +364,7 @@ class TrackingService : LifecycleService() {
 
         // Forward to bound module
         onProgressUpdate?.invoke(newLegacyState.distanceMeters, newLegacyState.elapsedSeconds, newLegacyState.goalReached)
+        onSessionStateUpdate?.invoke(newSessionState)
 
         if (newLegacyState.goalReached) {
             MMKVStore.setGoalsReached(true)

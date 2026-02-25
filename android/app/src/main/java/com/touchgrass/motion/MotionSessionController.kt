@@ -3,6 +3,7 @@ package com.touchgrass.motion
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.touchgrass.MMKVStore
 
 /**
  * Central state machine and single source of truth for motion detection.
@@ -202,6 +203,10 @@ object MotionSessionController {
             potentialMovementStartTime = 0L
             potentialStopStartTime = 0L
             trackingStartSignalled = false
+            // Clear AR latch on reset so a stale ENTER (missing EXIT) can't
+            // trigger a start after background tracking is toggled.
+            arActiveType = "unknown"
+            arIsActive = false
             Log.d(TAG, "Session reset to IDLE")
         }
     }
@@ -476,6 +481,10 @@ object MotionSessionController {
      * in an eligible activity type. Returns true if a start signal was emitted.
      */
     private fun maybeSignalTrackingStart(): Boolean {
+        // Hard guarantee: never auto-start unless background/idle monitoring is enabled.
+        // This protects against stale Activity Recognition state and any accidental
+        // motion engine restarts while the user has auto tracking disabled.
+        if (!MMKVStore.isIdleMonitoringEnabled()) return false
         if (trackingStartSignalled) return false
         if (currentState != MotionState.MOVING) return false
         if (!arIsActive) return false
