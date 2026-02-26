@@ -74,6 +74,13 @@ data class MotionConfig(
      */
         val varianceStartThreshold: Float = 0.22f,
 
+    /**
+     * Debounce duration (ms) that variance must remain continuously above
+     * [varianceStartThreshold] before it is treated as a true movement signal.
+     * Helps ignore short shakes and brief bumps.
+     */
+    val varianceStartDebounceMs: Long = 500L,
+
     /** Rolling variance window size during MOVING state (~1 second at SENSOR_DELAY_GAME). */
     val accelWindowSize: Int = 50,
 

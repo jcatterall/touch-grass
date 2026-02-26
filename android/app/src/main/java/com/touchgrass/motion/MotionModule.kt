@@ -255,6 +255,8 @@ class MotionModule(reactContext: ReactApplicationContext) :
                 map.getDouble("stepStopTimeoutCyclingMs").toLong() else 20_000L,
             varianceStartThreshold = if (map.hasKey("varianceStartThreshold"))
                 map.getDouble("varianceStartThreshold").toFloat() else 0.18f,
+            varianceStartDebounceMs = if (map.hasKey("varianceStartDebounceMs"))
+                map.getDouble("varianceStartDebounceMs").toLong() else 500L,
             corroborationMinSignals = if (map.hasKey("corroborationMinSignals"))
                 map.getInt("corroborationMinSignals") else 2,
             corroborationWindowMs = if (map.hasKey("corroborationWindowMs"))

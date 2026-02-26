@@ -78,6 +78,8 @@ export interface MotionConfig {
   stepStopTimeoutCyclingMs?: number;
   /** Accelerometer variance threshold for start detection. Default: 0.18 */
   varianceStartThreshold?: number;
+  /** Debounce duration (ms) variance must stay above varianceStartThreshold. Default: 500 */
+  varianceStartDebounceMs?: number;
   /** Number of distinct signal types required within corroborationWindowMs to start tracking. Default: 2 */
   corroborationMinSignals?: number;
   /** Time window (ms) for corroboration signal counting. Default: 3000 */

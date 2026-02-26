@@ -9,6 +9,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.util.Log
 import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityTransition
@@ -69,6 +70,17 @@ object MotionEngine : SensorEventListener {
     /** Timestamp of last accelerometer variance spike above varianceStartThreshold. */
     @Volatile
     private var lastVarianceSpikeTime: Long = 0L
+
+    /**
+     * Debounce state for variance-based movement: variance must remain above
+     * [MotionConfig.varianceStartThreshold] continuously for
+     * [MotionConfig.varianceStartDebounceMs] before counting as a signal.
+     */
+    @Volatile
+    private var varianceAboveSinceElapsedMs: Long = 0L
+
+    @Volatile
+    private var varianceDebouncedActive: Boolean = false
 
     /** Timestamp of last Activity Recognition ENTER transition (walking/running/cycling). */
     @Volatile
@@ -150,6 +162,8 @@ object MotionEngine : SensorEventListener {
         stationaryLockCandidateStart = 0L
         cadenceDropStart = 0L
         lastVarianceSpikeTime = 0L
+        varianceAboveSinceElapsedMs = 0L
+        varianceDebouncedActive = false
         lastActivityEnterTime = 0L
         running = false
         Log.i(TAG, "MotionEngine stopped")
@@ -341,6 +355,8 @@ object MotionEngine : SensorEventListener {
     }
 
     private fun handleAccelerometer(event: SensorEvent) {
+        val nowElapsed = SystemClock.elapsedRealtime()
+
         val magnitude = sqrt(
             event.values[0].toDouble().pow(2.0) +
                     event.values[1].toDouble().pow(2.0) +
@@ -362,8 +378,25 @@ object MotionEngine : SensorEventListener {
 
         val variance = computeVariance()
 
-        // Track variance spike time for corroboration
-        if (variance >= config.varianceStartThreshold) {
+        // Sustained-variance debounce: require variance to stay above the start threshold
+        // continuously for varianceStartDebounceMs before treating it as a movement signal.
+        val debouncedVarianceHigh = if (variance >= config.varianceStartThreshold) {
+            if (varianceAboveSinceElapsedMs == 0L) {
+                varianceAboveSinceElapsedMs = nowElapsed
+            }
+            if (!varianceDebouncedActive) {
+                varianceDebouncedActive =
+                    (nowElapsed - varianceAboveSinceElapsedMs) >= config.varianceStartDebounceMs
+            }
+            varianceDebouncedActive
+        } else {
+            varianceAboveSinceElapsedMs = 0L
+            varianceDebouncedActive = false
+            false
+        }
+
+        // Track variance spike time for corroboration (only after debounce arms)
+        if (debouncedVarianceHigh) {
             lastVarianceSpikeTime = System.currentTimeMillis()
         }
 
@@ -379,7 +412,7 @@ object MotionEngine : SensorEventListener {
         // Use lastKnownRealActivityType for the same reason as in handleStepDetected — so
         // re-trigger works correctly after a stop when AR hasn't re-emitted an ENTER.
         if (!stationaryLockActive
-            && variance >= config.varianceStartThreshold
+            && debouncedVarianceHigh
             && confidence >= config.movementConfidenceThreshold
         ) {
             MotionSessionController.onMovementDetected(

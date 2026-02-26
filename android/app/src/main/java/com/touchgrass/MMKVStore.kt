@@ -141,7 +141,8 @@ object MMKVStore {
             kv.encode(KEY_TODAY_DISTANCE, 0.0)
             kv.encode(KEY_GOALS_REACHED, false)
         }
-        kv.encode(KEY_TODAY_ELAPSED, v)
+        val current = kv.decodeLong(KEY_TODAY_ELAPSED, 0L)
+        kv.encode(KEY_TODAY_ELAPSED, maxOf(current, v))
     }
 
     /**
@@ -155,7 +156,8 @@ object MMKVStore {
             kv.encode(KEY_TODAY_ELAPSED, 0L)
             kv.encode(KEY_GOALS_REACHED, false)
         }
-        kv.encode(KEY_TODAY_DISTANCE, v)
+        val current = kv.decodeDouble(KEY_TODAY_DISTANCE, 0.0)
+        kv.encode(KEY_TODAY_DISTANCE, maxOf(current, v))
     }
 
     fun setGoal(type: String, value: Double, unit: String) {

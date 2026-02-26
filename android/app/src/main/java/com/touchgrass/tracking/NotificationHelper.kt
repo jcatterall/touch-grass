@@ -53,11 +53,11 @@ class NotificationHelper(private val context: Context) {
             } else {
                 val parts = mutableListOf<String>()
                 if (hasDistance) {
-                    val current = state.distanceMeters
+                    val current = try { MMKVStore.getTodayDistance() } catch (_: Exception) { state.distanceMeters }
                     parts.add("Progress: ${formatDistance(current)} / ${formatDistance(goalDistanceValue)}")
                 }
                 if (hasTime) {
-                    val current = state.elapsedSeconds
+                    val current = try { MMKVStore.getTodayElapsed() } catch (_: Exception) { state.elapsedSeconds }
                     parts.add("Progress: ${formatTime(current)} / ${formatTimeSeconds(goalTimeValue.toLong())}")
                 }
                 parts.joinToString(" | ")
