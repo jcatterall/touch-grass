@@ -19,7 +19,7 @@ import kotlin.math.min
 object MovementConfidenceEngine {
 
     /** Weight for the Activity Recognition API signal. */
-    private const val WEIGHT_ACTIVITY = 0.50f
+    private const val WEIGHT_ACTIVITY = 0.65f
 
     /** Weight for the step detector / cadence signal. */
     private const val WEIGHT_STEP = 0.30f
@@ -28,7 +28,7 @@ object MovementConfidenceEngine {
     private const val WEIGHT_VARIANCE = 0.20f
 
     /** Weight for sustained duration / consistency. */
-    private const val WEIGHT_DURATION = 0.20f
+    private const val WEIGHT_DURATION = 0.10f
 
     /** Maximum duration bonus (ms). Beyond this, duration contributes full weight. */
     private const val MAX_DURATION_MS = 10_000L

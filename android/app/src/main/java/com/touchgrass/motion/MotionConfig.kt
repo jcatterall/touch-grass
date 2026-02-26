@@ -24,7 +24,7 @@ data class MotionConfig(
         * Raised slightly from 0.30 to make brief shakes less likely to confirm.
      * while the movementConfirmWindowMs provides the false-positive protection.
      */
-        val movementConfidenceThreshold: Float = 0.35f,
+      val movementConfidenceThreshold: Float = 0.75f,
 
     // ── Stop detection ──────────────────────────────────────────────────────
 
@@ -72,7 +72,7 @@ data class MotionConfig(
         * for START detection. Raised slightly to make short high-frequency shakes
         * less likely to pass the start guard. Real walking variance is 0.25+.
      */
-        val varianceStartThreshold: Float = 0.22f,
+      val varianceStartThreshold: Float = 0.5f,
 
     /**
      * Debounce duration (ms) that variance must remain continuously above

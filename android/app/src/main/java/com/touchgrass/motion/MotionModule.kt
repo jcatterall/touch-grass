@@ -240,9 +240,9 @@ class MotionModule(reactContext: ReactApplicationContext) :
 
         return MotionConfig(
             movementConfirmWindowMs = if (map.hasKey("movementConfirmWindowMs"))
-                map.getDouble("movementConfirmWindowMs").toLong() else 4_000L,
+                map.getDouble("movementConfirmWindowMs").toLong() else 6_000L,
             movementConfidenceThreshold = if (map.hasKey("movementConfidenceThreshold"))
-                map.getDouble("movementConfidenceThreshold").toFloat() else 0.30f,
+                map.getDouble("movementConfidenceThreshold").toFloat() else 0.75f,
             stepStopTimeoutMs = if (map.hasKey("stepStopTimeoutMs"))
                 map.getDouble("stepStopTimeoutMs").toLong() else 7_000L,
             varianceStopThreshold = if (map.hasKey("varianceStopThreshold"))
@@ -254,7 +254,7 @@ class MotionModule(reactContext: ReactApplicationContext) :
             stepStopTimeoutCyclingMs = if (map.hasKey("stepStopTimeoutCyclingMs"))
                 map.getDouble("stepStopTimeoutCyclingMs").toLong() else 20_000L,
             varianceStartThreshold = if (map.hasKey("varianceStartThreshold"))
-                map.getDouble("varianceStartThreshold").toFloat() else 0.18f,
+                map.getDouble("varianceStartThreshold").toFloat() else 0.5f,
             varianceStartDebounceMs = if (map.hasKey("varianceStartDebounceMs"))
                 map.getDouble("varianceStartDebounceMs").toLong() else 500L,
             corroborationMinSignals = if (map.hasKey("corroborationMinSignals"))
@@ -268,9 +268,9 @@ class MotionModule(reactContext: ReactApplicationContext) :
             stationaryLockVariance = if (map.hasKey("stationaryLockVariance"))
                 map.getDouble("stationaryLockVariance").toFloat() else 0.08f,
             stationaryLockDurationMs = if (map.hasKey("stationaryLockDurationMs"))
-                map.getDouble("stationaryLockDurationMs").toLong() else 30_000L,
+                map.getDouble("stationaryLockDurationMs").toLong() else 10_000L,
             stationaryUnlockVariance = if (map.hasKey("stationaryUnlockVariance"))
-                map.getDouble("stationaryUnlockVariance").toFloat() else 0.35f,
+                map.getDouble("stationaryUnlockVariance").toFloat() else 0.25f,
             cadenceDropThreshold = if (map.hasKey("cadenceDropThreshold"))
                 map.getDouble("cadenceDropThreshold").toFloat() else 0.3f,
             cadenceDropDurationMs = if (map.hasKey("cadenceDropDurationMs"))

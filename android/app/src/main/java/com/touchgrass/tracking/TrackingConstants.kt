@@ -13,7 +13,7 @@ object TrackingConstants {
      * Short buffer after motion stops before ending the session (ms).
      * Absorbs brief pauses (traffic lights, doorways) without ending the session.
      */
-    const val STATIONARY_BUFFER_MS = 5_000L
+    const val STATIONARY_BUFFER_MS = 20_000L
 
     /** Minimum distance delta to accumulate when activity is confirmed walking/running/cycling. */
     const val MIN_DELTA_METERS_ACTIVE = 3f
@@ -31,7 +31,7 @@ object TrackingConstants {
     const val MAX_PLAUSIBLE_MULTIPLIER = 10f
 
     /** Throttle notification updates so we don't spam the NotificationManager. */
-    const val NOTIFICATION_THROTTLE_MS = 15_000L
+    const val NOTIFICATION_THROTTLE_MS = 2_000L
 
     /**
      * Minimum GPS speed (m/s) required before a distance delta is accumulated.

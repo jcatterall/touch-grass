@@ -116,18 +116,28 @@ class TrackingController(
 
             ActivityType.IN_VEHICLE -> {
                 motionMoving = false
-                // Pause accumulation; keep GPS alive at low power for plausibility.
-                handler.removeCallbacks(stationaryBufferRunnable)
-                gps.setMode(GpsMode.LOW_POWER)
-                state = state.copy(
-                    mode = TrackingMode.PAUSED_VEHICLE,
-                    gpsMode = GpsMode.LOW_POWER
-                )
+                // Manual sessions are user-owned and must be immune to motion/AR stop signals.
+                if (state.mode == TrackingMode.TRACKING_MANUAL) {
+                    Log.d(TAG, "IN_VEHICLE ignored in manual mode")
+                } else {
+                    // Pause accumulation; keep GPS alive at low power for plausibility.
+                    handler.removeCallbacks(stationaryBufferRunnable)
+                    gps.setMode(GpsMode.LOW_POWER)
+                    state = state.copy(
+                        mode = TrackingMode.PAUSED_VEHICLE,
+                        gpsMode = GpsMode.LOW_POWER
+                    )
+                }
             }
 
             ActivityType.STILL -> {
                 // STILL at high confidence → end immediately, no buffer.
                 if (snapshot.confirmed) {
+                    if (state.mode == TrackingMode.TRACKING_MANUAL) {
+                        Log.d(TAG, "STILL (confirmed) ignored in manual mode")
+                        publishState()
+                        return
+                    }
                     Log.d(TAG, "STILL (confirmed) — ending session immediately")
                     handler.removeCallbacks(stationaryBufferRunnable)
                     finaliseSession()
@@ -155,8 +165,10 @@ class TrackingController(
     fun onMotionStopped() {
         Log.d(TAG, "Motion stopped — arming stationary buffer (${TrackingConstants.STATIONARY_BUFFER_MS}ms)")
         motionMoving = false
-        if (state.mode == TrackingMode.TRACKING_AUTO || state.mode == TrackingMode.TRACKING_MANUAL) {
+        if (state.mode == TrackingMode.TRACKING_AUTO) {
             armStationaryBuffer()
+        } else if (state.mode == TrackingMode.TRACKING_MANUAL) {
+            Log.d(TAG, "Motion stopped ignored in manual mode")
         }
     }
 
@@ -179,6 +191,12 @@ class TrackingController(
             if (arActiveType == activityType) {
                 arIsActive = false
                 arActiveType = ActivityType.UNKNOWN
+                if (state.mode == TrackingMode.TRACKING_AUTO) {
+                    // Robust auto behavior: if AR becomes inactive while auto tracking,
+                    // begin graceful stop countdown unless movement re-qualifies.
+                    motionMoving = false
+                    armStationaryBuffer()
+                }
                 state = state.copy(
                     activityType = ActivityType.UNKNOWN,
                     activityConfidence = 0,
@@ -278,6 +296,16 @@ class TrackingController(
 
     /** Stop any active session immediately (e.g. user tapped Stop). */
     fun stopManualSession() {
+        handler.removeCallbacks(stationaryBufferRunnable)
+        if (state.mode != TrackingMode.TRACKING_MANUAL) {
+            Log.d(TAG, "stopManualSession ignored: mode=${state.mode}")
+            return
+        }
+        finaliseSession()
+    }
+
+    /** Stop whichever session is currently active (manual or auto). */
+    fun stopActiveSession() {
         handler.removeCallbacks(stationaryBufferRunnable)
         finaliseSession()
     }

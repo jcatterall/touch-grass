@@ -240,6 +240,7 @@ class TrackingService : LifecycleService() {
             TrackingConstants.ACTION_START_IDLE -> {
                 Log.d(TAG, "ACTION_START_IDLE — entering idle watch mode")
                 MMKVStore.setAutoTracking(false)
+                MMKVStore.setTrackingMode("idle")
                 MMKVStore.setIdleMonitoringEnabled(true)
                 startMotionIfNeeded()
                 // Controller stays in IDLE; GPS stays OFF.
@@ -247,8 +248,19 @@ class TrackingService : LifecycleService() {
             }
 
             TrackingConstants.ACTION_STOP_BACKGROUND -> {
-                Log.d(TAG, "ACTION_STOP_BACKGROUND — stopping service")
+                Log.d(TAG, "ACTION_STOP_BACKGROUND — force-stopping all tracking and stopping service")
                 MMKVStore.setIdleMonitoringEnabled(false)
+
+                // Hard-stop contract: disabling auto/background tracking must end
+                // any active session (auto or manual) and publish canonical IDLE
+                // before motion/service teardown.
+                val currentMode = controller.currentState().mode
+                val isActive = currentMode == TrackingMode.TRACKING_AUTO ||
+                        currentMode == TrackingMode.TRACKING_MANUAL
+                if (isActive) {
+                    controller.stopActiveSession()
+                }
+
                 stopMotionIfRunning()
                 stopSelf()
                 return START_NOT_STICKY
@@ -285,12 +297,8 @@ class TrackingService : LifecycleService() {
                 // always reflects the aggregate of all active plans (never a sentinel).
 
                 controller.startManualSession()
-                // Ensure fast-path readers (JS, MotionModule) observe manual
-                // tracking immediately by writing the MMKV flag and elapsed.
-                MMKVStore.setAutoTracking(true)
-                MMKVStore.setTodayElapsed(controller.currentState().toLegacyTrackingState().elapsedSeconds)
-                MMKVStore.setTodayLastUpdateMs(System.currentTimeMillis())
-                Log.d(TAG, "Manual start — MMKV set: is_auto_tracking=true elapsed=${controller.currentState().toLegacyTrackingState().elapsedSeconds}")
+                // Fast-path projection is published from handleStateChange().
+                Log.d(TAG, "Manual start requested")
                 return START_STICKY
             }
         }
@@ -306,6 +314,7 @@ class TrackingService : LifecycleService() {
         gpsManager.stop()
         stopMotionIfRunning()
         MMKVStore.setAutoTracking(false)
+        MMKVStore.setTrackingMode("idle")
 
         // Restore default sink to avoid leaking this service instance.
         MotionSessionController.trackingSink = object : MotionTrackingSink {
@@ -319,6 +328,10 @@ class TrackingService : LifecycleService() {
     // ── Public surface for TrackingModule ─────────────────────────────────────
 
     fun stopTracking() {
+        controller.stopActiveSession()
+    }
+
+    fun stopManualSession() {
         controller.stopManualSession()
     }
 
@@ -358,10 +371,17 @@ class TrackingService : LifecycleService() {
 
         // ── MMKV sync (fast-path for JS on foreground resume) ─────────────────
         MMKVStore.setAutoTracking(nowTracking)
+        val trackingMode = when (newSessionState.mode) {
+            TrackingMode.TRACKING_MANUAL -> "manual"
+            TrackingMode.TRACKING_AUTO -> "auto"
+            else -> "idle"
+        }
+        MMKVStore.setTrackingMode(trackingMode)
         // Project canonical totals into MMKV as absolute values.
         // This makes Room the single source of truth while keeping JS reads synchronous.
         MMKVStore.setTodayDistance(newLegacyState.distanceMeters)
         MMKVStore.setTodayElapsed(newLegacyState.elapsedSeconds)
+        MMKVStore.bumpTrackingRevision()
         // Commit marker written last so multi-process readers can treat it as "snapshot complete".
         MMKVStore.setTodayLastUpdateMs(System.currentTimeMillis())
 

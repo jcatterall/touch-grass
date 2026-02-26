@@ -304,37 +304,19 @@ export function useTracking(): TrackingState {
 
       // Baseline snapshot (authoritative totals at anchor time)
       setTodayProgress(prev => {
-        if (isNewDay) {
-          return {
-            distanceMeters: anchor.todayDistanceMeters,
-            elapsedSeconds: anchor.todayElapsedSeconds,
-            goalReached: anchor.goalReached,
-          };
-        }
-
-        const nextDistance = Math.max(
-          prev.distanceMeters,
-          anchor.todayDistanceMeters,
-        );
-        const nextElapsed = Math.max(
-          prev.elapsedSeconds,
-          anchor.todayElapsedSeconds,
-        );
-        const nextGoal = prev.goalReached || anchor.goalReached;
-
+        const next = {
+          distanceMeters: anchor.todayDistanceMeters,
+          elapsedSeconds: anchor.todayElapsedSeconds,
+          goalReached: anchor.goalReached,
+        };
         if (
-          prev.distanceMeters === nextDistance &&
-          prev.elapsedSeconds === nextElapsed &&
-          prev.goalReached === nextGoal
+          prev.distanceMeters === next.distanceMeters &&
+          prev.elapsedSeconds === next.elapsedSeconds &&
+          prev.goalReached === next.goalReached
         ) {
           return prev;
         }
-
-        return {
-          distanceMeters: nextDistance,
-          elapsedSeconds: nextElapsed,
-          goalReached: nextGoal,
-        };
+        return next;
       });
 
       anchorRef.current = {
@@ -545,83 +527,20 @@ export function useTracking(): TrackingState {
       : false;
 
     setTodayProgress(prev => {
-      if (isNewDay) {
-        return {
-          distanceMeters: mmkvDistance,
-          elapsedSeconds: mmkvElapsed,
-          goalReached: mmkvGoalsReached,
-        };
-      }
-
-      const nextDistance = Math.max(prev.distanceMeters, mmkvDistance);
-      const nextElapsed = Math.max(prev.elapsedSeconds, mmkvElapsed);
-      const nextGoal = prev.goalReached || mmkvGoalsReached;
-
+      const next = {
+        distanceMeters: mmkvDistance,
+        elapsedSeconds: mmkvElapsed,
+        goalReached: mmkvGoalsReached,
+      };
       if (
-        prev.distanceMeters === nextDistance &&
-        prev.elapsedSeconds === nextElapsed &&
-        prev.goalReached === nextGoal
+        prev.distanceMeters === next.distanceMeters &&
+        prev.elapsedSeconds === next.elapsedSeconds &&
+        prev.goalReached === next.goalReached
       ) {
         return prev;
       }
-
-      return {
-        distanceMeters: nextDistance,
-        elapsedSeconds: nextElapsed,
-        goalReached: nextGoal,
-      };
+      return next;
     });
-
-    try {
-      const daily = await Tracking.getDailyTotalNative();
-      if (!daily) return;
-
-      // If native is actively tracking, avoid JS write-back into MMKV today totals.
-      // The service is the single-writer for in-flight accumulation.
-      if (fastStorage.isAutoTracking()) {
-        return;
-      }
-
-      // Room totals are authoritative for completed sessions, but can lag slightly
-      // behind MMKV projections. Never decrease what the user sees on Home.
-      const mergedDistance = Math.max(mmkvDistance, daily.distanceMeters);
-      const mergedElapsed = Math.max(mmkvElapsed, daily.elapsedSeconds);
-      const mergedGoalsReached = mmkvGoalsReached || daily.goalsReached;
-
-      fastStorage.setTodayDistance(mergedDistance);
-      fastStorage.setTodayElapsed(mergedElapsed);
-      fastStorage.setGoalsReached(mergedGoalsReached);
-
-      setTodayProgress(prev => {
-        if (isNewDay) {
-          return {
-            distanceMeters: mergedDistance,
-            elapsedSeconds: mergedElapsed,
-            goalReached: mergedGoalsReached,
-          };
-        }
-
-        const nextDistance = Math.max(prev.distanceMeters, mergedDistance);
-        const nextElapsed = Math.max(prev.elapsedSeconds, mergedElapsed);
-        const nextGoal = prev.goalReached || mergedGoalsReached;
-
-        if (
-          prev.distanceMeters === nextDistance &&
-          prev.elapsedSeconds === nextElapsed &&
-          prev.goalReached === nextGoal
-        ) {
-          return prev;
-        }
-
-        return {
-          distanceMeters: nextDistance,
-          elapsedSeconds: nextElapsed,
-          goalReached: nextGoal,
-        };
-      });
-    } catch {
-      // best-effort
-    }
   }, [applyAnchor, stopUiTick]);
 
   const schedulePostStopSync = useCallback(
@@ -682,7 +601,6 @@ export function useTracking(): TrackingState {
       // GPS session has started.
       trackingStarted.current = true;
       setIsTracking(true);
-      setTrackingMode('auto');
       setDebugNativeRunning(true);
 
       // Do not reset today totals to zero; native/MMKV already track today's totals.
@@ -796,11 +714,24 @@ export function useTracking(): TrackingState {
   // Toggle background tracking using MotionTracker + idle TrackingService
   const toggleBackgroundTracking = useCallback(async () => {
     if (backgroundTrackingEnabled) {
+      // Hard-stop contract: disabling auto/background tracking must stop
+      // all tracking sessions (auto + manual) and converge to idle immediately.
+      stopUiTick();
+      anchorRef.current = null;
+      trackingStarted.current = false;
+      setIsTracking(false);
+      setTrackingMode('idle');
+      setDebugNativeRunning(false);
+
+      await Tracking.stopTracking().catch(() => {});
+
       // Stop the idle service (native owns motion engine lifecycle in this app)
       await Tracking.stopIdleService().catch(() => {});
       await storage.setBackgroundTrackingEnabled(false);
       setBackgroundTrackingEnabled(false);
       setDebugMotionServiceRunning(false);
+
+      schedulePostStopSync();
 
       // Clean up MotionTracker event subscriptions
       motionStateChangedSub.current?.remove();
@@ -818,7 +749,7 @@ export function useTracking(): TrackingState {
       setBackgroundTrackingEnabled(true);
       setDebugMotionServiceRunning(true);
     }
-  }, [backgroundTrackingEnabled]);
+  }, [backgroundTrackingEnabled, schedulePostStopSync, stopUiTick]);
 
   // MotionTracker event subscriptions — update UI state in real time.
   // The actual TrackingService start/stop is handled natively via MotionTrackingBridge.

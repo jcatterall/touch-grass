@@ -119,10 +119,15 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
 
     @ReactMethod
     fun startTracking(goalType: String, goalValue: Double, goalUnit: String, promise: Promise) {
-        if (bound && trackingService != null) {
-            Log.d(TAG, "Already tracking, ignoring duplicate start")
-            promise.resolve(true)
-            return
+        val svc = trackingService
+        if (bound && svc != null) {
+            val mode = svc.currentSessionState.mode
+            val alreadyTracking = mode == TrackingMode.TRACKING_AUTO || mode == TrackingMode.TRACKING_MANUAL
+            if (alreadyTracking) {
+                Log.d(TAG, "Already tracking, ignoring duplicate start")
+                promise.resolve(true)
+                return
+            }
         }
 
         try {
@@ -223,14 +228,20 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             // Best effort fallback when unbound: provide projected totals but do not
             // claim eligibility (fail-closed so JS never ticks incorrectly).
             if (session == null) {
+                val persistedMode = MMKVStore.getTrackingMode().lowercase(Locale.US)
+                val safeMode = when (persistedMode) {
+                    "manual", "auto" -> persistedMode
+                    else -> "idle"
+                }
+                val isTracking = safeMode == "manual" || safeMode == "auto"
                 val result = Arguments.createMap().apply {
                     putDouble("todayDistanceMeters", MMKVStore.getTodayDistance())
                     putDouble("todayElapsedSeconds", MMKVStore.getTodayElapsed().toDouble())
                     putDouble("sessionDistanceMeters", 0.0)
                     putDouble("sessionElapsedSeconds", 0.0)
                     putBoolean("goalReached", MMKVStore.getGoalsReached())
-                    putBoolean("isTracking", false)
-                    putString("mode", "idle")
+                    putBoolean("isTracking", isTracking)
+                    putString("mode", safeMode)
                     putBoolean("shouldTick", false)
                     putDouble("lastUpdateMs", System.currentTimeMillis().toDouble())
                 }
@@ -320,13 +331,29 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             // Fail-closed: clear the native flag before attempting to message the service.
             // This guarantees motion can never auto-start a session if auto tracking is disabled.
             MMKVStore.setIdleMonitoringEnabled(false)
-            MotionSessionController.reset()
+
+            // Hard-stop contract: disabling auto/background tracking must force-stop
+            // any active session (manual or auto) and converge to IDLE.
+            trackingService?.stopTracking()
+
+            // Optimistically project idle for unbound readers while native service
+            // completes teardown/final projection.
+            MMKVStore.setAutoTracking(false)
+            MMKVStore.setTrackingMode("idle")
+            MMKVStore.bumpTrackingRevision()
+            MMKVStore.setTodayLastUpdateMs(System.currentTimeMillis())
 
             val intent = Intent(context, TrackingService::class.java).apply {
                 action = TrackingConstants.ACTION_STOP_BACKGROUND
             }
             context.startService(intent)
-            unbindService()
+
+            // Keep the binder alive briefly so JS can receive the final IDLE event
+            // and state projection before we detach.
+            mainHandler.postDelayed({
+                unbindService()
+                MotionSessionController.reset()
+            }, stopGraceMs)
 
             Log.d(TAG, "Idle service stopped")
             promise.resolve(true)
@@ -397,7 +424,6 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     private fun sendEvent(eventName: String, params: com.facebook.react.bridge.WritableMap) {
         try {
             if (!reactApplicationContext.hasActiveReactInstance()) return
-            if (!isForeground) return
             reactApplicationContext
                 .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 .emit(eventName, params)

@@ -28,6 +28,8 @@ object MMKVStore {
         if (!kv.containsKey(KEY_TODAY_DISTANCE)) kv.encode(KEY_TODAY_DISTANCE, 0.0)
         if (!kv.containsKey(KEY_TODAY_ELAPSED))  kv.encode(KEY_TODAY_ELAPSED, 0L)
         if (!kv.containsKey(KEY_GOAL_VALUE))     kv.encode(KEY_GOAL_VALUE, 0.0)
+        if (!kv.containsKey(KEY_TRACKING_MODE))  kv.encode(KEY_TRACKING_MODE, "idle")
+        if (!kv.containsKey(KEY_TRACKING_REVISION)) kv.encode(KEY_TRACKING_REVISION, 0L)
         if (!kv.containsKey(KEY_GOAL_DISTANCE_VALUE)) kv.encode(KEY_GOAL_DISTANCE_VALUE, 0.0)
         if (!kv.containsKey(KEY_GOAL_DISTANCE_UNIT))  kv.encode(KEY_GOAL_DISTANCE_UNIT, "m")
         if (!kv.containsKey(KEY_GOAL_TIME_VALUE))     kv.encode(KEY_GOAL_TIME_VALUE, 0.0)
@@ -46,6 +48,8 @@ object MMKVStore {
     const val KEY_TODAY_ELAPSED    = "today_elapsed_seconds"
     const val KEY_GOALS_REACHED    = "today_goals_reached"
     const val KEY_IS_AUTO_TRACKING = "is_auto_tracking"
+    const val KEY_TRACKING_MODE    = "tracking_mode"
+    const val KEY_TRACKING_REVISION = "tracking_revision"
     const val KEY_TODAY_LAST_UPDATE_MS = "today_last_update_ms"
 
     // Aggregated goal written by JS whenever active plans change.
@@ -109,6 +113,8 @@ object MMKVStore {
     fun getTodayElapsed(): Long    = kv.decodeLong(KEY_TODAY_ELAPSED, 0L)
     fun getGoalsReached(): Boolean = kv.decodeBool(KEY_GOALS_REACHED, false)
     fun isAutoTracking(): Boolean  = kv.decodeBool(KEY_IS_AUTO_TRACKING, false)
+    fun getTrackingMode(): String  = kv.decodeString(KEY_TRACKING_MODE) ?: "idle"
+    fun getTrackingRevision(): Long = kv.decodeLong(KEY_TRACKING_REVISION, 0L)
 
     // ---- Goal readers ----
 
@@ -139,6 +145,12 @@ object MMKVStore {
 
     fun setGoalsReached(v: Boolean) = kv.encode(KEY_GOALS_REACHED, v)
     fun setAutoTracking(v: Boolean) = kv.encode(KEY_IS_AUTO_TRACKING, v)
+    fun setTrackingMode(v: String) = kv.encode(KEY_TRACKING_MODE, v)
+    fun bumpTrackingRevision(): Long {
+        val next = kv.decodeLong(KEY_TRACKING_REVISION, 0L) + 1L
+        kv.encode(KEY_TRACKING_REVISION, next)
+        return next
+    }
 
     fun setTodayLastUpdateMs(v: Long) = kv.encode(KEY_TODAY_LAST_UPDATE_MS, v)
 
@@ -152,8 +164,7 @@ object MMKVStore {
         if (kv.decodeString(KEY_CURRENT_DAY) != today) {
             resetForNewDay(today)
         }
-        val current = kv.decodeLong(KEY_TODAY_ELAPSED, 0L)
-        kv.encode(KEY_TODAY_ELAPSED, maxOf(current, v))
+        kv.encode(KEY_TODAY_ELAPSED, v)
     }
 
     /**
@@ -165,8 +176,7 @@ object MMKVStore {
         if (kv.decodeString(KEY_CURRENT_DAY) != today) {
             resetForNewDay(today)
         }
-        val current = kv.decodeDouble(KEY_TODAY_DISTANCE, 0.0)
-        kv.encode(KEY_TODAY_DISTANCE, maxOf(current, v))
+        kv.encode(KEY_TODAY_DISTANCE, v)
     }
 
     fun setGoal(type: String, value: Double, unit: String) {
@@ -223,6 +233,7 @@ object MMKVStore {
         kv.encode(KEY_TODAY_DISTANCE, 0.0)
         kv.encode(KEY_TODAY_ELAPSED, 0L)
         kv.encode(KEY_GOALS_REACHED, false)
+        kv.encode(KEY_TRACKING_MODE, "idle")
         kv.encode(KEY_TODAY_LAST_UPDATE_MS, 0L)
     }
 
