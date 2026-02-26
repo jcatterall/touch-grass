@@ -169,9 +169,18 @@ export function useTracking(): TrackingState {
   // Single source of truth for "today progress": native projects canonical totals into
   // MMKV, and the TrackingModule progress/event stream exposes the same totals.
   const [todayProgress, setTodayProgress] = useState<TrackingProgress>(() => ({
-    distanceMeters: fastStorage.getTodayDistance(),
-    elapsedSeconds: fastStorage.getTodayElapsed(),
-    goalReached: fastStorage.getGoalsReached(),
+    distanceMeters:
+      fastStorage.getCurrentDay() === todayYyyyMmDd()
+        ? fastStorage.getTodayDistance()
+        : 0,
+    elapsedSeconds:
+      fastStorage.getCurrentDay() === todayYyyyMmDd()
+        ? fastStorage.getTodayElapsed()
+        : 0,
+    goalReached:
+      fastStorage.getCurrentDay() === todayYyyyMmDd()
+        ? fastStorage.getGoalsReached()
+        : false,
   }));
 
   const [activePlans, setActivePlans] = useState<BlockingPlan[]>([]);
@@ -353,6 +362,30 @@ export function useTracking(): TrackingState {
       const hasActivePlanNow = activePlans.length > 0;
       fastStorage.setPlanActiveToday(hasActivePlanNow);
       fastStorage.setPlanDay(hasActivePlanNow ? todayYyyyMmDd() : '');
+
+      if (hasActivePlanNow) {
+        const now = new Date();
+        const endOfDay = new Date(now);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        let untilMs = 0;
+        for (const plan of activePlans) {
+          if (plan.duration.type === 'entire_day') {
+            untilMs = Math.max(untilMs, endOfDay.getTime());
+            continue;
+          }
+
+          const [toH, toM] = plan.duration.to.split(':').map(Number);
+          const to = new Date(now);
+          to.setHours(toH, toM, 0, 0);
+          untilMs = Math.max(untilMs, to.getTime());
+        }
+
+        fastStorage.setPlanActiveUntilMs(untilMs);
+      } else {
+        fastStorage.setPlanActiveUntilMs(0);
+      }
+
       NativeModules.TrackingModule?.notifyGoalsUpdated?.()?.catch?.(() => {});
     } catch {
       // best-effort
@@ -503,9 +536,13 @@ export function useTracking(): TrackingState {
     anchorRef.current = null;
     stopUiTick();
 
-    const mmkvDistance = fastStorage.getTodayDistance();
-    const mmkvElapsed = fastStorage.getTodayElapsed();
-    const mmkvGoalsReached = fastStorage.getGoalsReached();
+    const mmkvDay = fastStorage.getCurrentDay();
+    const isMmkvForToday = mmkvDay === todayKey;
+    const mmkvDistance = isMmkvForToday ? fastStorage.getTodayDistance() : 0;
+    const mmkvElapsed = isMmkvForToday ? fastStorage.getTodayElapsed() : 0;
+    const mmkvGoalsReached = isMmkvForToday
+      ? fastStorage.getGoalsReached()
+      : false;
 
     setTodayProgress(prev => {
       if (isNewDay) {
@@ -538,6 +575,12 @@ export function useTracking(): TrackingState {
     try {
       const daily = await Tracking.getDailyTotalNative();
       if (!daily) return;
+
+      // If native is actively tracking, avoid JS write-back into MMKV today totals.
+      // The service is the single-writer for in-flight accumulation.
+      if (fastStorage.isAutoTracking()) {
+        return;
+      }
 
       // Room totals are authoritative for completed sessions, but can lag slightly
       // behind MMKV projections. Never decrease what the user sees on Home.
@@ -753,8 +796,7 @@ export function useTracking(): TrackingState {
   // Toggle background tracking using MotionTracker + idle TrackingService
   const toggleBackgroundTracking = useCallback(async () => {
     if (backgroundTrackingEnabled) {
-      // Stop MotionTracker and the idle service
-      await MotionTracker.stopMonitoring().catch(() => {});
+      // Stop the idle service (native owns motion engine lifecycle in this app)
       await Tracking.stopIdleService().catch(() => {});
       await storage.setBackgroundTrackingEnabled(false);
       setBackgroundTrackingEnabled(false);

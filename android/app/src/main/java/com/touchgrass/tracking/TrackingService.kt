@@ -289,6 +289,7 @@ class TrackingService : LifecycleService() {
                 // tracking immediately by writing the MMKV flag and elapsed.
                 MMKVStore.setAutoTracking(true)
                 MMKVStore.setTodayElapsed(controller.currentState().toLegacyTrackingState().elapsedSeconds)
+                MMKVStore.setTodayLastUpdateMs(System.currentTimeMillis())
                 Log.d(TAG, "Manual start — MMKV set: is_auto_tracking=true elapsed=${controller.currentState().toLegacyTrackingState().elapsedSeconds}")
                 return START_STICKY
             }
@@ -361,6 +362,8 @@ class TrackingService : LifecycleService() {
         // This makes Room the single source of truth while keeping JS reads synchronous.
         MMKVStore.setTodayDistance(newLegacyState.distanceMeters)
         MMKVStore.setTodayElapsed(newLegacyState.elapsedSeconds)
+        // Commit marker written last so multi-process readers can treat it as "snapshot complete".
+        MMKVStore.setTodayLastUpdateMs(System.currentTimeMillis())
 
         // Forward to bound module
         onProgressUpdate?.invoke(newLegacyState.distanceMeters, newLegacyState.elapsedSeconds, newLegacyState.goalReached)

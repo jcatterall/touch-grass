@@ -35,7 +35,9 @@ object MMKVStore {
         if (!kv.containsKey(KEY_BLOCKED_COUNT))  kv.encode(KEY_BLOCKED_COUNT, 0)
         if (!kv.containsKey(KEY_PLAN_DAY))       kv.encode(KEY_PLAN_DAY, "")
         if (!kv.containsKey(KEY_PLAN_ACTIVE_TODAY)) kv.encode(KEY_PLAN_ACTIVE_TODAY, false)
+        if (!kv.containsKey(KEY_PLAN_ACTIVE_UNTIL_MS)) kv.encode(KEY_PLAN_ACTIVE_UNTIL_MS, 0L)
         if (!kv.containsKey(KEY_IDLE_MONITORING_ENABLED)) kv.encode(KEY_IDLE_MONITORING_ENABLED, false)
+        if (!kv.containsKey(KEY_TODAY_LAST_UPDATE_MS)) kv.encode(KEY_TODAY_LAST_UPDATE_MS, 0L)
     }
 
     // ---- Key constants (shared with JS side in src/storage.ts fastStorage) ----
@@ -44,6 +46,7 @@ object MMKVStore {
     const val KEY_TODAY_ELAPSED    = "today_elapsed_seconds"
     const val KEY_GOALS_REACHED    = "today_goals_reached"
     const val KEY_IS_AUTO_TRACKING = "is_auto_tracking"
+    const val KEY_TODAY_LAST_UPDATE_MS = "today_last_update_ms"
 
     // Aggregated goal written by JS whenever active plans change.
     // Consumed by TrackingService to display accurate progress in the notification.
@@ -64,6 +67,10 @@ object MMKVStore {
     // Whether there is at least one active plan for today (day + time window).
     // Written by JS.
     const val KEY_PLAN_ACTIVE_TODAY = "plan_active_today"
+
+    // Optional: absolute expiry timestamp for current "plan active" snapshot.
+    // Written by JS so notifications can fail-closed if the app is terminated.
+    const val KEY_PLAN_ACTIVE_UNTIL_MS = "plan_active_until_ms"
 
     // Whether idle motion monitoring should be running even when no session is active.
     const val KEY_IDLE_MONITORING_ENABLED = "idle_monitoring_enabled"
@@ -122,12 +129,18 @@ object MMKVStore {
 
     fun isPlanActiveToday(): Boolean = kv.decodeBool(KEY_PLAN_ACTIVE_TODAY, false)
 
+    fun getPlanActiveUntilMs(): Long = kv.decodeLong(KEY_PLAN_ACTIVE_UNTIL_MS, 0L)
+
     fun isIdleMonitoringEnabled(): Boolean = kv.decodeBool(KEY_IDLE_MONITORING_ENABLED, false)
+
+    fun getTodayLastUpdateMs(): Long = kv.decodeLong(KEY_TODAY_LAST_UPDATE_MS, 0L)
 
     // ---- Writers ----
 
     fun setGoalsReached(v: Boolean) = kv.encode(KEY_GOALS_REACHED, v)
     fun setAutoTracking(v: Boolean) = kv.encode(KEY_IS_AUTO_TRACKING, v)
+
+    fun setTodayLastUpdateMs(v: Long) = kv.encode(KEY_TODAY_LAST_UPDATE_MS, v)
 
     /**
      * Overwrites today's elapsed seconds with an absolute value.
@@ -137,9 +150,7 @@ object MMKVStore {
     fun setTodayElapsed(v: Long) {
         val today = todayDate()
         if (kv.decodeString(KEY_CURRENT_DAY) != today) {
-            kv.encode(KEY_CURRENT_DAY, today)
-            kv.encode(KEY_TODAY_DISTANCE, 0.0)
-            kv.encode(KEY_GOALS_REACHED, false)
+            resetForNewDay(today)
         }
         val current = kv.decodeLong(KEY_TODAY_ELAPSED, 0L)
         kv.encode(KEY_TODAY_ELAPSED, maxOf(current, v))
@@ -152,9 +163,7 @@ object MMKVStore {
     fun setTodayDistance(v: Double) {
         val today = todayDate()
         if (kv.decodeString(KEY_CURRENT_DAY) != today) {
-            kv.encode(KEY_CURRENT_DAY, today)
-            kv.encode(KEY_TODAY_ELAPSED, 0L)
-            kv.encode(KEY_GOALS_REACHED, false)
+            resetForNewDay(today)
         }
         val current = kv.decodeDouble(KEY_TODAY_DISTANCE, 0.0)
         kv.encode(KEY_TODAY_DISTANCE, maxOf(current, v))
@@ -196,6 +205,10 @@ object MMKVStore {
         kv.encode(KEY_PLAN_ACTIVE_TODAY, v)
     }
 
+    fun setPlanActiveUntilMs(v: Long) {
+        kv.encode(KEY_PLAN_ACTIVE_UNTIL_MS, v)
+    }
+
     fun setIdleMonitoringEnabled(v: Boolean) {
         kv.encode(KEY_IDLE_MONITORING_ENABLED, v)
     }
@@ -204,6 +217,14 @@ object MMKVStore {
 
     private fun todayDate(): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+    private fun resetForNewDay(today: String) {
+        kv.encode(KEY_CURRENT_DAY, today)
+        kv.encode(KEY_TODAY_DISTANCE, 0.0)
+        kv.encode(KEY_TODAY_ELAPSED, 0L)
+        kv.encode(KEY_GOALS_REACHED, false)
+        kv.encode(KEY_TODAY_LAST_UPDATE_MS, 0L)
+    }
 
     fun todayKey(): String = todayDate()
 }

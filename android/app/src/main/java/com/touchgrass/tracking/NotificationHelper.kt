@@ -29,13 +29,16 @@ class NotificationHelper(private val context: Context) {
             todayKey: String,
             planDay: String,
             planActiveFlag: Boolean,
+            planActiveUntilMs: Long,
             goalDistanceValue: Double,
             goalDistanceUnit: String,
             goalTimeValue: Double,
             goalTimeUnit: String,
+            nowMs: Long,
             state: TrackingState
         ): NotificationText {
-            val planActiveToday = planDay == todayKey && planActiveFlag
+            val notExpired = planActiveUntilMs <= 0L || nowMs <= planActiveUntilMs
+            val planActiveToday = planDay == todayKey && planActiveFlag && notExpired
 
             val hasDistance = planActiveToday && goalDistanceUnit == "m" && goalDistanceValue > 0.0
             val hasTime = planActiveToday && goalTimeUnit == "s" && goalTimeValue > 0.0
@@ -104,9 +107,11 @@ class NotificationHelper(private val context: Context) {
         // Number of distinct blocked apps (fast-path via MMKV)
         val blockedCount = try { MMKVStore.getBlockedCount() } catch (e: Exception) { 0 }
 
+        val nowMs = System.currentTimeMillis()
         val today = try { MMKVStore.todayKey() } catch (e: Exception) { "" }
         val planDay = try { MMKVStore.getPlanDay() } catch (e: Exception) { "" }
         val planActiveFlag = try { MMKVStore.isPlanActiveToday() } catch (e: Exception) { false }
+        val planActiveUntilMs = try { MMKVStore.getPlanActiveUntilMs() } catch (e: Exception) { 0L }
         val goalDistanceUnit = try { MMKVStore.getGoalDistanceUnit() } catch (e: Exception) { "m" }
         val goalTimeUnit = try { MMKVStore.getGoalTimeUnit() } catch (e: Exception) { "s" }
         val goalDistanceValue = try { MMKVStore.getGoalDistanceValue() } catch (e: Exception) { 0.0 }
@@ -117,10 +122,12 @@ class NotificationHelper(private val context: Context) {
             todayKey = today,
             planDay = planDay,
             planActiveFlag = planActiveFlag,
+            planActiveUntilMs = planActiveUntilMs,
             goalDistanceValue = goalDistanceValue,
             goalDistanceUnit = goalDistanceUnit,
             goalTimeValue = goalTimeValue,
             goalTimeUnit = goalTimeUnit,
+            nowMs = nowMs,
             state = state
         )
 

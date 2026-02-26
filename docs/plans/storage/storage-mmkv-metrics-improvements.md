@@ -53,16 +53,19 @@
 
 ### A. MMKV Namespaces
 
-| Namespace                    | Purpose                                                                                             |       |                                                                 |
-| ---------------------------- | --------------------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------- |
-| `touchgrass_state`           | Synchronous counters for today's totals: distance, elapsed time, goal reached, auto-tracking flags. |       |                                                                 |
-| `live:progress`              | Real-time progress for spinner & notification updates.                                              |       |                                                                 |
-| `live:activePlanSnapshot`    | Snapshot of currently active plans (includes `has_active_plans`, blocked apps, goal info).          |       |                                                                 |
-| `metrics:daily:YYYY-MM-DD`   | Immutable daily metrics.                                                                            |       |                                                                 |
-| `metrics:index:daily`        | Index of available daily metric dates for fast range queries.                                       |       |                                                                 |
-| `metrics:rolling:7d          | 30d                                                                                                 | 365d` | Precomputed aggregates for efficient summary queries over time. |
-| `metrics:monthly:YYYY-MM`    | Monthly summaries for long-term retention and efficiency.                                           |       |                                                                 |
-| `event:timestamp` (optional) | Append-only events: focus sessions, unlocks, blocked attempts, session start/end.                   |       |                                                                 |
+> **Important (repo reality vs target design):** The namespaces below describe the **target key model**.
+> The current TouchGrass repo uses **one MMKV container** (id `touchgrass_state`, multi-process) with **typed keys**, and uses **Room** as the durable store for historical session/daily totals.
+> See **2.1 Current Implementation Mapping (repo-specific)** for the authoritative current mapping.
+
+| Namespace / keyspace                 | Purpose |
+| ----------------------------------- | ------- |
+| `touchgrass_state`                  | Synchronous counters for today's totals: distance, elapsed time, goal reached, auto-tracking flags. |
+| `live:*` (optional target keyspace) | Real-time progress & runtime snapshots for UI/notifications if you choose to store them as JSON blobs. |
+| `metrics:daily:YYYY-MM-DD`          | Immutable daily metrics (target). |
+| `metrics:index:daily`               | Index of available daily metric dates for fast range queries (target). |
+| `metrics:rolling:7d|30d|365d`       | Precomputed aggregates for efficient summary queries (target). |
+| `metrics:monthly:YYYY-MM`           | Monthly summaries for long-term retention and efficiency (target). |
+| `event:*` (optional)                | Append-only events: focus sessions, unlocks, blocked attempts, session start/end (target). |
 
 **Considerations:**
 
@@ -72,6 +75,9 @@
 ---
 
 ### B. Runtime Snapshot Keys
+
+> **Target schema (not implemented as a single JSON blob in the current repo):**
+> Current implementation uses typed MMKV keys (goal/plan/today totals) rather than a `live:activePlanSnapshot` object.
 
 ```ts
 type ActivePlanSnapshot = {
@@ -122,6 +128,9 @@ type DailyMetrics = {
 
 ### D. Live Progress Schema
 
+> **Target schema (not implemented in the current repo):**
+> The current repo uses native session progress + MMKV typed key projection rather than a `live:progress` JSON object.
+
 ```ts
 type LiveProgress = {
   date: string,
@@ -163,9 +172,14 @@ This section maps the architectural plan to the current TouchGrass implementatio
    - `today_goals_reached` — Boolean
    - `is_auto_tracking` — Boolean
    - `goal_type`, `goal_value`, `goal_unit` — aggregated goal metadata
+   - `plan_day`, `plan_active_today` — plan-day snapshot used by notifications
+   - `goal_distance_value`, `goal_distance_unit`, `goal_time_value`, `goal_time_unit` — typed goal keys used by native notification rendering
+   - `idle_monitoring_enabled` — native/JS toggle used by background/idle monitoring
    - `blocked_count` — Int (number of blocked packages)
 
 - **Where historical snapshots live today:** Daily/immutable snapshots remain in AsyncStorage under the `daily_activity` key (JS: `storage.saveDailyActivity`) rather than MMKV. Plans and onboarding data also remain in AsyncStorage (`blocking_plans`, `onboarding_complete`, etc.).
+
+- **Where historical truth lives today (important):** Android persists session history and daily totals to **Room** (sessions + daily_totals). AsyncStorage `daily_activity` exists as a legacy format and a fallback read path in headless flows, but the current native-first implementation treats Room as the durable source of truth for completed totals.
 
 - **Runtime snapshot model (current):** There is no single `live:activePlanSnapshot` JSON blob in MMKV. Instead the native side reads a small set of typed keys (`blocked_count`, `goal_*`, `is_auto_tracking`, today's totals) and the JS side emits `PLANS_CHANGED_EVENT` to coordinate plan changes. AppBlocker receives config over the native bridge.
 
@@ -174,6 +188,100 @@ This section maps the architectural plan to the current TouchGrass implementatio
 - **JS initialization and double-count protection:** `useTracking` intentionally avoids reading `today_distance_meters` at init when a session may be active (to prevent double-counting). Instead it relies on `Tracking.getIsAutoTracking()` and `Tracking.getProgress()` to recover live session state, or reads MMKV after a session stops to obtain the completed baseline.
 
 - **Rollover handling:** Rollover logic for daily counters exists on the Kotlin side (`MMKVStore.accumulateTodayDistance()` and `setTodayElapsed()` check `current_day` and reset keys when the stored date differs). JS relies on these values for baseline reads.
+
+### 2.1.1 Sources of Truth & Writer Responsibilities
+
+This section is the **operational contract** that prevents double reads/writes and keeps UI + notifications consistent.
+
+- **Distance/time (today):** Canonical totals are maintained by the **native tracking pipeline**. MMKV stores a *projection* of those totals for fast multi-process reads.
+- **Distance/time (history):** Canonical historical sessions/daily totals are stored in **Room** (Android). This is the preferred source for charting/metrics.
+- **MMKV usage:** MMKV is used as a **fast, synchronous shared state** for:
+   - Today's totals and flags (distance/time/goalReached/isAutoTracking)
+   - Aggregated plan/goal metadata required by notifications
+   - Fast blocker summary values (e.g., blocked app count)
+- **JS responsibilities:** JS owns plan aggregation and writes *plan/goal metadata* keys. JS should not accumulate distance/time deltas; it may only perform **monotonic repair/hydration** when re-syncing.
+
+### 2.1.2 MMKV Key Contract (Ownership & Types)
+
+**Native-owned (authoritative writer; projected as absolute totals):**
+
+- `current_day` (String `YYYY-MM-DD`) — day rollover gate
+- `today_distance_meters` (Double)
+- `today_elapsed_seconds` (Long)
+- `today_goals_reached` (Boolean)
+- `is_auto_tracking` (Boolean)
+
+**JS-owned (plan + goal aggregation; consumed by native notifications):**
+
+- `goal_type`, `goal_value`, `goal_unit` (strings/numbers)
+- `goal_distance_value`, `goal_distance_unit`, `goal_time_value`, `goal_time_unit` (typed goal keys)
+- `plan_day` (String `YYYY-MM-DD`), `plan_active_today` (Boolean)
+
+**Mixed / integration keys (must remain safe + small):**
+
+- `blocked_count` (Int) — written by native blocker/config code, derived from JS-provided list
+- `idle_monitoring_enabled` (Boolean) — used to coordinate background/idle monitoring
+
+> Best practice: treat MMKV as the *shared projection layer*. The moment a key becomes a “second accumulator,” double-writing bugs become likely.
+
+### 2.1.3 Foreground 1Hz Tick Model (Non-persisted UI Tick)
+
+To preserve the current Home screen behavior (1 Hz elapsed tick) **without introducing double writes**, the UI should follow this rule:
+
+- When tracking is active and the app is in the foreground, **displayed elapsed time can tick at 1 Hz**, but that tick must be **derived from a native-provided anchor snapshot** (baseline + timestamp) rather than incrementing persisted totals.
+- Persisted elapsed seconds in MMKV continues to be written by native tracking; JS should not attempt to “keep MMKV updated every second.”
+
+### 2.1.4 No Double Reads / No Out-of-sync Presentation (Strategies)
+
+These are the key best-practice strategies already present in the repo and should be preserved:
+
+- **Avoid baseline reads during an active session:** if tracking is active, UI state should come from the native session state/anchor, not from re-reading today totals (prevents double-counting and flicker).
+- **Monotonic merge (never decrease):** when syncing from MMKV/Room into UI, merge by taking the maximum distance/time observed and OR-ing goalReached.
+- **Stop-grace + resync:** after a stop event, wait a short grace window before reading today totals to avoid races where native has not yet projected the final totals into MMKV.
+
+### 2.1.5 No Double Writes (Single-accumulator Invariant)
+
+The app must maintain a single-accumulator invariant for distance/time:
+
+- **Only the native tracking pipeline accumulates distance/time deltas.**
+- Any JS write-back into MMKV for today totals must be treated as **repair/hydration only**:
+   - Never add deltas.
+   - Never decrease totals.
+   - Prefer max/OR merge semantics.
+
+### 2.1.6 Room Persistence Model (Charting-friendly History)
+
+Current Android implementation uses Room as the durable history layer:
+
+- **Sessions table:** per-session records (start/end/mode/distance/elapsed), enabling accurate per-day reconstruction.
+- **Daily totals table:** per-day aggregates (distance/time/goalsReached and related metadata).
+
+This aligns naturally with charting requirements (daily/weekly/monthly ranges) without requiring MMKV `metrics:*` keys yet.
+
+### 2.1.7 Charting Readiness (Metrics Mapping + Gaps)
+
+The charting plan (`charting-implementation.md`) assumes time-bucketed `metrics:*` keys in MMKV. The current repo instead has:
+
+- **Today (fast UI/notification):** MMKV typed keys in `touchgrass_state`
+- **History (metrics/charting):** Room daily totals + sessions
+
+Mapping charting metrics → current storage:
+
+- `distanceMeters` → Room daily totals (authoritative); MMKV `today_distance_meters` (today only)
+- `elapsedSeconds` → Room daily totals (authoritative); MMKV `today_elapsed_seconds` (today only)
+- `goalsReached` → Room daily totals + MMKV `today_goals_reached`
+- `sessions` → Room sessions table exists; ensure daily session counting is reliable (either compute from sessions by date, or store an incremented `sessionCount` in daily totals)
+
+Metrics that are **not stored yet** (required by the charting plan, but charting is deferred):
+
+- `focusMinutes` — can be derived from tracked time only if “focus == active tracking time”; otherwise needs a dedicated field or event model
+- `blockedAttempts` — needs an event/counter persisted by the blocker layer
+- `unlockEvents` — needs an event/counter definition and persistence
+
+Recommended future-safe storage structure (no charting implementation required now):
+
+- Treat Room as the canonical history layer and add fields (or a companion table) for: `focusSeconds`, `blockedAttempts`, `unlockEvents`.
+- If you later want MMKV `metrics:*` for cross-platform parity or cloud sync, generate it as **derived snapshots** from Room (write-once per day), not as a second live accumulator.
 
 Notes / Implications:
 
@@ -188,35 +296,28 @@ Notes / Implications:
 
 1. **Session Start / Motion Detected:**
 
-   * Native service initiates tracking, sets `live:progress.active = true`.
-   * Updates runtime snapshot if needed.
+   * Native service initiates tracking and begins updating canonical session state.
+   * Native projects absolute totals into MMKV (`today_distance_meters`, `today_elapsed_seconds`, flags) for fast reads.
 
 2. **During Session:**
 
-   * Native service updates:
-
-     * `touchgrass_state` for fast counters
-     * `live:progress` every few seconds
-   * JS UI reads `live:progress` for spinner / notification updates.
+   * Native updates MMKV frequently (fast-path) to keep UI + notifications in sync.
+   * JS UI uses native progress/anchor state for real-time display and uses MMKV primarily as a baseline projection.
 
 3. **Session End / Goal Completion:**
 
-   * Merge `live:progress` into `metrics:daily:YYYY-MM-DD`.
-   * Update rolling aggregates.
-   * Reset `live:progress` for next session.
-   * Update `goal_reached_today` in runtime snapshot.
+   * Native finalizes session persistence to Room and projects the final totals into MMKV.
+   * JS performs a post-stop resync (after a short grace window) and merges monotonic totals.
 
 4. **Plan Changes:**
 
-   * JS computes aggregated goals.
-   * Updates runtime snapshot (`live:activePlanSnapshot`) including `has_active_plans`.
-   * Native services instantly enforce blocking rules.
+   * JS computes aggregated goals/plans and writes goal/plan keys into MMKV (`goal_*`, `plan_*`).
+   * Native notification rendering reads these typed keys synchronously.
 
 5. **Day Rollover / Midnight Handling:**
 
-   * Finalize previous day's `metrics:daily`.
-   * Reset `touchgrass_state` counters and `live:progress`.
-   * Update `current_day` key for consistent reads.
+   * Native compares `current_day` and resets MMKV daily counters when day changes.
+   * Historical attribution should remain canonical in Room (and can later generate `metrics:daily:*` snapshots if desired).
 
 **Edge Cases Covered:**
 
@@ -243,29 +344,47 @@ Notes / Implications:
 
 ## 5️⃣ Real-Time UI Considerations
 
-* **Spinner:** reads `live:progress` every 1–2 seconds.
-* **Notification:** background service reads `live:progress`.
-* **Fast Checks:** `has_active_plans` prevents unnecessary plan iteration.
+* **Spinner:** uses native progress/anchor state for foreground animation; uses MMKV as a baseline projection.
+* **Notification:** reads today's totals + typed goal/plan keys from MMKV in multi-process mode.
+* **Fast Checks:** prefer boolean/typed keys (e.g., `plan_active_today`) over scanning plan objects.
 * **Goal Reached:**
 
   * Stops spinner animation
-  * Updates runtime snapshot
-  * Updates `touchgrass_state` counters
+   * Native sets `today_goals_reached` in MMKV and persists the completed session/daily totals to Room
+   * Notifications read the updated flags/totals synchronously from MMKV
 
 **Performance Notes:**
 
-* Keep runtime snapshot small (<1KB).
-* Debounce writes to avoid high-frequency MMKV disk writes.
+* If you implement a runtime snapshot blob later, keep it small (<1KB).
+* Debounce writes only if performance testing indicates it is necessary; current repo intentionally uses a native fast-path update strategy.
 
 ---
 
 ## 6️⃣ Performance & Reliability Best Practices
 
 * **Synchronous first:** Native services read MMKV directly; JS reads are secondary.
-* **Batch updates:** Update MMKV every 2–5 seconds to reduce I/O.
+* **Batch updates (optional):** Update MMKV every 2–5 seconds only if needed; the current implementation uses high-frequency updates for realtime UI/notifications.
 * **Rolling aggregates:** Precompute `7d`, `30d` totals to reduce live summation.
 * **Atomic updates:** Day rollover and goal completion should be atomic to prevent inconsistencies.
 * **Snapshot versioning:** Optional `snapshotVersion` key for migration and schema validation.
+
+### 6.1 Compatibility / Non-regression Requirements
+
+These are explicit non-regression requirements based on current behavior:
+
+1. **Home screen elapsed time ticks at 1 Hz while foreground**
+
+   - The UI may tick displayed elapsed time at 1 Hz, but it must be derived from a native anchor snapshot (baseline + timestamp) and must not become a second writer/accumulator.
+
+2. **Single-accumulator invariant for distance/time**
+
+   - Only native tracking accumulates distance/time deltas.
+   - Any JS write-back is hydration-only and must be monotonic (max/OR), never additive.
+
+3. **No out-of-sync presentation**
+
+   - Avoid baseline reads during an active session.
+   - Use stop-grace + post-stop resync to avoid race conditions.
 
 ---
 
@@ -287,16 +406,16 @@ Notes / Implications:
 **Phase 1: Core functionality**
 
 * MMKV setup and multi-process configuration
-* Live progress storage (`live:progress`)
-* Runtime snapshot (`live:activePlanSnapshot` with `has_active_plans`)
+* Typed MMKV key projection for today totals + flags (`touchgrass_state`)
+* Foreground 1 Hz elapsed tick derived from native anchor (UI-only; no per-second persistence writes)
 * Background tracking & notifications
 * Real-time spinner updates
 
 **Phase 2: Historical metrics**
 
-* Daily snapshots (`metrics:daily:YYYY-MM-DD`)
-* Date index (`metrics:index:daily`)
-* Rolling aggregates (`metrics:rolling`)
+* Room-backed daily totals + session history as canonical charting source
+* (Optional, target) Derived daily snapshots (`metrics:daily:YYYY-MM-DD`) for portability/cloud sync
+* (Optional, target) Date index + rolling aggregates (`metrics:index:daily`, `metrics:rolling:*`)
 
 **Phase 3: Future extensions**
 
@@ -325,15 +444,15 @@ Notes / Implications:
 
 ## 🔑 Summary
 
-* **Live Progress:** `live:progress` → real-time spinner & notifications
-* **Runtime Snapshot:** `live:activePlanSnapshot` → blocking decisions & fast evaluation, includes `has_active_plans`
-* **Today’s Counters:** `touchgrass_state` → atomic counters for native reads
-* **Daily Metrics:** `metrics:daily:YYYY-MM-DD` → immutable snapshots for historical insights
+* **Source of truth:** Native tracking pipeline (today) + Room (history)
+* **Today’s fast projection:** `touchgrass_state` MMKV typed keys → realtime UI baselines & notifications
+* **Plan/goal sync:** JS computes aggregated goal/plan keys → native reads synchronously for notifications
+* **Daily Metrics (future keyspace):** `metrics:daily:YYYY-MM-DD` → optional derived snapshots for portability/cloud sync
 * **Rolling Aggregates & Monthly Summaries:** Precomputed for efficient queries
 * **Optional Event Log:** Future analytics, ML readiness
-* **Plan Changes:** JS computes aggregated goal and updates runtime snapshot
-* **Day Rollover:** Reset live progress, finalize daily metrics
-* **Best Practices:** Atomic updates, stable schema, native-first reads, memoized selectors, debounced writes
+* **Plan Changes:** JS writes typed goal/plan keys; avoids making distance/time a JS accumulator
+* **Day Rollover:** Native resets MMKV day counters using `current_day`; Room remains canonical for history
+* **Best Practices:** Monotonic merges, stop-grace resync, native-first reads, preserve 1Hz foreground tick
 
 ---
 

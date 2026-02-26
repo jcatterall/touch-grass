@@ -61,6 +61,37 @@ interface TrackingDao {
     @Query("SELECT * FROM daily_totals ORDER BY date DESC LIMIT :limit")
     suspend fun getRecentDailyTotals(limit: Int): List<DailyTotalEntity>
 
+    @Query("SELECT * FROM daily_totals WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC")
+    suspend fun getDailyTotalsBetween(startDate: String, endDate: String): List<DailyTotalEntity>
+
+    /**
+     * Increments today's sessionCount, creating the row if missing.
+     * Called once per session start so sessionCount is accurate.
+     */
+    @Transaction
+    suspend fun bumpSessionCount(date: String) {
+        val existing = getDailyTotal(date)
+        if (existing != null) {
+            upsertDailyTotal(
+                existing.copy(
+                    sessionCount = existing.sessionCount + 1,
+                    lastUpdatedMs = System.currentTimeMillis(),
+                )
+            )
+        } else {
+            upsertDailyTotal(
+                DailyTotalEntity(
+                    date = date,
+                    distanceMeters = 0.0,
+                    elapsedSeconds = 0L,
+                    goalsReached = false,
+                    sessionCount = 1,
+                    lastUpdatedMs = System.currentTimeMillis(),
+                )
+            )
+        }
+    }
+
     /**
      * Atomically accumulates [deltaDist] and [deltaElapsed] into today's daily total row,
      * creating it if it doesn't exist yet. Called from TrackingService on each GPS fix

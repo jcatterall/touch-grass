@@ -1,6 +1,7 @@
 package com.touchgrass.storage
 
 import android.content.Context
+import com.touchgrass.MMKVMetricsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -18,6 +19,14 @@ class SessionRepository(context: Context) {
     private val dao = TrackingDatabase.getInstance(context).trackingDao()
     private val scope = CoroutineScope(Dispatchers.IO)
 
+    init {
+        // Best-effort init; safe to call multiple times.
+        try {
+            MMKVMetricsStore.init(context)
+        } catch (_: Exception) {
+        }
+    }
+
     private var currentSessionId: String? = null
     private var sessionMode: String = "auto"
 
@@ -27,6 +36,8 @@ class SessionRepository(context: Context) {
         currentSessionId = id
         sessionMode = mode
         scope.launch {
+            // Track number of sessions per day (used by derived snapshots).
+            dao.bumpSessionCount(today)
             dao.insertSession(
                 SessionEntity(
                     id = id,
@@ -100,6 +111,19 @@ class SessionRepository(context: Context) {
             // flip goalsReached from false -> true at the daily level.
             if (deltaDistance > 0.0 || deltaElapsed > 0L || (nextGoalReached && !prevGoalReached)) {
                 dao.accumulateDaily(today, deltaDistance, deltaElapsed, nextGoalReached)
+            }
+
+            // Derived snapshots (MMKV metrics) are written from Room once per close.
+            // This keeps Room canonical while allowing fast snapshot reads.
+            try {
+                val daily = dao.getDailyTotal(today)
+                if (daily != null) {
+                    MMKVMetricsStore.writeDailySnapshot(daily)
+                    MMKVMetricsStore.recomputeAndWriteRolling(dao, endDate = today)
+                    MMKVMetricsStore.recomputeAndWriteMonthly(dao, date = today)
+                }
+            } catch (_: Exception) {
+                // best-effort
             }
         }
         currentSessionId = null

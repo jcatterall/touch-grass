@@ -12,11 +12,26 @@ import { generateUUID } from '../utils/guid';
  */
 const _mmkv = new MMKV({ id: 'touchgrass_state', mode: Mode.MULTI_PROCESS });
 
+// Low-frequency, Room-derived snapshot storage (separate MMKV file to avoid
+// mixing historical/derived keys with the high-frequency today projection).
+const _mmkvMetrics = new MMKV({
+  id: 'touchgrass_metrics',
+  mode: Mode.MULTI_PROCESS,
+});
+
 export const fastStorage = {
+  // Native-owned rollover marker. JS should treat mismatched days as a reset.
+  getCurrentDay: (): string => _mmkv.getString('current_day') ?? '',
+
   getTodayDistance: (): number => _mmkv.getNumber('today_distance_meters') ?? 0,
   getTodayElapsed: (): number => _mmkv.getNumber('today_elapsed_seconds') ?? 0,
   getGoalsReached: (): boolean =>
     _mmkv.getBoolean('today_goals_reached') ?? false,
+
+  // Native commit marker written after projecting today totals.
+  getTodayLastUpdateMs: (): number =>
+    _mmkv.getNumber('today_last_update_ms') ?? 0,
+
   setTodayDistance: (meters: number): void => {
     _mmkv.set('today_distance_meters', meters);
   },
@@ -31,6 +46,11 @@ export const fastStorage = {
   getPlanDay: (): string => _mmkv.getString('plan_day') ?? '',
   isPlanActiveToday: (): boolean =>
     _mmkv.getBoolean('plan_active_today') ?? false,
+
+  // Optional expiry fence for notification correctness when JS is terminated.
+  // If present and in the past, native should treat plan as inactive.
+  getPlanActiveUntilMs: (): number =>
+    _mmkv.getNumber('plan_active_until_ms') ?? 0,
 
   /** Write the aggregated goal so TrackingService can display correct progress in the notification. */
   setGoal(
@@ -67,6 +87,82 @@ export const fastStorage = {
   },
   setPlanActiveToday(active: boolean): void {
     _mmkv.set('plan_active_today', active);
+  },
+
+  setPlanActiveUntilMs(untilMs: number): void {
+    _mmkv.set('plan_active_until_ms', untilMs);
+  },
+};
+
+export type DailyMetricsSnapshot = {
+  date: string;
+  distanceMeters: number;
+  elapsedSeconds: number;
+  sessions: number;
+  goalsReached: boolean;
+  lastUpdatedMs: number;
+};
+
+export type RollingMetricsSnapshot = {
+  window: '7d' | '30d' | '365d';
+  startDate: string;
+  endDate: string;
+  distanceMeters: number;
+  elapsedSeconds: number;
+  days: number;
+  goalsReachedDays: number;
+  computedAtMs: number;
+};
+
+export type MonthlyMetricsSnapshot = {
+  month: string; // YYYY-MM
+  distanceMeters: number;
+  elapsedSeconds: number;
+  days: number;
+  goalsReachedDays: number;
+  computedAtMs: number;
+};
+
+export const metricsStorage = {
+  getDailyIndex(): string[] {
+    const raw = _mmkvMetrics.getString('metrics:index:daily');
+    if (!raw) return [];
+    try {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) ? (v as string[]) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  getDaily(date: string): DailyMetricsSnapshot | null {
+    const raw = _mmkvMetrics.getString(`metrics:daily:${date}`);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as DailyMetricsSnapshot;
+    } catch {
+      return null;
+    }
+  },
+
+  getRolling(window: '7d' | '30d' | '365d'): RollingMetricsSnapshot | null {
+    const raw = _mmkvMetrics.getString(`metrics:rolling:${window}`);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as RollingMetricsSnapshot;
+    } catch {
+      return null;
+    }
+  },
+
+  getMonthly(month: string): MonthlyMetricsSnapshot | null {
+    const raw = _mmkvMetrics.getString(`metrics:monthly:${month}`);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as MonthlyMetricsSnapshot;
+    } catch {
+      return null;
+    }
   },
 };
 
