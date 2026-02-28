@@ -14,6 +14,7 @@ import { UsageReport } from './usage/UsageReport';
 import { UsagePermissions } from './usage/UsagePermissions';
 import { BlockingPlan } from '../../types';
 import { PlanBuilding } from './PlanBuilding';
+import { NotificationBlock } from './NotificationBlock';
 
 export interface OnboardingStepProps {
   onComplete: () => void;
@@ -42,6 +43,7 @@ const STEPS = [
   'planBuilding',
   'streak',
   'paywall',
+  'notificationBlock',
   'notification',
 ] as const;
 
@@ -154,6 +156,9 @@ export const Onboarding = ({
     ),
     streak: <Streak onComplete={handleNext} onBack={handleBack} />,
     paywall: <Paywall onComplete={handleNext} onBack={handleBack} />,
+    notificationBlock: (
+      <NotificationBlock onComplete={handleNext} onBack={handleBack} />
+    ),
     notification: <Notification onComplete={handleNext} onBack={handleBack} />,
   };
 

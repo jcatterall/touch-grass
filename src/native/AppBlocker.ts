@@ -1,6 +1,6 @@
-import {NativeModules, Platform} from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
-const {AppBlockerModule} = NativeModules;
+const { AppBlockerModule } = NativeModules;
 
 const isAvailable = Platform.OS === 'android' && AppBlockerModule != null;
 
@@ -25,6 +25,28 @@ export const AppBlocker = {
   async requestUsageStatsPermission(): Promise<boolean> {
     if (!isAvailable) return false;
     return AppBlockerModule.requestUsageStatsPermission();
+  },
+
+  async hasNotificationListenerPermission(): Promise<boolean> {
+    if (!isAvailable) return false;
+    return AppBlockerModule.hasNotificationListenerPermission();
+  },
+
+  async requestNotificationListenerPermission(): Promise<boolean> {
+    if (!isAvailable) return false;
+    return AppBlockerModule.requestNotificationListenerPermission();
+  },
+
+  async getNotificationsBlockedTodayForApp(
+    packageName: string,
+  ): Promise<number> {
+    if (!isAvailable) return 0;
+    return AppBlockerModule.getNotificationsBlockedTodayForApp(packageName);
+  },
+
+  async getNotificationsBlockedTodayTotal(): Promise<number> {
+    if (!isAvailable) return 0;
+    return AppBlockerModule.getNotificationsBlockedTodayTotal();
   },
 
   async updateBlockerConfig(

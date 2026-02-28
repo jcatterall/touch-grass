@@ -39,7 +39,11 @@ class NotificationHelper(private val context: Context) {
         ): NotificationText {
             val notExpired = planActiveUntilMs <= 0L || nowMs <= planActiveUntilMs
             val planActiveToday = planDay == todayKey && planActiveFlag && notExpired
-            val dayIsToday = MMKVStore.isCurrentDayToday()
+            val dayIsToday = try {
+                MMKVStore.isCurrentDayToday()
+            } catch (_: Exception) {
+                true
+            }
             val progressDistance = if (dayIsToday) state.distanceMeters else 0.0
             val progressElapsed = if (dayIsToday) state.elapsedSeconds else 0L
 

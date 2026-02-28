@@ -41,11 +41,11 @@ export const PlanBuilding = ({ onComplete }: PlanBuildingProps) => {
 
   useEffect(() => {
     progress.value = withSequence(
-      withTiming(0.75, { duration: 5600, easing: Easing.out(Easing.quad) }),
-      withTiming(0.97, { duration: 5600, easing: Easing.out(Easing.exp) }),
-      withTiming(1, { duration: 400, easing: Easing.out(Easing.quad) }),
+      withTiming(0.75, { duration: 3500, easing: Easing.out(Easing.quad) }),
+      withTiming(0.97, { duration: 3500, easing: Easing.out(Easing.exp) }),
+      withTiming(1, { duration: 250, easing: Easing.out(Easing.quad) }),
     );
-    const t = setTimeout(onComplete, 12800);
+    const t = setTimeout(onComplete, 8000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -95,7 +95,7 @@ export const PlanBuilding = ({ onComplete }: PlanBuildingProps) => {
           {STEPS.map((label, i) => (
             <Animated.View
               key={i}
-              entering={FadeIn.delay(i * 2400 + 800).duration(400)}
+              entering={FadeIn.delay(i * 1500 + 500).duration(250)}
               style={styles.row}
             >
               <CircleCheck

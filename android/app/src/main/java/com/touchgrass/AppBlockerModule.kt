@@ -1,10 +1,12 @@
 package com.touchgrass
 
 import android.app.AppOpsManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Process
 import android.provider.Settings
+import android.provider.Settings.Secure
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import com.facebook.react.bridge.Promise
@@ -78,6 +80,7 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
                 .putString(AppBlockerService.PREF_BLOCKED_PACKAGES, jsonArr.toString())
                 .putBoolean(AppBlockerService.PREF_GOALS_REACHED, goalsReached)
                 .putBoolean(AppBlockerService.PREF_HAS_PERMANENT, hasPermanent)
+                .putLong(AppBlockerService.PREF_CONFIG_UPDATED_AT_MS, System.currentTimeMillis())
                 .apply()
 
             // Mirror the blocked package count into MMKV so native notifications
@@ -156,6 +159,53 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
             .remove(AppBlockerService.PREF_CURRENTLY_BLOCKED)
             .apply()
         promise.resolve(true)
+    }
+
+    @ReactMethod
+    fun hasNotificationListenerPermission(promise: Promise) {
+        try {
+            val enabledListeners = Secure.getString(
+                reactApplicationContext.contentResolver,
+                "enabled_notification_listeners"
+            ) ?: ""
+            val componentName = ComponentName(
+                reactApplicationContext,
+                NotificationBlockListenerService::class.java
+            ).flattenToString()
+            promise.resolve(enabledListeners.contains(componentName))
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun requestNotificationListenerPermission(promise: Promise) {
+        try {
+            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun getNotificationsBlockedTodayForApp(packageName: String, promise: Promise) {
+        try {
+            promise.resolve(MMKVStore.getTodayNotificationsBlockedForApp(packageName))
+        } catch (e: Exception) {
+            promise.resolve(0)
+        }
+    }
+
+    @ReactMethod
+    fun getNotificationsBlockedTodayTotal(promise: Promise) {
+        try {
+            promise.resolve(MMKVStore.getTodayNotificationsBlockedTotal())
+        } catch (e: Exception) {
+            promise.resolve(0)
+        }
     }
 
     @ReactMethod

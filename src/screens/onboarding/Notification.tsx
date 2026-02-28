@@ -1,6 +1,8 @@
+import { useCallback, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
+  AppState,
   Platform,
   PermissionsAndroid,
   Alert,
@@ -30,21 +32,58 @@ const requestNotificationPermission = async (): Promise<boolean> => {
 };
 
 export const Notification = ({ onComplete }: NotificationProps) => {
-  const handleContinue = () => {
+  const completedRef = useRef(false);
+
+  const isNotificationPermissionGranted = useCallback(async () => {
+    if (Platform.OS !== 'android' || Platform.Version < 33) {
+      return true;
+    }
+
+    return PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+    );
+  }, []);
+
+  const completeOnce = useCallback(() => {
+    if (completedRef.current) return;
+    completedRef.current = true;
     onComplete();
+  }, [onComplete]);
+
+  useEffect(() => {
+    isNotificationPermissionGranted().then(granted => {
+      if (granted) {
+        completeOnce();
+      }
+    });
+
+    const sub = AppState.addEventListener('change', state => {
+      if (state !== 'active') return;
+      isNotificationPermissionGranted().then(granted => {
+        if (granted) {
+          completeOnce();
+        }
+      });
+    });
+
+    return () => sub.remove();
+  }, [completeOnce, isNotificationPermissionGranted]);
+
+  const handleContinue = () => {
+    completeOnce();
   };
 
   const handleNotification = async () => {
     const granted = await requestNotificationPermission();
 
     if (granted) {
-      onComplete();
+      completeOnce();
     } else {
       Alert.alert(
-        'Permission Required',
-        'Notification access is needed to block unwanted notifications. Please enable it in settings.',
+        'Permission Optional',
+        'TouchGrass can still work without notification permission, but progress notifications may not appear on Android 13+.',
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: 'Continue', onPress: completeOnce },
           { text: 'Open Settings', onPress: () => Linking.openSettings() },
         ],
       );
@@ -55,14 +94,14 @@ export const Notification = ({ onComplete }: NotificationProps) => {
     <OnboardingContainer>
       <View style={styles.flex}>
         <View style={styles.item}>
-          <Illustration source="shield" size="md" />
+          <Illustration source="progress" size="md" />
           <View style={styles.heading}>
             <Typography variant="title" center>
-              Stay focused, not distracted
+              Track your progress
             </Typography>
             <Typography variant="subtitle" center>
-              Allow notification access so TouchGrass can mute alerts from
-              blocked apps during your active plans
+              Receive gentle notifications about your progress and stay
+              motivated to reach your goals
             </Typography>
           </View>
         </View>

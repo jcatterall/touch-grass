@@ -13,14 +13,16 @@ class NotificationHelperTest {
             todayKey = "2026-02-24",
             planDay = "",
             planActiveFlag = false,
+            planActiveUntilMs = 0L,
             goalDistanceValue = 5000.0,
             goalDistanceUnit = "m",
             goalTimeValue = 1800.0,
             goalTimeUnit = "s",
+            nowMs = System.currentTimeMillis(),
             state = TrackingState(distanceMeters = 1234.0, elapsedSeconds = 999)
         )
 
-        assertEquals("No active blocks for today", text.title)
+        assertEquals("No active plans for today", text.title)
         assertEquals("", text.body)
     }
 
@@ -31,10 +33,12 @@ class NotificationHelperTest {
             todayKey = "2026-02-24",
             planDay = "2026-02-24",
             planActiveFlag = true,
+            planActiveUntilMs = System.currentTimeMillis() + 60_000,
             goalDistanceValue = 5000.0,
             goalDistanceUnit = "m",
             goalTimeValue = 1800.0,
             goalTimeUnit = "s",
+            nowMs = System.currentTimeMillis(),
             state = TrackingState(distanceMeters = 1200.0, elapsedSeconds = 60)
         )
 

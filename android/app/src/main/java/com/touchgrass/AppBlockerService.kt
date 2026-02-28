@@ -25,6 +25,7 @@ class AppBlockerService : Service() {
         const val PREF_GOALS_REACHED = "goals_reached"
         const val PREF_HAS_PERMANENT = "has_permanent"
         const val PREF_CURRENTLY_BLOCKED = "currently_blocked"
+        const val PREF_CONFIG_UPDATED_AT_MS = "config_updated_at_ms"
         private const val POLL_INTERVAL_IDLE = 1000L
         private const val POLL_INTERVAL_BLOCKING = 500L
         private const val GESTURE_BLOCKER_HEIGHT_DP = 80

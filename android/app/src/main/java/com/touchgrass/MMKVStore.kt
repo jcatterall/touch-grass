@@ -2,6 +2,7 @@ package com.touchgrass
 
 import android.content.Context
 import com.tencent.mmkv.MMKV
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -41,6 +42,8 @@ object MMKVStore {
         if (!kv.containsKey(KEY_IDLE_MONITORING_ENABLED)) kv.encode(KEY_IDLE_MONITORING_ENABLED, false)
         if (!kv.containsKey(KEY_TODAY_LAST_UPDATE_MS)) kv.encode(KEY_TODAY_LAST_UPDATE_MS, 0L)
         if (!kv.containsKey(KEY_LAST_AR_REPLAY_EVENT_NANOS)) kv.encode(KEY_LAST_AR_REPLAY_EVENT_NANOS, 0L)
+        if (!kv.containsKey(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL)) kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL, 0)
+        if (!kv.containsKey(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON)) kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON, "{}")
     }
 
     // ---- Key constants (shared with JS side in src/storage.ts fastStorage) ----
@@ -80,6 +83,8 @@ object MMKVStore {
     // Whether idle motion monitoring should be running even when no session is active.
     const val KEY_IDLE_MONITORING_ENABLED = "idle_monitoring_enabled"
     const val KEY_LAST_AR_REPLAY_EVENT_NANOS = "last_ar_replay_event_nanos"
+    const val KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL = "today_notifications_blocked_total"
+    const val KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON = "today_notifications_blocked_by_app_json"
 
     // ---- Distance accumulation (called from TrackingService on each GPS fix) ----
 
@@ -152,6 +157,27 @@ object MMKVStore {
     fun getTodayLastUpdateMs(): Long = kv.decodeLong(KEY_TODAY_LAST_UPDATE_MS, 0L)
 
     fun getLastArReplayEventNanos(): Long = kv.decodeLong(KEY_LAST_AR_REPLAY_EVENT_NANOS, 0L)
+
+    fun getTodayNotificationsBlockedTotal(): Int {
+        ensureTodayRollover()
+        return kv.decodeInt(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL, 0)
+    }
+
+    fun getTodayNotificationsBlockedByAppJson(): String {
+        ensureTodayRollover()
+        return kv.decodeString(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON) ?: "{}"
+    }
+
+    fun getTodayNotificationsBlockedForApp(packageName: String): Int {
+        if (packageName.isBlank()) return 0
+        ensureTodayRollover()
+        return try {
+            val json = JSONObject(kv.decodeString(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON) ?: "{}")
+            json.optInt(packageName, 0)
+        } catch (_: Exception) {
+            0
+        }
+    }
 
     // ---- Writers ----
 
@@ -239,10 +265,36 @@ object MMKVStore {
         kv.encode(KEY_IDLE_MONITORING_ENABLED, v)
     }
 
+    fun incrementTodayNotificationsBlockedForApp(packageName: String) {
+        if (packageName.isBlank()) return
+        ensureTodayRollover()
+
+        val total = kv.decodeInt(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL, 0)
+        kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL, total + 1)
+
+        try {
+            val json = JSONObject(kv.decodeString(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON) ?: "{}")
+            val next = json.optInt(packageName, 0) + 1
+            json.put(packageName, next)
+            kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON, json.toString())
+        } catch (_: Exception) {
+            val json = JSONObject()
+            json.put(packageName, 1)
+            kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON, json.toString())
+        }
+    }
+
     // ---- Helpers ----
 
     private fun todayDate(): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+    private fun ensureTodayRollover() {
+        val today = todayDate()
+        if (kv.decodeString(KEY_CURRENT_DAY) != today) {
+            resetForNewDay(today)
+        }
+    }
 
     private fun resetForNewDay(today: String) {
         kv.encode(KEY_CURRENT_DAY, today)
@@ -251,6 +303,8 @@ object MMKVStore {
         kv.encode(KEY_GOALS_REACHED, false)
         kv.encode(KEY_TRACKING_MODE, "idle")
         kv.encode(KEY_TODAY_LAST_UPDATE_MS, 0L)
+        kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL, 0)
+        kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON, "{}")
     }
 
     fun todayKey(): String = todayDate()
