@@ -10,6 +10,7 @@ import android.util.Log
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.os.Build
 import androidx.core.content.ContextCompat
 import android.Manifest
 import com.facebook.react.bridge.Arguments
@@ -166,24 +167,9 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             val svc = trackingService
             svc?.stopTracking()
 
-            // If background idle monitoring is enabled, do NOT stop the service.
-            // We only ended the active session; the service should remain alive to
-            // watch for motion.
-            if (MMKVStore.isIdleMonitoringEnabled()) {
-                promise.resolve(true)
-                return
-            }
-
-            // Give TrackingService time to publish the final IDLE state, which
-            // projects canonical totals into MMKV. Stopping/unbinding immediately
-            // can race that projection and cause JS to read 0.
-            val context = reactApplicationContext
+            // Keep TrackingService alive so a single sticky notification can
+            // continue showing current day plan status, even when no session is active.
             mainHandler.postDelayed({
-                try {
-                    context.stopService(Intent(context, TrackingService::class.java))
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to stop TrackingService", e)
-                }
                 unbindService()
             }, stopGraceMs)
 
@@ -198,12 +184,25 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     fun getProgress(promise: Promise) {
         try {
             val service = trackingService
+            val isToday = MMKVStore.isCurrentDayToday()
             // If the JS layer calls getProgress while the service is not bound
             // (common on cold start / after background), fall back to MMKV's
             // projected "today totals" so UI can still show current progress.
-            val distanceMeters = service?.distanceMeters ?: MMKVStore.getTodayDistance()
-            val elapsedSeconds = service?.elapsedSeconds ?: MMKVStore.getTodayElapsed()
-            val goalReached = service?.goalReached ?: MMKVStore.getGoalsReached()
+            val distanceMeters = if (isToday) {
+                service?.distanceMeters ?: MMKVStore.getTodayDistanceSafe()
+            } else {
+                0.0
+            }
+            val elapsedSeconds = if (isToday) {
+                service?.elapsedSeconds ?: MMKVStore.getTodayElapsedSafe()
+            } else {
+                0L
+            }
+            val goalReached = if (isToday) {
+                service?.goalReached ?: MMKVStore.getGoalsReachedSafe()
+            } else {
+                false
+            }
             val result = Arguments.createMap().apply {
                 putDouble("distanceMeters", distanceMeters)
                 putDouble("elapsedSeconds", elapsedSeconds.toDouble())
@@ -235,11 +234,11 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                 }
                 val isTracking = safeMode == "manual" || safeMode == "auto"
                 val result = Arguments.createMap().apply {
-                    putDouble("todayDistanceMeters", MMKVStore.getTodayDistance())
-                    putDouble("todayElapsedSeconds", MMKVStore.getTodayElapsed().toDouble())
+                    putDouble("todayDistanceMeters", MMKVStore.getTodayDistanceSafe())
+                    putDouble("todayElapsedSeconds", MMKVStore.getTodayElapsedSafe().toDouble())
                     putDouble("sessionDistanceMeters", 0.0)
                     putDouble("sessionElapsedSeconds", 0.0)
-                    putBoolean("goalReached", MMKVStore.getGoalsReached())
+                    putBoolean("goalReached", MMKVStore.getGoalsReachedSafe())
                     putBoolean("isTracking", isTracking)
                     putString("mode", safeMode)
                     putBoolean("shouldTick", false)
@@ -301,8 +300,8 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         try {
             val context = reactApplicationContext
 
-            if (!hasLocationPermission()) {
-                Log.w(TAG, "startIdleService called without location permission; not starting TrackingService")
+            if (!canStartTrackingForeground()) {
+                Log.w(TAG, "startIdleService called without runtime HEALTH/LOCATION permissions; not starting TrackingService")
                 promise.resolve(false)
                 return
             }
@@ -372,12 +371,15 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     fun notifyGoalsUpdated(promise: Promise) {
         try {
             val context = reactApplicationContext
-            if (MMKVStore.isAutoTracking() && hasLocationPermission()) {
-                val intent = Intent(context, TrackingService::class.java).apply {
-                    action = TrackingConstants.ACTION_GOALS_UPDATED
-                }
-                ContextCompat.startForegroundService(context, intent)
+            if (!canStartTrackingForeground()) {
+                Log.w(TAG, "notifyGoalsUpdated skipped: missing runtime HEALTH/LOCATION permissions")
+                promise.resolve(false)
+                return
             }
+            val intent = Intent(context, TrackingService::class.java).apply {
+                action = TrackingConstants.ACTION_GOALS_UPDATED
+            }
+            ContextCompat.startForegroundService(context, intent)
             promise.resolve(true)
         } catch (e: Exception) {
             Log.w(TAG, "notifyGoalsUpdated failed", e)
@@ -433,10 +435,15 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     private fun hasLocationPermission(): Boolean {
-        val context = reactApplicationContext
-        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
-        return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
+        return TrackingPermissionGate.hasLocationPermission(reactApplicationContext)
+    }
+
+    private fun hasActivityRecognitionPermission(): Boolean {
+        return TrackingPermissionGate.hasActivityRecognitionPermission(reactApplicationContext)
+    }
+
+    private fun canStartTrackingForeground(): Boolean {
+        return TrackingPermissionGate.canStartForegroundTracking(reactApplicationContext)
     }
 
     companion object {
@@ -476,13 +483,17 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             TrackingMode.TRACKING_AUTO -> "auto"
             else -> "idle"
         }
+        val isToday = MMKVStore.isCurrentDayToday()
+        val todayDistance = if (isToday) s.todayDistanceMeters else 0.0
+        val todayElapsed = if (isToday) s.todayElapsedSeconds else 0L
+        val goalsReached = if (isToday) s.goalReached else false
 
         return Arguments.createMap().apply {
-            putDouble("todayDistanceMeters", s.todayDistanceMeters)
-            putDouble("todayElapsedSeconds", s.todayElapsedSeconds.toDouble())
+            putDouble("todayDistanceMeters", todayDistance)
+            putDouble("todayElapsedSeconds", todayElapsed.toDouble())
             putDouble("sessionDistanceMeters", s.sessionDistanceMeters)
             putDouble("sessionElapsedSeconds", s.sessionElapsedSeconds.toDouble())
-            putBoolean("goalReached", s.goalReached)
+            putBoolean("goalReached", goalsReached)
             putBoolean("isTracking", isTracking)
             putString("mode", modeString)
             putBoolean("shouldTick", s.isTimeEligible)
@@ -500,9 +511,9 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             isTracking = isTracking,
             mode = s.mode,
             shouldTick = s.isTimeEligible,
-            todayDistanceMeters = s.todayDistanceMeters,
-            todayElapsedSeconds = s.todayElapsedSeconds,
-            goalReached = s.goalReached
+            todayDistanceMeters = if (MMKVStore.isCurrentDayToday()) s.todayDistanceMeters else 0.0,
+            todayElapsedSeconds = if (MMKVStore.isCurrentDayToday()) s.todayElapsedSeconds else 0L,
+            goalReached = if (MMKVStore.isCurrentDayToday()) s.goalReached else false
         )
 
         val now = SystemClock.elapsedRealtime()

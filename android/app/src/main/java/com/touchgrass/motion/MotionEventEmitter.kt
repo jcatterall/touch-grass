@@ -59,7 +59,8 @@ object MotionEventEmitter {
         distanceMeters: Double,
         timestamp: Long,
         lastKnownActivity: String,
-        trackingSignalled: Boolean
+        trackingSignalled: Boolean,
+        trackingBlockedReason: String?
     ) {
         val params = Arguments.createMap().apply {
             putString("state", state.name)
@@ -69,6 +70,11 @@ object MotionEventEmitter {
             putDouble("timestamp", timestamp.toDouble())
             putString("lastKnownActivity", lastKnownActivity)
             putBoolean("trackingSignalled", trackingSignalled)
+            if (trackingBlockedReason == null) {
+                putNull("trackingBlockedReason")
+            } else {
+                putString("trackingBlockedReason", trackingBlockedReason)
+            }
         }
         emit(EVENT_STATE_CHANGED, params)
     }

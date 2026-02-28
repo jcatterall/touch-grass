@@ -19,6 +19,13 @@ const _mmkvMetrics = new MMKV({
   mode: Mode.MULTI_PROCESS,
 });
 
+function localYyyyMmDd(date: Date = new Date()): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export const fastStorage = {
   // Native-owned rollover marker. JS should treat mismatched days as a reset.
   getCurrentDay: (): string => _mmkv.getString('current_day') ?? '',
@@ -268,7 +275,7 @@ export const storage = {
     elapsedSeconds: number,
     goalsReached: boolean,
   ): Promise<void> {
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const today = localYyyyMmDd();
     const activities = await this.getDailyActivities();
 
     const idx = activities.findIndex(a => a.date === today);
@@ -290,7 +297,7 @@ export const storage = {
   },
 
   async getTodayActivity(): Promise<DailyActivity> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localYyyyMmDd();
     const activities = await this.getDailyActivities();
     return (
       activities.find(a => a.date === today) ?? {

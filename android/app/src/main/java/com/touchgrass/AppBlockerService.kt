@@ -14,6 +14,7 @@ import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import com.touchgrass.tracking.TrackingConstants
+import com.touchgrass.tracking.TrackingPermissionGate
 import com.touchgrass.tracking.TrackingService
 
 class AppBlockerService : Service() {
@@ -193,10 +194,17 @@ class AppBlockerService : Service() {
 
     private fun notifyTrackingService(action: String) {
         try {
+            if (!canStartTrackingForeground()) {
+                return
+            }
             val intent = Intent(this, TrackingService::class.java).apply { this.action = action }
             ContextCompat.startForegroundService(this, intent)
         } catch (_: Exception) {
             // TrackingService may not be running — safe to ignore
         }
+    }
+
+    private fun canStartTrackingForeground(): Boolean {
+        return TrackingPermissionGate.canStartForegroundTracking(this)
     }
 }

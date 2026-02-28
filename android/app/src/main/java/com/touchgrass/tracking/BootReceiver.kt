@@ -25,14 +25,24 @@ class BootReceiver : BroadcastReceiver() {
             return
         }
 
-        if (!MMKVStore.isIdleMonitoringEnabled()) {
-            Log.d(TAG, "Boot completed: idle monitoring disabled — no-op")
-            return
+        val idleEnabled = MMKVStore.isIdleMonitoringEnabled()
+        if (idleEnabled) {
+            Log.i(TAG, "Boot completed: restoring idle monitoring")
+        } else {
+            Log.i(TAG, "Boot completed: restoring sticky notification state")
         }
 
-        Log.i(TAG, "Boot completed: restoring idle monitoring")
         val svcIntent = Intent(context, TrackingService::class.java).apply {
-            action = TrackingConstants.ACTION_START_IDLE
+            action = if (idleEnabled) {
+                TrackingConstants.ACTION_START_IDLE
+            } else {
+                TrackingConstants.ACTION_GOALS_UPDATED
+            }
+        }
+
+        if (!TrackingPermissionGate.canStartForegroundTracking(context)) {
+            Log.w(TAG, "Skipping TrackingService foreground start on boot: no runtime HEALTH/LOCATION permissions")
+            return
         }
 
         try {
@@ -41,4 +51,5 @@ class BootReceiver : BroadcastReceiver() {
             Log.w(TAG, "Failed to start TrackingService on boot", e)
         }
     }
+
 }

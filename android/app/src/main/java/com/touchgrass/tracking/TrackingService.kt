@@ -1,6 +1,7 @@
 package com.touchgrass.tracking
 
 import android.content.Intent
+import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.Manifest
@@ -49,6 +50,9 @@ class TrackingService : LifecycleService() {
 
     companion object {
         private const val TAG = "TrackingService"
+        private const val SESSION_CHECKPOINT_INTERVAL_MS = 15_000L
+        private const val SESSION_CHECKPOINT_DISTANCE_DELTA_M = 25.0
+        private const val SESSION_CHECKPOINT_ELAPSED_DELTA_S = 15L
     }
 
     // ── Dependencies ──────────────────────────────────────────────────────────
@@ -89,6 +93,11 @@ class TrackingService : LifecycleService() {
 
     // Whether motion monitoring is enabled (MotionEngine running in this process).
     private var motionEnabled = false
+
+    // In-flight session checkpoint markers.
+    private var lastSessionCheckpointMs = 0L
+    private var lastSessionCheckpointDistance = 0.0
+    private var lastSessionCheckpointElapsed = 0L
 
     // ── Binder (for TrackingModule to access progress values) ─────────────────
 
@@ -153,15 +162,18 @@ class TrackingService : LifecycleService() {
                     } else {
                         // Fallback: if Room has no aggregate yet but MMKV has totals (e.g. upgrade
                         // from older versions), seed Room once so it becomes authoritative.
-                        val mmkvDist = MMKVStore.getTodayDistance()
-                        val mmkvElapsed = MMKVStore.getTodayElapsed()
-                        // Never seed while a session is active; MMKV may include an in-flight session
-                        // which would be double-counted when the session later closes.
-                        if (!MMKVStore.isAutoTracking() && (mmkvDist > 0.0 || mmkvElapsed > 0L)) {
-                            Log.d(TAG, "Merging MMKV baseline: distance=$mmkvDist elapsed=$mmkvElapsed")
+                        val mmkvDay = MMKVStore.getCurrentDay()
+                        val mmkvDist = MMKVStore.getTodayDistanceSafe()
+                        val mmkvElapsed = MMKVStore.getTodayElapsedSafe()
+                        // MMKV projection doubles as an in-flight checkpoint. If the process
+                        // was killed mid-session, preserve that progress as today's baseline.
+                        if (mmkvDist > 0.0 || mmkvElapsed > 0L) {
+                            Log.d(TAG, "Merging MMKV baseline checkpoint: day=$mmkvDay distance=$mmkvDist elapsed=$mmkvElapsed")
                             controller.applyBaseline(mmkvDist, mmkvElapsed)
-                            repo.seedDailyTotalIfMissing(today, mmkvDist, mmkvElapsed, MMKVStore.getGoalsReached())
+                            repo.seedDailyTotalIfMissing(today, mmkvDist, mmkvElapsed, MMKVStore.getGoalsReachedSafe())
                             baselineMerged = true
+                        } else if (!MMKVStore.isCurrentDayToday() && (MMKVStore.getTodayDistance() > 0.0 || MMKVStore.getTodayElapsed() > 0L)) {
+                            Log.d(TAG, "Skipping MMKV baseline merge due to stale day: current_day=$mmkvDay today=$today")
                         }
                     }
                 } catch (e: Exception) {
@@ -176,10 +188,11 @@ class TrackingService : LifecycleService() {
 
         // Stage 5: deliver motion transitions directly into the controller (no intent IPC).
         MotionSessionController.trackingSink = object : MotionTrackingSink {
-            override fun onMotionStarted(activityType: String) {
-                if (!hasLocationPermission()) return
-                if (!MMKVStore.isIdleMonitoringEnabled()) return
+            override fun onMotionStarted(activityType: String): Boolean {
+                if (!hasLocationPermission()) return false
+                if (!MMKVStore.isIdleMonitoringEnabled()) return false
                 controller.onMotion(activityType.toActivitySnapshotStarted())
+                return controller.currentState().mode == TrackingMode.TRACKING_AUTO
             }
 
             override fun onMotionStopped(activityType: String, reason: String) {
@@ -209,10 +222,16 @@ class TrackingService : LifecycleService() {
         // Stage 1: START_STICKY restart can deliver a null intent.
         // Never interpret that as a user-initiated manual start.
         if (intent == null) {
-            Log.w(TAG, "onStartCommand: null intent (likely START_STICKY restart) — no-op")
+            Log.w(TAG, "onStartCommand: null intent (likely START_STICKY restart) — fail-closed to IDLE")
+            MMKVStore.setAutoTracking(false)
+            MMKVStore.setTrackingMode("idle")
+            MMKVStore.bumpTrackingRevision()
+            MMKVStore.setTodayLastUpdateMs(System.currentTimeMillis())
             if (MMKVStore.isIdleMonitoringEnabled()) {
                 Log.d(TAG, "Restoring idle monitoring after sticky restart")
                 startMotionIfNeeded()
+            } else {
+                stopMotionIfRunning()
             }
             refreshNotification()
             return START_STICKY
@@ -225,6 +244,7 @@ class TrackingService : LifecycleService() {
         if (action != null && action.isNotBlank() &&
             action != TrackingConstants.ACTION_START_IDLE &&
             action != TrackingConstants.ACTION_STOP_BACKGROUND &&
+            action != TrackingConstants.ACTION_AR_TRANSITION_REPLAY &&
             action != TrackingConstants.ACTION_BLOCKER_STARTED &&
             action != TrackingConstants.ACTION_BLOCKER_STOPPED &&
             action != TrackingConstants.ACTION_GOALS_UPDATED
@@ -248,7 +268,7 @@ class TrackingService : LifecycleService() {
             }
 
             TrackingConstants.ACTION_STOP_BACKGROUND -> {
-                Log.d(TAG, "ACTION_STOP_BACKGROUND — force-stopping all tracking and stopping service")
+                Log.d(TAG, "ACTION_STOP_BACKGROUND — force-stopping all tracking and disabling motion monitoring")
                 MMKVStore.setIdleMonitoringEnabled(false)
 
                 // Hard-stop contract: disabling auto/background tracking must end
@@ -262,8 +282,40 @@ class TrackingService : LifecycleService() {
                 }
 
                 stopMotionIfRunning()
-                stopSelf()
-                return START_NOT_STICKY
+                refreshNotification()
+                return START_STICKY
+            }
+
+            TrackingConstants.ACTION_AR_TRANSITION_REPLAY -> {
+                if (!MMKVStore.isIdleMonitoringEnabled()) {
+                    Log.d(TAG, "ACTION_AR_TRANSITION_REPLAY ignored: idle monitoring disabled")
+                    return START_STICKY
+                }
+
+                val type = intent.getIntExtra(TrackingConstants.EXTRA_AR_ACTIVITY_TYPE, -1)
+                val isEntering = intent.getBooleanExtra(TrackingConstants.EXTRA_AR_IS_ENTERING, false)
+                val eventTimeNanos = intent.getLongExtra(TrackingConstants.EXTRA_AR_EVENT_TIME_NANOS, 0L)
+
+                if (type < 0) {
+                    Log.w(TAG, "ACTION_AR_TRANSITION_REPLAY ignored: invalid activity type")
+                    startMotionIfNeeded()
+                    return START_STICKY
+                }
+
+                // Always ensure monitoring is active before replaying the transition.
+                startMotionIfNeeded()
+
+                val lastReplayNanos = MMKVStore.getLastArReplayEventNanos()
+                if (eventTimeNanos > 0L && eventTimeNanos == lastReplayNanos) {
+                    Log.d(TAG, "ACTION_AR_TRANSITION_REPLAY deduped: nanos=$eventTimeNanos")
+                    return START_STICKY
+                }
+
+                MotionEngine.onActivityTransitionDetected(type = type, isEntering = isEntering)
+                if (eventTimeNanos > 0L) {
+                    MMKVStore.setLastArReplayEventNanos(eventTimeNanos)
+                }
+                return START_STICKY
             }
 
             TrackingConstants.ACTION_BLOCKER_STARTED -> {
@@ -318,7 +370,7 @@ class TrackingService : LifecycleService() {
 
         // Restore default sink to avoid leaking this service instance.
         MotionSessionController.trackingSink = object : MotionTrackingSink {
-            override fun onMotionStarted(activityType: String) {}
+            override fun onMotionStarted(activityType: String): Boolean = false
             override fun onMotionStopped(activityType: String, reason: String) {}
             override fun onArActivityChanged(activityType: String, isActive: Boolean) {}
         }
@@ -361,8 +413,19 @@ class TrackingService : LifecycleService() {
         if (wasIdle && nowTracking) {
             val mode = if (newSessionState.mode == TrackingMode.TRACKING_MANUAL) "manual" else "auto"
             repo.startSession(mode)
+            lastSessionCheckpointMs = 0L
+            lastSessionCheckpointDistance = 0.0
+            lastSessionCheckpointElapsed = 0L
         }
         // Session close is handled by TrackingController.onSessionFinalised.
+
+        if (nowTracking) {
+            maybeCheckpointSession(newSessionState, force = wasIdle)
+        } else if (wasTracking) {
+            lastSessionCheckpointMs = 0L
+            lastSessionCheckpointDistance = 0.0
+            lastSessionCheckpointElapsed = 0L
+        }
 
         prevMode = newSessionState.mode
 
@@ -377,10 +440,15 @@ class TrackingService : LifecycleService() {
             else -> "idle"
         }
         MMKVStore.setTrackingMode(trackingMode)
+        val dayMismatch = !MMKVStore.isCurrentDayToday()
+        val projectedDistance = if (dayMismatch && !nowTracking) 0.0 else newLegacyState.distanceMeters
+        val projectedElapsed = if (dayMismatch && !nowTracking) 0L else newLegacyState.elapsedSeconds
+        val projectedGoalsReached = if (dayMismatch && !nowTracking) false else newLegacyState.goalReached
         // Project canonical totals into MMKV as absolute values.
         // This makes Room the single source of truth while keeping JS reads synchronous.
-        MMKVStore.setTodayDistance(newLegacyState.distanceMeters)
-        MMKVStore.setTodayElapsed(newLegacyState.elapsedSeconds)
+        MMKVStore.setTodayDistance(projectedDistance)
+        MMKVStore.setTodayElapsed(projectedElapsed)
+        MMKVStore.setGoalsReached(projectedGoalsReached)
         MMKVStore.bumpTrackingRevision()
         // Commit marker written last so multi-process readers can treat it as "snapshot complete".
         MMKVStore.setTodayLastUpdateMs(System.currentTimeMillis())
@@ -389,8 +457,7 @@ class TrackingService : LifecycleService() {
         onProgressUpdate?.invoke(newLegacyState.distanceMeters, newLegacyState.elapsedSeconds, newLegacyState.goalReached)
         onSessionStateUpdate?.invoke(newSessionState)
 
-        if (newLegacyState.goalReached) {
-            MMKVStore.setGoalsReached(true)
+        if (projectedGoalsReached) {
             onGoalReachedCallback?.invoke()
         }
 
@@ -414,20 +481,42 @@ class TrackingService : LifecycleService() {
         notificationController.update(s)
     }
 
+    private fun maybeCheckpointSession(s: TrackingSessionState, force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        val distanceDelta = kotlin.math.abs(s.sessionDistanceMeters - lastSessionCheckpointDistance)
+        val elapsedDelta = kotlin.math.abs(s.sessionElapsedSeconds - lastSessionCheckpointElapsed)
+        val shouldCheckpoint = force ||
+            lastSessionCheckpointMs == 0L ||
+            (now - lastSessionCheckpointMs) >= SESSION_CHECKPOINT_INTERVAL_MS ||
+            distanceDelta >= SESSION_CHECKPOINT_DISTANCE_DELTA_M ||
+            elapsedDelta >= SESSION_CHECKPOINT_ELAPSED_DELTA_S
+
+        if (!shouldCheckpoint) return
+
+        repo.checkpointCurrentSession(
+            distanceMeters = s.sessionDistanceMeters,
+            elapsedSeconds = s.sessionElapsedSeconds,
+            goalReached = s.goalReached
+        )
+        lastSessionCheckpointMs = now
+        lastSessionCheckpointDistance = s.sessionDistanceMeters
+        lastSessionCheckpointElapsed = s.sessionElapsedSeconds
+    }
+
     /** Call startForeground immediately — required before any async work. */
     private fun postForeground(s: TrackingState) {
         val notification = notificationController.build(s)
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    // Stage 5: service hosts both motion (health) and tracking (location).
-                    // Only request LOCATION type if we currently have location permission.
-                    val base = ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
-                    if (hasLocationPermission()) base or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else base
-                } else {
-                    // Pre-34: keep existing behavior (location type).
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                val type = resolveForegroundType()
+                if (type == null) {
+                    Log.w(
+                        TAG,
+                        "Cannot start foreground service: missing runtime permission for HEALTH/LOCATION foreground types; stopping self"
+                    )
+                    stopSelf()
+                    return
                 }
                 startForeground(
                     TrackingConstants.NOTIFICATION_ID,
@@ -441,16 +530,32 @@ class TrackingService : LifecycleService() {
             // If the platform still rejects the foreground promotion (e.g. not
             // in an eligible state), fail closed by stopping the service so the
             // app process doesn't crash.
-            Log.e(TAG, "Failed to start foreground with location type; stopping self", se)
+            Log.e(TAG, "Failed to start foreground with resolved service type; stopping self", se)
             stopSelf()
         }
     }
 
+    private fun resolveForegroundType(): Int? {
+        val hasLocation = TrackingPermissionGate.hasLocationPermission(this)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return if (hasLocation) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else null
+        }
+
+        val hasHealthRuntime = TrackingPermissionGate.hasActivityRecognitionPermission(this)
+        return when {
+            hasHealthRuntime && hasLocation -> ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            hasHealthRuntime -> ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+            hasLocation -> ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            else -> null
+        }
+    }
+
     private fun hasLocationPermission(): Boolean {
-        // Check for either fine or coarse location permission at runtime.
-        val fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-        val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-        return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
+        return TrackingPermissionGate.hasLocationPermission(this)
+    }
+
+    private fun hasActivityRecognitionPermission(): Boolean {
+        return TrackingPermissionGate.hasActivityRecognitionPermission(this)
     }
 
     private fun startMotionIfNeeded() {

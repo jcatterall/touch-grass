@@ -67,7 +67,11 @@ class MotionModule(reactContext: ReactApplicationContext) :
         stopStateUpdates()
         stateUpdateRunnable = object : Runnable {
             override fun run() {
-                val activity = MotionSessionController.currentActivityType
+                val activity = if (MotionSessionController.arIsActive) {
+                    MotionSessionController.arActiveType
+                } else {
+                    "unknown"
+                }
                 val stepDetected = MotionEngine.isStepDetectedRecently()
                 // Consider GPS active when the motion state is MOVING OR when the
                 // native TrackingService indicates an active session.
@@ -154,7 +158,11 @@ class MotionModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun getDetailedMotionState(promise: Promise) {
         try {
-            val activity = MotionSessionController.currentActivityType
+            val activity = if (MotionSessionController.arIsActive) {
+                MotionSessionController.arActiveType
+            } else {
+                "unknown"
+            }
             val stepDetected = MotionEngine.isStepDetectedRecently()
             val gpsActive = MotionSessionController.currentState == MotionState.MOVING
             val variance = MotionEngine.getVariance()
@@ -196,7 +204,8 @@ class MotionModule(reactContext: ReactApplicationContext) :
                     distanceMeters = 0.0,
                     timestamp = System.currentTimeMillis(),
                     lastKnownActivity = MotionSessionController.lastKnownRealActivityType,
-                    trackingSignalled = false
+                    trackingSignalled = false,
+                    trackingBlockedReason = null
                 )
                 Log.d(TAG, "State replay on subscribe: $state ($activityType)")
             }

@@ -129,6 +129,41 @@ class SessionRepository(context: Context) {
         currentSessionId = null
     }
 
+    fun checkpointCurrentSession(distanceMeters: Double, elapsedSeconds: Long, goalReached: Boolean) {
+        val id = currentSessionId ?: return
+        val today = todayDate()
+        scope.launch {
+            val existing = dao.getSession(id)
+            if (existing != null) {
+                dao.upsertSession(
+                    existing.copy(
+                        date = today,
+                        mode = sessionMode,
+                        endMs = null,
+                        distanceMeters = maxOf(existing.distanceMeters, distanceMeters),
+                        elapsedSeconds = maxOf(existing.elapsedSeconds, elapsedSeconds),
+                        goalReached = existing.goalReached || goalReached,
+                    )
+                )
+            } else {
+                val now = System.currentTimeMillis()
+                val startMs = now - (elapsedSeconds.coerceAtLeast(0L) * 1000L)
+                dao.upsertSession(
+                    SessionEntity(
+                        id = id,
+                        date = today,
+                        mode = sessionMode,
+                        startMs = startMs,
+                        endMs = null,
+                        distanceMeters = distanceMeters,
+                        elapsedSeconds = elapsedSeconds,
+                        goalReached = goalReached,
+                    )
+                )
+            }
+        }
+    }
+
     suspend fun getDailyTotal(date: String): DailyTotalEntity? = dao.getDailyTotal(date)
 
     suspend fun seedDailyTotalIfMissing(

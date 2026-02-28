@@ -220,6 +220,25 @@ class TrackingController(
         val eligible = isTimeEligible()
         sessions.tick(eligible)
 
+        // Strict auto-mode policy: only accumulate distance while auto time is eligible
+        // (moving + AR active + walking/running/cycling). Keep last location fresh so
+        // resuming eligibility doesn't create a large jump delta.
+        if (state.mode == TrackingMode.TRACKING_AUTO && !eligible) {
+            lastLocation = location
+            val sessionDistance = sessions.currentDistance()
+            val sessionElapsed = sessions.elapsedSeconds()
+            state = state.copy(
+                sessionDistanceMeters = sessionDistance,
+                sessionElapsedSeconds = sessionElapsed,
+                todayDistanceMeters = baseDistanceMeters + sessionDistance,
+                todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
+                isTimeEligible = false,
+                lastUpdateMs = System.currentTimeMillis()
+            )
+            publishState()
+            return
+        }
+
         // GPS drift guard: require meaningful speed (≥ 0.5 m/s) to filter stationary GPS noise.
         // Skip this guard for manual sessions so slow walking still accumulates.
         if (state.mode != TrackingMode.TRACKING_MANUAL && location.hasSpeed() && location.speed < TrackingConstants.MIN_ACCUMULATE_SPEED_MS) {
@@ -383,6 +402,8 @@ class TrackingController(
             todayDistanceMeters = baseDistanceMeters,
             todayElapsedSeconds = baseElapsedSeconds,
             isTimeEligible = false,
+            activityType = ActivityType.UNKNOWN,
+            activityConfidence = 0,
             lastUpdateMs = System.currentTimeMillis()
         )
 

@@ -490,7 +490,9 @@ object MotionEngine : SensorEventListener {
                 activityTransition(DetectedActivity.ON_BICYCLE, ActivityTransition.ACTIVITY_TRANSITION_ENTER),
                 activityTransition(DetectedActivity.ON_BICYCLE, ActivityTransition.ACTIVITY_TRANSITION_EXIT),
                 activityTransition(DetectedActivity.IN_VEHICLE, ActivityTransition.ACTIVITY_TRANSITION_ENTER),
+                activityTransition(DetectedActivity.IN_VEHICLE, ActivityTransition.ACTIVITY_TRANSITION_EXIT),
                 activityTransition(DetectedActivity.STILL, ActivityTransition.ACTIVITY_TRANSITION_ENTER),
+                activityTransition(DetectedActivity.STILL, ActivityTransition.ACTIVITY_TRANSITION_EXIT),
             )
             val request = ActivityTransitionRequest(transitions)
             val pendingIntent = getActivityPendingIntent()
@@ -610,17 +612,28 @@ object MotionEngine : SensorEventListener {
             }
             DetectedActivity.IN_VEHICLE -> {
                 if (isEntering) {
+                    clearEligibleArLatchIfNeeded("in_vehicle_enter")
                     Log.i(TAG, "IN_VEHICLE detected — forcing stop immediately")
                     MotionSessionController.forceStop("vehicle_detected")
                 }
             }
             DetectedActivity.STILL -> {
                 if (isEntering) {
+                    clearEligibleArLatchIfNeeded("still_enter")
                     // STILL is an optional confirmation signal, not a standalone trigger.
                     // Nudge inactivity evaluation to check stop conditions.
                     MotionSessionController.onInactivityCheck()
                 }
             }
+        }
+    }
+
+    private fun clearEligibleArLatchIfNeeded(reason: String) {
+        if (!MotionSessionController.arIsActive) return
+        val active = MotionSessionController.arActiveType
+        if (active == "walking" || active == "running" || active == "cycling") {
+            Log.i(TAG, "Clearing stale AR latch '$active' on $reason")
+            MotionSessionController.onArTransition(active, false)
         }
     }
 

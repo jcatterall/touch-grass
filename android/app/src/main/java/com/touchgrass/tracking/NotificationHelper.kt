@@ -39,12 +39,15 @@ class NotificationHelper(private val context: Context) {
         ): NotificationText {
             val notExpired = planActiveUntilMs <= 0L || nowMs <= planActiveUntilMs
             val planActiveToday = planDay == todayKey && planActiveFlag && notExpired
+            val dayIsToday = MMKVStore.isCurrentDayToday()
+            val progressDistance = if (dayIsToday) state.distanceMeters else 0.0
+            val progressElapsed = if (dayIsToday) state.elapsedSeconds else 0L
 
             val hasDistance = planActiveToday && goalDistanceUnit == "m" && goalDistanceValue > 0.0
             val hasTime = planActiveToday && goalTimeUnit == "s" && goalTimeValue > 0.0
 
             val title = if (!planActiveToday) {
-                "No active blocks for today"
+                "No active plans for today"
             } else if (blockedCount == 1) {
                 "1 application blocked"
             } else {
@@ -56,10 +59,10 @@ class NotificationHelper(private val context: Context) {
             } else {
                 val parts = mutableListOf<String>()
                 if (hasDistance) {
-                    parts.add("Progress: ${formatDistance(state.distanceMeters)} / ${formatDistance(goalDistanceValue)}")
+                    parts.add("Progress: ${formatDistance(progressDistance)} / ${formatDistance(goalDistanceValue)}")
                 }
                 if (hasTime) {
-                    parts.add("Progress: ${formatTime(state.elapsedSeconds)} / ${formatTimeSeconds(goalTimeValue.toLong())}")
+                    parts.add("Progress: ${formatTime(progressElapsed)} / ${formatTimeSeconds(goalTimeValue.toLong())}")
                 }
                 parts.joinToString(" | ")
             }

@@ -29,8 +29,9 @@ object MotionTrackingBridge : MotionTrackingSink {
      * @param activityType String name as emitted by MotionEngine:
      *   "walking", "running", "cycling", "vehicle", "still", or "unknown".
      */
-    override fun onMotionStarted(activityType: String) {
+    override fun onMotionStarted(activityType: String): Boolean {
         Log.d(TAG, "onMotionStarted: $activityType")
+        return false
     }
 
     /**

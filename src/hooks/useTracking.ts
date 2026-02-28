@@ -63,7 +63,34 @@ export function isWithinDuration(plan: BlockingPlan): boolean {
   const fromMinutes = fromH * 60 + fromM;
   const toMinutes = toH * 60 + toM;
 
-  return currentMinutes >= fromMinutes && currentMinutes <= toMinutes;
+  if (fromMinutes <= toMinutes) {
+    return currentMinutes >= fromMinutes && currentMinutes <= toMinutes;
+  }
+
+  return currentMinutes >= fromMinutes || currentMinutes <= toMinutes;
+}
+
+function activeUntilForPlan(plan: BlockingPlan, now: Date): number {
+  if (plan.duration.type === 'entire_day') {
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+    return endOfDay.getTime();
+  }
+
+  const [toH, toM] = plan.duration.to.split(':').map(Number);
+  const until = new Date(now);
+  until.setHours(toH, toM, 0, 0);
+
+  const [fromH, fromM] = plan.duration.from.split(':').map(Number);
+  const fromMinutes = fromH * 60 + fromM;
+  const toMinutes = toH * 60 + toM;
+  const isOvernightWindow = fromMinutes > toMinutes;
+
+  if (isOvernightWindow && until.getTime() < now.getTime()) {
+    until.setDate(until.getDate() + 1);
+  }
+
+  return until.getTime();
 }
 
 export function findActivePlansForToday(plans: BlockingPlan[]): BlockingPlan[] {
@@ -135,6 +162,7 @@ export type TrackingMode = 'idle' | 'manual' | 'auto';
 export interface DebugInfo {
   motionState: MotionStateType;
   motionActivity: string;
+  trackingBlockedReason: string | null;
   motionServiceRunning: boolean;
   nativeServiceRunning: boolean;
   currentActivity: string;
@@ -192,6 +220,9 @@ export function useTracking(): TrackingState {
   const [debugMotionState, setDebugMotionState] =
     useState<MotionStateType>('UNKNOWN');
   const [debugMotionActivity, setDebugMotionActivity] = useState('unknown');
+  const [debugTrackingBlockedReason, setDebugTrackingBlockedReason] = useState<
+    string | null
+  >(null);
   const [debugMotionServiceRunning, setDebugMotionServiceRunning] =
     useState(false);
   const [debugNativeRunning, setDebugNativeRunning] = useState(false);
@@ -295,6 +326,14 @@ export function useTracking(): TrackingState {
       const todayKey = todayYyyyMmDd();
       const isNewDay = dayRef.current !== todayKey;
       if (isNewDay) dayRef.current = todayKey;
+      const isAnchorForToday = fastStorage.getCurrentDay() === todayKey;
+      const todayDistanceMeters = isAnchorForToday
+        ? anchor.todayDistanceMeters
+        : 0;
+      const todayElapsedSeconds = isAnchorForToday
+        ? anchor.todayElapsedSeconds
+        : 0;
+      const goalReached = isAnchorForToday ? anchor.goalReached : false;
 
       // Update authoritative flags
       setIsTracking(anchor.isTracking);
@@ -305,9 +344,9 @@ export function useTracking(): TrackingState {
       // Baseline snapshot (authoritative totals at anchor time)
       setTodayProgress(prev => {
         const next = {
-          distanceMeters: anchor.todayDistanceMeters,
-          elapsedSeconds: anchor.todayElapsedSeconds,
-          goalReached: anchor.goalReached,
+          distanceMeters: todayDistanceMeters,
+          elapsedSeconds: todayElapsedSeconds,
+          goalReached,
         };
         if (
           prev.distanceMeters === next.distanceMeters &&
@@ -320,11 +359,11 @@ export function useTracking(): TrackingState {
       });
 
       anchorRef.current = {
-        baseTodayDistanceMeters: anchor.todayDistanceMeters,
-        baseTodayElapsedSeconds: anchor.todayElapsedSeconds,
+        baseTodayDistanceMeters: todayDistanceMeters,
+        baseTodayElapsedSeconds: todayElapsedSeconds,
         baseSessionDistanceMeters: anchor.sessionDistanceMeters,
         baseSessionElapsedSeconds: anchor.sessionElapsedSeconds,
-        goalReached: anchor.goalReached,
+        goalReached,
         isTracking: anchor.isTracking,
         mode,
         shouldTick: anchor.shouldTick,
@@ -347,20 +386,9 @@ export function useTracking(): TrackingState {
 
       if (hasActivePlanNow) {
         const now = new Date();
-        const endOfDay = new Date(now);
-        endOfDay.setHours(23, 59, 59, 999);
-
         let untilMs = 0;
         for (const plan of activePlans) {
-          if (plan.duration.type === 'entire_day') {
-            untilMs = Math.max(untilMs, endOfDay.getTime());
-            continue;
-          }
-
-          const [toH, toM] = plan.duration.to.split(':').map(Number);
-          const to = new Date(now);
-          to.setHours(toH, toM, 0, 0);
-          untilMs = Math.max(untilMs, to.getTime());
+          untilMs = Math.max(untilMs, activeUntilForPlan(plan, now));
         }
 
         fastStorage.setPlanActiveUntilMs(untilMs);
@@ -379,17 +407,21 @@ export function useTracking(): TrackingState {
   useEffect(() => {
     try {
       if (goals.hasDistanceGoal && goals.hasTimeGoal) {
-        // Write both typed keys so native notification can display both.
+        fastStorage.setGoal('distance', goals.totalDistanceMeters, 'm');
         fastStorage.setGoalDistance(goals.totalDistanceMeters, 'm');
         fastStorage.setGoalTime(goals.totalTimeSeconds, 's');
-        // Also update aggregated compatibility key (distance first)
-        fastStorage.setGoal('distance', goals.totalDistanceMeters, 'm');
       } else if (goals.hasDistanceGoal) {
         fastStorage.setGoal('distance', goals.totalDistanceMeters, 'm');
+        fastStorage.setGoalDistance(goals.totalDistanceMeters, 'm');
+        fastStorage.setGoalTime(0, 's');
       } else if (goals.hasTimeGoal) {
         fastStorage.setGoal('time', goals.totalTimeSeconds, 's');
+        fastStorage.setGoalDistance(0, 'm');
+        fastStorage.setGoalTime(goals.totalTimeSeconds, 's');
       } else {
         fastStorage.setGoal('none', 0, '');
+        fastStorage.setGoalDistance(0, 'm');
+        fastStorage.setGoalTime(0, 's');
       }
       NativeModules.TrackingModule?.notifyGoalsUpdated?.()?.catch?.(() => {});
     } catch {
@@ -759,6 +791,7 @@ export function useTracking(): TrackingState {
     if (!backgroundTrackingEnabled) {
       setDebugMotionState('UNKNOWN');
       setDebugMotionActivity('unknown');
+      setDebugTrackingBlockedReason(null);
       setDebugCurrentActivity('unknown');
       setDebugStepDetected(false);
       setDebugGpsActive(false);
@@ -771,11 +804,13 @@ export function useTracking(): TrackingState {
       (event: MotionStateChangedEvent) => {
         setDebugMotionState(event.state);
         setDebugMotionActivity(event.activityType);
+        setDebugTrackingBlockedReason(event.trackingBlockedReason ?? null);
         // Only consider MotionStateChanged as authoritative for starting/stopping
         // when the native side explicitly signalled TrackingService. Otherwise
         // treat these events as debug-only and rely on Tracking.onTrackingStarted
         // / onTrackingStopped or the Tracking.getTrackingAnchor() snapshot for authoritative state.
         if (event.state === 'MOVING' && event.trackingSignalled) {
+          setDebugTrackingBlockedReason(null);
           // TrackingService auto-started via MotionTrackingBridge natively.
           // Update JS isTracking state if not already set.
           if (!trackingStarted.current) {
@@ -789,6 +824,7 @@ export function useTracking(): TrackingState {
           // any progress/delta that might have started in native code.
           syncFromNativeService().catch(() => {});
         } else if (event.state === 'IDLE') {
+          setDebugTrackingBlockedReason(null);
           // The authoritative stop event comes from Tracking.onTrackingStopped.
           // Keep the debug flag for sensor/GPS activity but do not flip isTracking
           // here — wait for the Tracking service event or MMKV poll.
@@ -828,6 +864,7 @@ export function useTracking(): TrackingState {
     () => ({
       motionState: debugMotionState,
       motionActivity: debugMotionActivity,
+      trackingBlockedReason: debugTrackingBlockedReason,
       motionServiceRunning: debugMotionServiceRunning,
       nativeServiceRunning: debugNativeRunning,
       currentActivity: debugCurrentActivity,
@@ -839,6 +876,7 @@ export function useTracking(): TrackingState {
     [
       debugMotionState,
       debugMotionActivity,
+      debugTrackingBlockedReason,
       debugMotionServiceRunning,
       debugNativeRunning,
       debugCurrentActivity,

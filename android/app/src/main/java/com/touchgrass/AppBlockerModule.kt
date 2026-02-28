@@ -14,6 +14,7 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.UiThreadUtil
 import androidx.core.content.ContextCompat
+import com.touchgrass.tracking.TrackingPermissionGate
 import org.json.JSONArray
 
 class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
@@ -88,7 +89,7 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
             }
             // Also notify TrackingService to refresh its persistent notification
             try {
-                if (MMKVStore.isAutoTracking() || MMKVStore.isIdleMonitoringEnabled()) {
+                if (canStartTrackingForeground()) {
                     val intent = Intent(reactApplicationContext, com.touchgrass.tracking.TrackingService::class.java).apply {
                         action = com.touchgrass.tracking.TrackingConstants.ACTION_GOALS_UPDATED
                     }
@@ -110,10 +111,12 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
             // Ensure TrackingService is running so there's a single sticky notification.
             // ACTION_GOALS_UPDATED refreshes the existing notification without enabling motion.
             try {
-                val trackingIntent = Intent(reactApplicationContext, com.touchgrass.tracking.TrackingService::class.java).apply {
-                    action = com.touchgrass.tracking.TrackingConstants.ACTION_GOALS_UPDATED
+                if (canStartTrackingForeground()) {
+                    val trackingIntent = Intent(reactApplicationContext, com.touchgrass.tracking.TrackingService::class.java).apply {
+                        action = com.touchgrass.tracking.TrackingConstants.ACTION_GOALS_UPDATED
+                    }
+                    ContextCompat.startForegroundService(reactApplicationContext, trackingIntent)
                 }
-                ContextCompat.startForegroundService(reactApplicationContext, trackingIntent)
             } catch (_: Exception) {
                 // best-effort
             }
@@ -200,5 +203,9 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
         } catch (e: Exception) {
             promise.reject("ERROR", e.message)
         }
+    }
+
+    private fun canStartTrackingForeground(): Boolean {
+        return TrackingPermissionGate.canStartForegroundTracking(reactApplicationContext)
     }
 }

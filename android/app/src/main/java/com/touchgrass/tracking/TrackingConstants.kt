@@ -44,11 +44,17 @@ object TrackingConstants {
     // Lifecycle actions driven by JS / user
     const val ACTION_START_IDLE      = "com.touchgrass.action.START_IDLE"
     const val ACTION_STOP_BACKGROUND = "com.touchgrass.action.STOP_BACKGROUND"
+    const val ACTION_AR_TRANSITION_REPLAY = "com.touchgrass.action.AR_TRANSITION_REPLAY"
 
     // Goal extras for manual tracking start
     const val EXTRA_GOAL_TYPE  = "goal_type"
     const val EXTRA_GOAL_VALUE = "goal_value"
     const val EXTRA_GOAL_UNIT  = "goal_unit"
+
+    // Activity transition replay extras (receiver -> service bootstrap)
+    const val EXTRA_AR_ACTIVITY_TYPE = "ar_activity_type"
+    const val EXTRA_AR_IS_ENTERING = "ar_is_entering"
+    const val EXTRA_AR_EVENT_TIME_NANOS = "ar_event_time_nanos"
 
     // AppBlocker coordination
     const val ACTION_BLOCKER_STARTED = "com.touchgrass.action.BLOCKER_STARTED"

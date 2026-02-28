@@ -51,6 +51,26 @@ function formatTime(seconds: number, totalSeconds: number): string {
   return `${formatValue(seconds)} / ${formatValue(totalSeconds)}`;
 }
 
+function formatTrackingBlockedReason(reason: string | null): string {
+  if (!reason) return 'unknown reason';
+  switch (reason) {
+    case 'location_permission_missing_or_tracking_rejected':
+      return 'location permission unavailable';
+    case 'activity_not_active':
+      return 'eligible activity not active';
+    case 'activity_not_eligible':
+      return 'activity is not walking/running/cycling';
+    case 'idle_monitoring_disabled':
+      return 'background tracking disabled';
+    case 'stale_activity_latch':
+      return 'activity signal became stale';
+    case 'tracking_sink_error':
+      return 'native tracking start failed';
+    default:
+      return reason.replace(/_/g, ' ');
+  }
+}
+
 export const HomeScreen = () => {
   const {
     isTracking,
@@ -84,6 +104,9 @@ export const HomeScreen = () => {
   // This prevents the "automatically tracking" message from showing during the 5-second
   // stationary buffer drain window after the user stops (isTracking stays true briefly).
   const isActivelyTracking = isTracking && isMotionDetected;
+  const blockedReasonText = formatTrackingBlockedReason(
+    debugInfo.trackingBlockedReason,
+  );
 
   const statusText = !hasPlans
     ? 'No active plan for today'
@@ -93,7 +116,9 @@ export const HomeScreen = () => {
     ? isActivelyTracking
       ? 'Activity detected, automatically tracking'
       : isMotionDetected
-      ? 'Motion detected, acquiring GPS...'
+      ? debugInfo.trackingBlockedReason
+        ? `Motion detected, tracking blocked: ${blockedReasonText}`
+        : 'Motion detected, acquiring GPS...'
       : 'Watching for movement...'
     : isTracking
     ? "Keep going! You're making progress"
@@ -203,6 +228,9 @@ export const HomeScreen = () => {
         </Typography>
         <Typography variant="body" style={styles.debugText}>
           Motion state: {debugInfo.motionState}
+        </Typography>
+        <Typography variant="body" style={styles.debugText}>
+          Tracking blocked: {debugInfo.trackingBlockedReason ?? 'none'}
         </Typography>
         <Typography variant="body" style={styles.debugText}>
           Activity: {debugInfo.currentActivity.toUpperCase()}

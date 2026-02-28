@@ -45,6 +45,8 @@ export interface MotionStateChangedEvent {
   timestamp: number;
   // Optional: native hint that TrackingService was signalled for this transition
   trackingSignalled?: boolean;
+  // Optional: why tracking was not signalled while moving
+  trackingBlockedReason?: string | null;
   // Optional: last known real activity (preserved across IDLE) for re-trigger heuristics
   lastKnownActivity?: MotionActivityType;
 }

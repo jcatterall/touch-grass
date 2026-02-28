@@ -7,7 +7,7 @@ package com.touchgrass.motion
  * intent IPC.
  */
 interface MotionTrackingSink {
-    fun onMotionStarted(activityType: String)
+    fun onMotionStarted(activityType: String): Boolean
     fun onMotionStopped(activityType: String, reason: String)
 
     /**

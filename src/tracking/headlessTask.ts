@@ -109,10 +109,16 @@ async function activityTask(data: TaskData): Promise<void> {
       fastStorage.setGoal('distance', goals.totalDistanceMeters, 'm');
     } else if (goals.hasDistanceGoal) {
       fastStorage.setGoal('distance', goals.totalDistanceMeters, 'm');
+      fastStorage.setGoalDistance(goals.totalDistanceMeters, 'm');
+      fastStorage.setGoalTime(0, 's');
     } else if (goals.hasTimeGoal) {
       fastStorage.setGoal('time', goals.totalTimeSeconds, 's');
+      fastStorage.setGoalDistance(0, 'm');
+      fastStorage.setGoalTime(goals.totalTimeSeconds, 's');
     } else {
       fastStorage.setGoal('none', 0, '');
+      fastStorage.setGoalDistance(0, 'm');
+      fastStorage.setGoalTime(0, 's');
     }
   } catch {
     // best-effort

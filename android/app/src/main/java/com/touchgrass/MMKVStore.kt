@@ -40,6 +40,7 @@ object MMKVStore {
         if (!kv.containsKey(KEY_PLAN_ACTIVE_UNTIL_MS)) kv.encode(KEY_PLAN_ACTIVE_UNTIL_MS, 0L)
         if (!kv.containsKey(KEY_IDLE_MONITORING_ENABLED)) kv.encode(KEY_IDLE_MONITORING_ENABLED, false)
         if (!kv.containsKey(KEY_TODAY_LAST_UPDATE_MS)) kv.encode(KEY_TODAY_LAST_UPDATE_MS, 0L)
+        if (!kv.containsKey(KEY_LAST_AR_REPLAY_EVENT_NANOS)) kv.encode(KEY_LAST_AR_REPLAY_EVENT_NANOS, 0L)
     }
 
     // ---- Key constants (shared with JS side in src/storage.ts fastStorage) ----
@@ -78,6 +79,7 @@ object MMKVStore {
 
     // Whether idle motion monitoring should be running even when no session is active.
     const val KEY_IDLE_MONITORING_ENABLED = "idle_monitoring_enabled"
+    const val KEY_LAST_AR_REPLAY_EVENT_NANOS = "last_ar_replay_event_nanos"
 
     // ---- Distance accumulation (called from TrackingService on each GPS fix) ----
 
@@ -109,9 +111,17 @@ object MMKVStore {
 
     // ---- Readers ----
 
+    fun getCurrentDay(): String = kv.decodeString(KEY_CURRENT_DAY) ?: ""
+
+    fun isCurrentDayToday(): Boolean = getCurrentDay() == todayDate()
+
     fun getTodayDistance(): Double = kv.decodeDouble(KEY_TODAY_DISTANCE, 0.0)
     fun getTodayElapsed(): Long    = kv.decodeLong(KEY_TODAY_ELAPSED, 0L)
     fun getGoalsReached(): Boolean = kv.decodeBool(KEY_GOALS_REACHED, false)
+
+    fun getTodayDistanceSafe(): Double = if (isCurrentDayToday()) getTodayDistance() else 0.0
+    fun getTodayElapsedSafe(): Long = if (isCurrentDayToday()) getTodayElapsed() else 0L
+    fun getGoalsReachedSafe(): Boolean = if (isCurrentDayToday()) getGoalsReached() else false
     fun isAutoTracking(): Boolean  = kv.decodeBool(KEY_IS_AUTO_TRACKING, false)
     fun getTrackingMode(): String  = kv.decodeString(KEY_TRACKING_MODE) ?: "idle"
     fun getTrackingRevision(): Long = kv.decodeLong(KEY_TRACKING_REVISION, 0L)
@@ -141,6 +151,8 @@ object MMKVStore {
 
     fun getTodayLastUpdateMs(): Long = kv.decodeLong(KEY_TODAY_LAST_UPDATE_MS, 0L)
 
+    fun getLastArReplayEventNanos(): Long = kv.decodeLong(KEY_LAST_AR_REPLAY_EVENT_NANOS, 0L)
+
     // ---- Writers ----
 
     fun setGoalsReached(v: Boolean) = kv.encode(KEY_GOALS_REACHED, v)
@@ -153,6 +165,10 @@ object MMKVStore {
     }
 
     fun setTodayLastUpdateMs(v: Long) = kv.encode(KEY_TODAY_LAST_UPDATE_MS, v)
+
+    fun setLastArReplayEventNanos(v: Long) {
+        kv.encode(KEY_LAST_AR_REPLAY_EVENT_NANOS, v)
+    }
 
     /**
      * Overwrites today's elapsed seconds with an absolute value.

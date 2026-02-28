@@ -29,6 +29,7 @@ import com.touchgrass.MMKVStore
 object MotionSessionController {
 
     private const val TAG = "MotionSession"
+    private const val AR_LATCH_STALE_TIMEOUT_MS = 120_000L
 
     // ── Configuration ────────────────────────────────────────────────────────
 
@@ -91,13 +92,16 @@ object MotionSessionController {
     @Volatile
     private var trackingStartSignalled: Boolean = false
 
+    @Volatile
+    private var trackingStartBlockedReason: String? = null
+
     /**
      * Destination for motion start/stop signals.
      * Default is a no-op; TrackingService installs an in-process sink when running.
      */
     @Volatile
     var trackingSink: MotionTrackingSink = object : MotionTrackingSink {
-        override fun onMotionStarted(activityType: String) {}
+        override fun onMotionStarted(activityType: String): Boolean = false
         override fun onMotionStopped(activityType: String, reason: String) {}
         override fun onArActivityChanged(activityType: String, isActive: Boolean) {}
     }
@@ -111,6 +115,12 @@ object MotionSessionController {
     @Volatile
     var arIsActive: Boolean = false
         private set
+
+    @Volatile
+    private var arLastEnterMs: Long = 0L
+
+    @Volatile
+    private var arLastUpdateMs: Long = 0L
 
     // ── Public API ───────────────────────────────────────────────────────────
 
@@ -137,13 +147,18 @@ object MotionSessionController {
      */
     fun onArTransition(activityType: String, isEntering: Boolean) {
         mainHandler.post {
+            val now = System.currentTimeMillis()
             if (isEntering) {
                 arActiveType = activityType
                 arIsActive = true
+                arLastEnterMs = now
+                arLastUpdateMs = now
             } else {
                 if (arActiveType == activityType) {
                     arActiveType = "unknown"
                     arIsActive = false
+                    arLastEnterMs = 0L
+                    arLastUpdateMs = now
                 }
             }
             trackingSink.onArActivityChanged(activityType, isEntering)
@@ -151,7 +166,19 @@ object MotionSessionController {
             // If we are already MOVING and AR just became active with an eligible type,
             // signal a delayed start (this covers AR arriving after sensor-based MOVING).
             if (currentState == MotionState.MOVING && isEntering) {
-                maybeSignalTrackingStart()
+                val trackingSignalled = maybeSignalTrackingStart()
+                if (!trackingSignalled) {
+                    MotionEventEmitter.emitStateChanged(
+                        state = currentState,
+                        activityType = currentActivityType,
+                        confidence = 1.0f,
+                        distanceMeters = 0.0,
+                        timestamp = System.currentTimeMillis(),
+                        lastKnownActivity = lastKnownRealActivityType,
+                        trackingSignalled = false,
+                        trackingBlockedReason = trackingStartBlockedReason
+                    )
+                }
             }
         }
     }
@@ -203,10 +230,13 @@ object MotionSessionController {
             potentialMovementStartTime = 0L
             potentialStopStartTime = 0L
             trackingStartSignalled = false
+            trackingStartBlockedReason = null
             // Clear AR latch on reset so a stale ENTER (missing EXIT) can't
             // trigger a start after background tracking is toggled.
             arActiveType = "unknown"
             arIsActive = false
+            arLastEnterMs = 0L
+            arLastUpdateMs = 0L
             Log.d(TAG, "Session reset to IDLE")
         }
     }
@@ -446,6 +476,7 @@ object MotionSessionController {
                 trackingSignalled = true
                 movementStartTime = 0L
                 trackingStartSignalled = false
+                trackingStartBlockedReason = null
                 // Reset currentActivityType to "unknown" so the debug UI and AppBlocker never
                 // see a stale walking/running state after the session ends.
                 // lastKnownRealActivityType is intentionally NOT reset here — it preserves the
@@ -463,7 +494,8 @@ object MotionSessionController {
             distanceMeters = 0.0,
             timestamp = System.currentTimeMillis(),
             lastKnownActivity = lastKnownRealActivityType,
-            trackingSignalled = trackingSignalled
+            trackingSignalled = trackingSignalled,
+            trackingBlockedReason = if (trackingSignalled) null else trackingStartBlockedReason
         )
 
         // Notify MotionEngine to adjust sensor power
@@ -484,16 +516,37 @@ object MotionSessionController {
         // Hard guarantee: never auto-start unless background/idle monitoring is enabled.
         // This protects against stale Activity Recognition state and any accidental
         // motion engine restarts while the user has auto tracking disabled.
-        if (!MMKVStore.isIdleMonitoringEnabled()) return false
-        if (trackingStartSignalled) return false
-        if (currentState != MotionState.MOVING) return false
-        if (!arIsActive) return false
-        if (arActiveType !in eligibleArTypes) return false
+        if (!MMKVStore.isIdleMonitoringEnabled()) {
+            trackingStartBlockedReason = "idle_monitoring_disabled"
+            return false
+        }
+        if (trackingStartSignalled) {
+            trackingStartBlockedReason = null
+            return false
+        }
+        if (currentState != MotionState.MOVING) {
+            trackingStartBlockedReason = "motion_not_moving"
+            return false
+        }
+        maybeClearStaleArLatch()
+        if (!arIsActive) {
+            trackingStartBlockedReason = "activity_not_active"
+            return false
+        }
+        if (arActiveType !in eligibleArTypes) {
+            trackingStartBlockedReason = "activity_not_eligible"
+            return false
+        }
 
         try {
             // Use the AR-latched type as the canonical start type.
-            trackingSink.onMotionStarted(arActiveType)
+            val started = trackingSink.onMotionStarted(arActiveType)
+            if (!started) {
+                trackingStartBlockedReason = "location_permission_missing_or_tracking_rejected"
+                return false
+            }
             trackingStartSignalled = true
+            trackingStartBlockedReason = null
             // Emit an event even if there was no state transition (delayed start case).
             MotionEventEmitter.emitStateChanged(
                 state = currentState,
@@ -502,11 +555,33 @@ object MotionSessionController {
                 distanceMeters = 0.0,
                 timestamp = System.currentTimeMillis(),
                 lastKnownActivity = lastKnownRealActivityType,
-                trackingSignalled = true
+                trackingSignalled = true,
+                trackingBlockedReason = null
             )
             return true
         } catch (_: Exception) {
+            trackingStartBlockedReason = "tracking_sink_error"
             return false
+        }
+    }
+
+    private fun maybeClearStaleArLatch() {
+        if (!arIsActive) return
+        if (arActiveType !in eligibleArTypes) return
+
+        val now = System.currentTimeMillis()
+        val latchAge = if (arLastEnterMs > 0L) now - arLastEnterMs else 0L
+        val recentlyCorroborated = MotionEngine.hasCorroboration() ||
+                (now - lastMovementSignalTime) <= config.corroborationWindowMs
+
+        if (latchAge >= AR_LATCH_STALE_TIMEOUT_MS && !recentlyCorroborated) {
+            Log.w(TAG, "Clearing stale AR latch type=$arActiveType ageMs=$latchAge")
+            arActiveType = "unknown"
+            arIsActive = false
+            arLastEnterMs = 0L
+            arLastUpdateMs = now
+            trackingSink.onArActivityChanged("unknown", false)
+            trackingStartBlockedReason = "stale_activity_latch"
         }
     }
 
