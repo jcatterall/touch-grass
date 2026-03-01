@@ -23,12 +23,18 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.touchgrass.storage.SessionRepository
 import com.touchgrass.motion.MotionSessionController
 import com.touchgrass.MMKVStore
+import com.touchgrass.MMKVMetricsStore
+import com.touchgrass.storage.TrackingDatabase
+import com.touchgrass.storage.DailyTotalEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.max
 
 class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext), LifecycleEventListener {
 
@@ -53,6 +59,13 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         val todayDistanceMeters: Double,
         val todayElapsedSeconds: Long,
         val goalReached: Boolean
+    )
+
+    private data class CurrentTotals(
+        val distanceMeters: Double,
+        val elapsedSeconds: Long,
+        val goalReached: Boolean,
+        val sessionCount: Int,
     )
 
     /**
@@ -233,12 +246,19 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                     else -> "idle"
                 }
                 val isTracking = safeMode == "manual" || safeMode == "auto"
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                val totals = runBlocking {
+                    getCurrentTotalsForDate(
+                        date = today,
+                        includeMmkvTodayFallback = true,
+                    )
+                }
                 val result = Arguments.createMap().apply {
-                    putDouble("todayDistanceMeters", MMKVStore.getTodayDistanceSafe())
-                    putDouble("todayElapsedSeconds", MMKVStore.getTodayElapsedSafe().toDouble())
+                    putDouble("todayDistanceMeters", totals.distanceMeters)
+                    putDouble("todayElapsedSeconds", totals.elapsedSeconds.toDouble())
                     putDouble("sessionDistanceMeters", 0.0)
                     putDouble("sessionElapsedSeconds", 0.0)
-                    putBoolean("goalReached", MMKVStore.getGoalsReachedSafe())
+                    putBoolean("goalReached", totals.goalReached)
                     putBoolean("isTracking", isTracking)
                     putString("mode", safeMode)
                     putBoolean("shouldTick", false)
@@ -265,27 +285,213 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
     }
 
     /**
-     * Returns today's accumulated distance/elapsed/goalsReached from Room.
+     * Returns today's reconciled totals from native persistence (Room daily + open session),
+     * with same-day MMKV fallback for fast-path continuity after process restarts.
      */
     @ReactMethod
     fun getDailyTotalNative(promise: Promise) {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-        val repo = SessionRepository(reactApplicationContext)
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val total = repo.getDailyTotal(today)
-                if (total == null) {
+                val total = getCurrentTotalsForDate(
+                    date = today,
+                    includeMmkvTodayFallback = true,
+                )
+                if (total.distanceMeters <= 0.0 && total.elapsedSeconds <= 0L && !total.goalReached) {
                     promise.resolve(null)
                 } else {
                     val result = Arguments.createMap().apply {
                         putDouble("distanceMeters", total.distanceMeters)
                         putDouble("elapsedSeconds", total.elapsedSeconds.toDouble())
-                        putBoolean("goalsReached", total.goalsReached)
+                        putBoolean("goalsReached", total.goalReached)
                     }
                     promise.resolve(result)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get daily total", e)
+                promise.reject("ERROR", e.message)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun getMetricsSummaryNative(period: String, anchorDate: String?, promise: Promise) {
+        val normalizedPeriod = normalizePeriod(period)
+        val endDate = normalizeDateOrToday(anchorDate)
+        val range = resolveRange(normalizedPeriod, endDate)
+        val dao = TrackingDatabase.getInstance(reactApplicationContext).trackingDao()
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                MMKVMetricsStore.init(reactApplicationContext)
+                val rows = dao.getDailyTotalsBetween(range.first, range.second)
+                val blocking = MMKVMetricsStore.getBlockingTotalsBetween(range.first, range.second)
+                val todayInRange = today in range.first..range.second
+                val reconciledToday = if (todayInRange) {
+                    getCurrentTotalsForDate(today, includeMmkvTodayFallback = true)
+                } else {
+                    null
+                }
+                val existingToday = rows.firstOrNull { it.date == today }
+
+                var distanceMeters = 0.0
+                var elapsedSeconds = 0L
+                var sessions = 0
+                var goalsReachedDays = 0
+                for (row in rows) {
+                    distanceMeters += row.distanceMeters
+                    elapsedSeconds += row.elapsedSeconds
+                    sessions += row.sessionCount
+                    if (row.goalsReached) goalsReachedDays += 1
+                }
+
+                if (todayInRange && reconciledToday != null) {
+                    if (existingToday != null) {
+                        distanceMeters -= existingToday.distanceMeters
+                        elapsedSeconds -= existingToday.elapsedSeconds
+                        sessions -= existingToday.sessionCount
+                        if (existingToday.goalsReached) goalsReachedDays -= 1
+                    }
+
+                    if (
+                        reconciledToday.distanceMeters > 0.0 ||
+                        reconciledToday.elapsedSeconds > 0L ||
+                        reconciledToday.goalReached ||
+                        reconciledToday.sessionCount > 0
+                    ) {
+                        distanceMeters += reconciledToday.distanceMeters
+                        elapsedSeconds += reconciledToday.elapsedSeconds
+                        sessions += reconciledToday.sessionCount
+                        if (reconciledToday.goalReached) goalsReachedDays += 1
+                    }
+                }
+
+                val streakRows = if (todayInRange && reconciledToday != null) {
+                    val withoutToday = rows.filterNot { it.date == today }
+                    if (
+                        reconciledToday.distanceMeters > 0.0 ||
+                        reconciledToday.elapsedSeconds > 0L ||
+                        reconciledToday.goalReached ||
+                        reconciledToday.sessionCount > 0
+                    ) {
+                        withoutToday + DailyTotalEntity(
+                            date = today,
+                            distanceMeters = reconciledToday.distanceMeters,
+                            elapsedSeconds = reconciledToday.elapsedSeconds,
+                            goalsReached = reconciledToday.goalReached,
+                            sessionCount = reconciledToday.sessionCount,
+                            lastUpdatedMs = System.currentTimeMillis(),
+                        )
+                    } else {
+                        withoutToday
+                    }
+                } else {
+                    rows
+                }
+
+                val streaks = computeStreaks(range.first, range.second, streakRows)
+
+                val result = Arguments.createMap().apply {
+                    putString("period", normalizedPeriod)
+                    putString("startDate", range.first)
+                    putString("endDate", range.second)
+                    putDouble("distanceMeters", distanceMeters)
+                    putDouble("elapsedSeconds", elapsedSeconds.toDouble())
+                    putDouble("sessions", sessions.toDouble())
+                    putDouble("goalsReachedDays", goalsReachedDays.toDouble())
+                    putDouble("blockedAttempts", blocking.blockedAttempts.toDouble())
+                    putDouble("notificationsBlocked", blocking.notificationsBlocked.toDouble())
+                    putDouble("currentGoalStreakDays", streaks.first.toDouble())
+                    putDouble("longestGoalStreakDays", streaks.second.toDouble())
+                    putDouble("computedAtMs", System.currentTimeMillis().toDouble())
+                }
+                promise.resolve(result)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to compute metrics summary", e)
+                promise.reject("ERROR", e.message)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun getMetricsSeriesNative(period: String, anchorDate: String?, promise: Promise) {
+        val normalizedPeriod = normalizePeriod(period)
+        val endDate = normalizeDateOrToday(anchorDate)
+        val range = if (normalizedPeriod == "alltime") {
+            Pair(addDays(endDate, -29), endDate)
+        } else {
+            resolveRange(normalizedPeriod, endDate)
+        }
+        val dao = TrackingDatabase.getInstance(reactApplicationContext).trackingDao()
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                MMKVMetricsStore.init(reactApplicationContext)
+                val rows = dao.getDailyTotalsBetween(range.first, range.second)
+                val byDate = rows.associateBy { it.date }
+                val todayInRange = today in range.first..range.second
+                val reconciledToday = if (todayInRange) {
+                    getCurrentTotalsForDate(today, includeMmkvTodayFallback = true)
+                } else {
+                    null
+                }
+
+                val points = Arguments.createArray()
+                var cursor = range.first
+                while (cursor <= range.second) {
+                    val row = byDate[cursor]
+                    val pointDistance = if (cursor == today && reconciledToday != null) {
+                        reconciledToday.distanceMeters
+                    } else {
+                        row?.distanceMeters ?: 0.0
+                    }
+                    val pointElapsed = if (cursor == today && reconciledToday != null) {
+                        reconciledToday.elapsedSeconds
+                    } else {
+                        row?.elapsedSeconds ?: 0L
+                    }
+                    val pointGoalsReached = if (cursor == today && reconciledToday != null) {
+                        reconciledToday.goalReached
+                    } else {
+                        row?.goalsReached ?: false
+                    }
+                    val pointSessions = if (cursor == today && reconciledToday != null) {
+                        reconciledToday.sessionCount
+                    } else {
+                        row?.sessionCount ?: 0
+                    }
+                    val blockingDaily = MMKVMetricsStore.getBlockingDaily(cursor)
+                    val point = Arguments.createMap().apply {
+                        putString("date", cursor)
+                        putDouble("distanceMeters", pointDistance)
+                        putDouble("elapsedSeconds", pointElapsed.toDouble())
+                        putBoolean("goalsReached", pointGoalsReached)
+                        putDouble("sessions", pointSessions.toDouble())
+                        putDouble(
+                            "blockedAttempts",
+                            (blockingDaily?.optInt("blockedAttempts", 0) ?: 0).toDouble(),
+                        )
+                        putDouble(
+                            "notificationsBlocked",
+                            (blockingDaily?.optInt("notificationsBlocked", 0) ?: 0).toDouble(),
+                        )
+                    }
+                    points.pushMap(point)
+                    cursor = addDays(cursor, 1)
+                }
+
+                val result = Arguments.createMap().apply {
+                    putString("period", normalizedPeriod)
+                    putString("startDate", range.first)
+                    putString("endDate", range.second)
+                    putArray("points", points)
+                    putDouble("computedAtMs", System.currentTimeMillis().toDouble())
+                }
+                promise.resolve(result)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to compute metrics series", e)
                 promise.reject("ERROR", e.message)
             }
         }
@@ -534,4 +740,119 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         lastAnchorSentElapsedRealtimeMs = now
         sendEvent(EVENT_TRACKING_ANCHOR, buildAnchorPayload(s))
     }
+
+    private fun normalizePeriod(period: String?): String {
+        val raw = period?.lowercase(Locale.US) ?: "day"
+        return when (raw) {
+            "day", "week", "month", "alltime" -> raw
+            else -> "day"
+        }
+    }
+
+    private fun normalizeDateOrToday(anchorDate: String?): String {
+        return if (!anchorDate.isNullOrBlank() && anchorDate.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+            anchorDate
+        } else {
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        }
+    }
+
+    private fun resolveRange(period: String, endDate: String): Pair<String, String> {
+        return when (period) {
+            "day" -> Pair(endDate, endDate)
+            "week" -> Pair(addDays(endDate, -6), endDate)
+            "month" -> {
+                val month = endDate.substring(0, 7)
+                val start = "$month-01"
+                val cal = Calendar.getInstance(Locale.US)
+                cal.time = dateFormatter.parse(start) ?: Date()
+                cal.add(Calendar.MONTH, 1)
+                cal.add(Calendar.DAY_OF_MONTH, -1)
+                Pair(start, dateFormatter.format(cal.time))
+            }
+            "alltime" -> Pair("1970-01-01", endDate)
+            else -> Pair(endDate, endDate)
+        }
+    }
+
+    private fun computeStreaks(
+        startDate: String,
+        endDate: String,
+        rows: List<DailyTotalEntity>,
+    ): Pair<Int, Int> {
+        val byDate = rows.associateBy { it.date }
+        var current = 0
+        var longest = 0
+        var run = 0
+        var cursor = startDate
+
+        while (cursor <= endDate) {
+            val reached = byDate[cursor]?.goalsReached ?: false
+            if (reached) {
+                run += 1
+                if (run > longest) longest = run
+            } else {
+                run = 0
+            }
+            cursor = addDays(cursor, 1)
+        }
+
+        cursor = endDate
+        while (cursor >= startDate) {
+            val reached = byDate[cursor]?.goalsReached ?: false
+            if (!reached) break
+            current += 1
+            cursor = addDays(cursor, -1)
+        }
+
+        return Pair(current, longest)
+    }
+
+    private fun addDays(date: String, delta: Int): String {
+        val cal = Calendar.getInstance(Locale.US)
+        cal.time = dateFormatter.parse(date) ?: Date()
+        cal.add(Calendar.DAY_OF_YEAR, delta)
+        return dateFormatter.format(cal.time)
+    }
+
+    private suspend fun getCurrentTotalsForDate(
+        date: String,
+        includeMmkvTodayFallback: Boolean,
+    ): CurrentTotals {
+        val repo = SessionRepository(reactApplicationContext)
+        val daily = repo.getDailyTotal(date)
+        val openSession = repo.getLatestOpenSessionForDate(date)
+
+        val includeTodayFallback =
+            includeMmkvTodayFallback && date == SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+        val reconciled = reconcileDayTotals(
+            dailyDistanceMeters = daily?.distanceMeters ?: 0.0,
+            dailyElapsedSeconds = daily?.elapsedSeconds ?: 0L,
+            dailyGoalReached = daily?.goalsReached ?: false,
+            openSessionDistanceMeters = openSession?.distanceMeters ?: 0.0,
+            openSessionElapsedSeconds = openSession?.elapsedSeconds ?: 0L,
+            openSessionGoalReached = openSession?.goalReached ?: false,
+            mmkvDistanceMeters = if (includeTodayFallback) MMKVStore.getTodayDistanceSafe() else 0.0,
+            mmkvElapsedSeconds = if (includeTodayFallback) MMKVStore.getTodayElapsedSafe() else 0L,
+            mmkvGoalReached = if (includeTodayFallback) MMKVStore.getGoalsReachedSafe() else false,
+            includeMmkvFallback = includeTodayFallback,
+        )
+
+        val sessionCount = when {
+            daily != null -> daily.sessionCount
+            openSession != null -> 1
+            else -> 0
+        }
+
+        return CurrentTotals(
+            distanceMeters = reconciled.distanceMeters,
+            elapsedSeconds = reconciled.elapsedSeconds,
+            goalReached = reconciled.goalReached,
+            sessionCount = sessionCount,
+        )
+    }
+
+    private val dateFormatter: SimpleDateFormat
+        get() = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 }

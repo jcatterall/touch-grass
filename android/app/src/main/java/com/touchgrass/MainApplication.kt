@@ -27,6 +27,7 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     MMKVStore.init(this)
+    MMKVMetricsStore.init(this)
     loadReactNative(this)
   }
 }

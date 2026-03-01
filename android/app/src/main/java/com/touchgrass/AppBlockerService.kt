@@ -26,9 +26,11 @@ class AppBlockerService : Service() {
         const val PREF_HAS_PERMANENT = "has_permanent"
         const val PREF_CURRENTLY_BLOCKED = "currently_blocked"
         const val PREF_CONFIG_UPDATED_AT_MS = "config_updated_at_ms"
+        const val PREF_CONFIG_DAY = "config_day"
         private const val POLL_INTERVAL_IDLE = 1000L
         private const val POLL_INTERVAL_BLOCKING = 500L
         private const val GESTURE_BLOCKER_HEIGHT_DP = 80
+        private const val BLOCKED_ATTEMPT_DEDUPE_MS = 1500L
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -37,6 +39,7 @@ class AppBlockerService : Service() {
 
     private var windowManager: WindowManager? = null
     private var gestureBlockerView: View? = null
+    private val lastBlockedAttemptByPackage = LinkedHashMap<String, Long>()
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -113,6 +116,8 @@ class AppBlockerService : Service() {
     }
 
     private fun launchBlockingScreen(blockedPackage: String) {
+        recordBlockedAttempt(blockedPackage)
+
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
             .putString(PREF_CURRENTLY_BLOCKED, blockedPackage)
             .apply()
@@ -130,6 +135,31 @@ class AppBlockerService : Service() {
             putExtra("BLOCKED_PACKAGE", blockedPackage)
         }
         startActivity(intent)
+    }
+
+    private fun recordBlockedAttempt(blockedPackage: String) {
+        val now = System.currentTimeMillis()
+        val previous = lastBlockedAttemptByPackage[blockedPackage]
+        if (previous != null && now - previous < BLOCKED_ATTEMPT_DEDUPE_MS) {
+            return
+        }
+
+        lastBlockedAttemptByPackage[blockedPackage] = now
+        if (lastBlockedAttemptByPackage.size > 200) {
+            val iterator = lastBlockedAttemptByPackage.entries.iterator()
+            repeat(100) {
+                if (iterator.hasNext()) {
+                    iterator.next()
+                    iterator.remove()
+                }
+            }
+        }
+
+        try {
+            MMKVMetricsStore.incrementBlockedAttempt(blockedPackage)
+        } catch (_: Exception) {
+            // best-effort
+        }
     }
 
     private fun clearBlockedApp() {

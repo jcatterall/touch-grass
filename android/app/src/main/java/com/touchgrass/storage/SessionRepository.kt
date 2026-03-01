@@ -1,6 +1,7 @@
 package com.touchgrass.storage
 
 import android.content.Context
+import android.util.Log
 import com.touchgrass.MMKVMetricsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,10 @@ import java.util.UUID
  * All writes are fire-and-forget on the IO dispatcher so they never block the GPS callback.
  */
 class SessionRepository(context: Context) {
+
+    companion object {
+        private const val TAG = "SessionRepository"
+    }
 
     private val dao = TrackingDatabase.getInstance(context).trackingDao()
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -121,6 +126,11 @@ class SessionRepository(context: Context) {
                     MMKVMetricsStore.writeDailySnapshot(daily)
                     MMKVMetricsStore.recomputeAndWriteRolling(dao, endDate = today)
                     MMKVMetricsStore.recomputeAndWriteMonthly(dao, date = today)
+                    MMKVMetricsStore.recomputeAndWriteAllTime(dao, endDate = today)
+                    Log.d(
+                        TAG,
+                        "closeSession recompute complete day=$today distance=${daily.distanceMeters} elapsed=${daily.elapsedSeconds} goals=${daily.goalsReached}",
+                    )
                 }
             } catch (_: Exception) {
                 // best-effort
@@ -165,6 +175,9 @@ class SessionRepository(context: Context) {
     }
 
     suspend fun getDailyTotal(date: String): DailyTotalEntity? = dao.getDailyTotal(date)
+
+    suspend fun getLatestOpenSessionForDate(date: String): SessionEntity? =
+        dao.getLatestOpenSessionForDate(date)
 
     suspend fun seedDailyTotalIfMissing(
         date: String,

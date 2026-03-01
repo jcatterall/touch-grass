@@ -29,6 +29,41 @@ export interface TrackingAnchor {
   lastUpdateMs: number;
 }
 
+export type MetricsPeriod = 'day' | 'week' | 'month' | 'alltime';
+
+export interface NativeMetricsSummary {
+  period: MetricsPeriod;
+  startDate: string;
+  endDate: string;
+  distanceMeters: number;
+  elapsedSeconds: number;
+  sessions: number;
+  goalsReachedDays: number;
+  blockedAttempts: number;
+  notificationsBlocked: number;
+  currentGoalStreakDays: number;
+  longestGoalStreakDays: number;
+  computedAtMs: number;
+}
+
+export interface NativeMetricsPoint {
+  date: string;
+  distanceMeters: number;
+  elapsedSeconds: number;
+  goalsReached: boolean;
+  sessions: number;
+  blockedAttempts: number;
+  notificationsBlocked: number;
+}
+
+export interface NativeMetricsSeries {
+  period: MetricsPeriod;
+  startDate: string;
+  endDate: string;
+  points: NativeMetricsPoint[];
+  computedAtMs: number;
+}
+
 const emitter = isAvailable ? new NativeEventEmitter(TrackingModule) : null;
 
 export const Tracking = {
@@ -138,6 +173,47 @@ export const Tracking = {
   async getIsAutoTracking(): Promise<boolean> {
     if (!isAvailable) return false;
     return TrackingModule.getIsAutoTracking();
+  },
+
+  async getMetricsSummary(
+    period: MetricsPeriod,
+    anchorDate?: string,
+  ): Promise<NativeMetricsSummary> {
+    if (!isAvailable) {
+      const today = new Date().toISOString().slice(0, 10);
+      return {
+        period,
+        startDate: today,
+        endDate: today,
+        distanceMeters: 0,
+        elapsedSeconds: 0,
+        sessions: 0,
+        goalsReachedDays: 0,
+        blockedAttempts: 0,
+        notificationsBlocked: 0,
+        currentGoalStreakDays: 0,
+        longestGoalStreakDays: 0,
+        computedAtMs: Date.now(),
+      };
+    }
+    return TrackingModule.getMetricsSummaryNative(period, anchorDate ?? null);
+  },
+
+  async getMetricsSeries(
+    period: MetricsPeriod,
+    anchorDate?: string,
+  ): Promise<NativeMetricsSeries> {
+    if (!isAvailable) {
+      const today = new Date().toISOString().slice(0, 10);
+      return {
+        period,
+        startDate: today,
+        endDate: today,
+        points: [],
+        computedAtMs: Date.now(),
+      };
+    }
+    return TrackingModule.getMetricsSeriesNative(period, anchorDate ?? null);
   },
 
   /**

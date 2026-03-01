@@ -80,6 +80,7 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
                 .putString(AppBlockerService.PREF_BLOCKED_PACKAGES, jsonArr.toString())
                 .putBoolean(AppBlockerService.PREF_GOALS_REACHED, goalsReached)
                 .putBoolean(AppBlockerService.PREF_HAS_PERMANENT, hasPermanent)
+                .putString(AppBlockerService.PREF_CONFIG_DAY, MMKVStore.todayKey())
                 .putLong(AppBlockerService.PREF_CONFIG_UPDATED_AT_MS, System.currentTimeMillis())
                 .apply()
 

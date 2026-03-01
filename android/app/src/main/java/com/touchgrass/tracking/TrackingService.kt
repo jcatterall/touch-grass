@@ -155,26 +155,37 @@ class TrackingService : LifecycleService() {
                 try {
                     val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
                     val daily = repo.getDailyTotal(today)
-                    if (daily != null) {
-                        Log.d(TAG, "Merging persisted daily totals: distance=${daily.distanceMeters} elapsed=${daily.elapsedSeconds}")
-                        controller.applyBaseline(daily.distanceMeters, daily.elapsedSeconds)
-                        baselineMerged = true
-                    } else {
-                        // Fallback: if Room has no aggregate yet but MMKV has totals (e.g. upgrade
-                        // from older versions), seed Room once so it becomes authoritative.
-                        val mmkvDay = MMKVStore.getCurrentDay()
-                        val mmkvDist = MMKVStore.getTodayDistanceSafe()
-                        val mmkvElapsed = MMKVStore.getTodayElapsedSafe()
-                        // MMKV projection doubles as an in-flight checkpoint. If the process
-                        // was killed mid-session, preserve that progress as today's baseline.
-                        if (mmkvDist > 0.0 || mmkvElapsed > 0L) {
-                            Log.d(TAG, "Merging MMKV baseline checkpoint: day=$mmkvDay distance=$mmkvDist elapsed=$mmkvElapsed")
-                            controller.applyBaseline(mmkvDist, mmkvElapsed)
-                            repo.seedDailyTotalIfMissing(today, mmkvDist, mmkvElapsed, MMKVStore.getGoalsReachedSafe())
-                            baselineMerged = true
-                        } else if (!MMKVStore.isCurrentDayToday() && (MMKVStore.getTodayDistance() > 0.0 || MMKVStore.getTodayElapsed() > 0L)) {
-                            Log.d(TAG, "Skipping MMKV baseline merge due to stale day: current_day=$mmkvDay today=$today")
+                    val openSession = repo.getLatestOpenSessionForDate(today)
+                    val roomDistance = (daily?.distanceMeters ?: 0.0) + (openSession?.distanceMeters ?: 0.0)
+                    val roomElapsed = (daily?.elapsedSeconds ?: 0L) + (openSession?.elapsedSeconds ?: 0L)
+                    val roomGoalReached = (daily?.goalsReached ?: false) || (openSession?.goalReached ?: false)
+
+                    val mmkvDay = MMKVStore.getCurrentDay()
+                    val mmkvDist = MMKVStore.getTodayDistanceSafe()
+                    val mmkvElapsed = MMKVStore.getTodayElapsedSafe()
+                    val mmkvGoalsReached = MMKVStore.getGoalsReachedSafe()
+
+                    val baseline = computeStartupBaseline(
+                        roomDistanceMeters = roomDistance,
+                        roomElapsedSeconds = roomElapsed,
+                        roomGoalReached = roomGoalReached,
+                        mmkvDistanceMeters = mmkvDist,
+                        mmkvElapsedSeconds = mmkvElapsed,
+                        mmkvGoalReached = mmkvGoalsReached,
+                    )
+
+                    if (baseline != null) {
+                        Log.d(
+                            TAG,
+                            "Merging startup baseline: roomDistance=$roomDistance roomElapsed=$roomElapsed openSession=${openSession != null} mmkvDay=$mmkvDay mmkvDistance=$mmkvDist mmkvElapsed=$mmkvElapsed",
+                        )
+                        controller.applyBaseline(baseline.distanceMeters, baseline.elapsedSeconds)
+                        if (daily == null && (mmkvDist > 0.0 || mmkvElapsed > 0L || mmkvGoalsReached)) {
+                            repo.seedDailyTotalIfMissing(today, mmkvDist, mmkvElapsed, mmkvGoalsReached)
                         }
+                        baselineMerged = true
+                    } else if (!MMKVStore.isCurrentDayToday() && (MMKVStore.getTodayDistance() > 0.0 || MMKVStore.getTodayElapsed() > 0L)) {
+                        Log.d(TAG, "Skipping MMKV baseline merge due to stale day: current_day=$mmkvDay today=$today")
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed merging persisted totals: ${e.message}")
@@ -440,10 +451,9 @@ class TrackingService : LifecycleService() {
             else -> "idle"
         }
         MMKVStore.setTrackingMode(trackingMode)
-        val dayMismatch = !MMKVStore.isCurrentDayToday()
-        val projectedDistance = if (dayMismatch && !nowTracking) 0.0 else newLegacyState.distanceMeters
-        val projectedElapsed = if (dayMismatch && !nowTracking) 0L else newLegacyState.elapsedSeconds
-        val projectedGoalsReached = if (dayMismatch && !nowTracking) false else newLegacyState.goalReached
+        val projectedDistance = newLegacyState.distanceMeters
+        val projectedElapsed = newLegacyState.elapsedSeconds
+        val projectedGoalsReached = newLegacyState.goalReached
         // Project canonical totals into MMKV as absolute values.
         // This makes Room the single source of truth while keeping JS reads synchronous.
         MMKVStore.setTodayDistance(projectedDistance)

@@ -24,6 +24,9 @@ interface TrackingDao {
     @Query("SELECT * FROM sessions WHERE date = :date ORDER BY startMs DESC")
     suspend fun getSessionsForDate(date: String): List<SessionEntity>
 
+    @Query("SELECT * FROM sessions WHERE date = :date AND endMs IS NULL ORDER BY startMs DESC LIMIT 1")
+    suspend fun getLatestOpenSessionForDate(date: String): SessionEntity?
+
     // ---- Daily totals ----
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

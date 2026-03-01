@@ -376,21 +376,20 @@ export function useTracking(): TrackingState {
     [ensureUiTick],
   );
 
-  // Persist the native-readable notion of "active plan for today".
-  // Used by the Android notification renderer (strict two-state contract).
-  useEffect(() => {
+  const syncNativePlanActivity = useCallback((plans: BlockingPlan[]) => {
     try {
-      const hasActivePlanNow = activePlans.length > 0;
+      const activeNow = findActivePlansForToday(plans);
+      const hasActivePlanNow = activeNow.length > 0;
+
       fastStorage.setPlanActiveToday(hasActivePlanNow);
       fastStorage.setPlanDay(hasActivePlanNow ? todayYyyyMmDd() : '');
 
       if (hasActivePlanNow) {
         const now = new Date();
         let untilMs = 0;
-        for (const plan of activePlans) {
+        for (const plan of activeNow) {
           untilMs = Math.max(untilMs, activeUntilForPlan(plan, now));
         }
-
         fastStorage.setPlanActiveUntilMs(untilMs);
       } else {
         fastStorage.setPlanActiveUntilMs(0);
@@ -400,7 +399,7 @@ export function useTracking(): TrackingState {
     } catch {
       // best-effort
     }
-  }, [activePlans]);
+  }, []);
 
   // Keep the native notification in sync with the real aggregated goal.
   // TrackingService reads these MMKV keys to display accurate progress.
@@ -442,6 +441,7 @@ export function useTracking(): TrackingState {
       const plans = await storage.getPlans();
       const active = findActivePlansForToday(plans);
       setActivePlans(active);
+      syncNativePlanActivity(plans);
     };
     load();
 
@@ -451,7 +451,7 @@ export function useTracking(): TrackingState {
       sub.remove();
       clearInterval(interval);
     };
-  }, []);
+  }, [syncNativePlanActivity]);
 
   // Sync blocker service with current plan/progress state.
   const progressRef = useRef(progress);
@@ -460,6 +460,7 @@ export function useTracking(): TrackingState {
   useEffect(() => {
     const syncBlocker = async () => {
       const plans = await storage.getPlans();
+      syncNativePlanActivity(plans);
       const blockingPlans = findBlockingPlansForToday(plans);
       const currentProgress = progressRef.current;
 
@@ -513,7 +514,7 @@ export function useTracking(): TrackingState {
     syncBlocker();
     const interval = setInterval(syncBlocker, 15_000);
     return () => clearInterval(interval);
-  }, [activePlans]);
+  }, [syncNativePlanActivity]);
 
   // Check permissions + load background tracking state on mount
   useEffect(() => {
@@ -527,6 +528,38 @@ export function useTracking(): TrackingState {
   // Sync live state from the native service. Called on mount and on app foreground resume.
   // Uses a native "anchor" snapshot (today totals + eligibility) so JS can render
   // an accurate 1Hz foreground timer without relying on 1Hz bridge events.
+  const reconcileTodayFromNativeDaily = useCallback(async () => {
+    try {
+      const nativeTotal = await Tracking.getDailyTotalNative();
+      if (!nativeTotal) return;
+
+      setTodayProgress(prev => {
+        const next = {
+          distanceMeters: Math.max(
+            prev.distanceMeters,
+            nativeTotal.distanceMeters,
+          ),
+          elapsedSeconds: Math.max(
+            prev.elapsedSeconds,
+            nativeTotal.elapsedSeconds,
+          ),
+          goalReached: prev.goalReached || nativeTotal.goalsReached,
+        };
+
+        if (
+          prev.distanceMeters === next.distanceMeters &&
+          prev.elapsedSeconds === next.elapsedSeconds &&
+          prev.goalReached === next.goalReached
+        ) {
+          return prev;
+        }
+        return next;
+      });
+    } catch {
+      // best-effort
+    }
+  }, []);
+
   const syncFromNativeService = useCallback(async () => {
     const todayKey = todayYyyyMmDd();
     const isNewDay = dayRef.current !== todayKey;
@@ -537,6 +570,13 @@ export function useTracking(): TrackingState {
       // If the native service responds, prefer the anchor snapshot for totals.
       // Even an idle anchor can be fresher than the MMKV projection right after stop.
       applyAnchor(anchor);
+      if (
+        !anchor.isTracking &&
+        anchor.todayDistanceMeters <= 0 &&
+        anchor.todayElapsedSeconds <= 0
+      ) {
+        reconcileTodayFromNativeDaily().catch(() => {});
+      }
       return;
     } catch {
       // fall through to MMKV/Room fast-path
@@ -573,7 +613,8 @@ export function useTracking(): TrackingState {
       }
       return next;
     });
-  }, [applyAnchor, stopUiTick]);
+    reconcileTodayFromNativeDaily().catch(() => {});
+  }, [applyAnchor, reconcileTodayFromNativeDaily, stopUiTick]);
 
   const schedulePostStopSync = useCallback(
     (delayMs: number = STOP_GRACE_MS) => {

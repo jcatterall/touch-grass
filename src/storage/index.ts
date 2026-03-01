@@ -130,6 +130,20 @@ export type MonthlyMetricsSnapshot = {
   computedAtMs: number;
 };
 
+export type AllTimeMetricsSnapshot = {
+  distanceMeters: number;
+  elapsedSeconds: number;
+  sessions: number;
+  goalsReachedDays: number;
+  currentGoalStreakDays: number;
+  longestGoalStreakDays: number;
+  focusMinutes: number | null;
+  notificationsBlockedTotal: number | null;
+  blockedAttemptsTotal: number | null;
+  computedAtMs: number;
+  schemaVersion: number;
+};
+
 export const metricsStorage = {
   getDailyIndex(): string[] {
     const raw = _mmkvMetrics.getString('metrics:index:daily');
@@ -167,6 +181,16 @@ export const metricsStorage = {
     if (!raw) return null;
     try {
       return JSON.parse(raw) as MonthlyMetricsSnapshot;
+    } catch {
+      return null;
+    }
+  },
+
+  getAllTime(): AllTimeMetricsSnapshot | null {
+    const raw = _mmkvMetrics.getString('metrics:alltime');
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as AllTimeMetricsSnapshot;
     } catch {
       return null;
     }
