@@ -14,22 +14,30 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        val actionName = intent.action ?: return
+        val supported = setOf(
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            Intent.ACTION_DATE_CHANGED,
+            Intent.ACTION_TIME_CHANGED,
+            Intent.ACTION_TIMEZONE_CHANGED,
+        )
+        if (actionName !in supported) return
 
         try {
             // Boot receivers can run in a fresh process where Application hasn't
             // initialized MMKV yet.
             MMKVStore.init(context.applicationContext)
         } catch (e: Exception) {
-            Log.w(TAG, "Boot completed: failed to init MMKV — cannot restore idle monitoring", e)
+            Log.w(TAG, "Receiver action=$actionName failed to init MMKV", e)
             return
         }
 
         val idleEnabled = MMKVStore.isIdleMonitoringEnabled()
         if (idleEnabled) {
-            Log.i(TAG, "Boot completed: restoring idle monitoring")
+            Log.i(TAG, "Receiver action=$actionName restoring idle monitoring")
         } else {
-            Log.i(TAG, "Boot completed: restoring sticky notification state")
+            Log.i(TAG, "Receiver action=$actionName restoring sticky notification state")
         }
 
         val svcIntent = Intent(context, TrackingService::class.java).apply {
@@ -41,14 +49,14 @@ class BootReceiver : BroadcastReceiver() {
         }
 
         if (!TrackingPermissionGate.canStartForegroundTracking(context)) {
-            Log.w(TAG, "Skipping TrackingService foreground start on boot: no runtime HEALTH/LOCATION permissions")
+            Log.w(TAG, "Skipping TrackingService foreground start for action=$actionName: missing runtime HEALTH/LOCATION permissions")
             return
         }
 
         try {
             ContextCompat.startForegroundService(context, svcIntent)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to start TrackingService on boot", e)
+            Log.w(TAG, "Failed to start TrackingService for action=$actionName", e)
         }
     }
 

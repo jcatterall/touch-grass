@@ -10,6 +10,7 @@ import {
   Tracking,
 } from '../../tracking/Tracking';
 import UsageStats from '../../native/UsageStats';
+import { AppBlocker } from '../../native/AppBlocker';
 
 interface MetricsScreenProps {
   onClose: () => void;
@@ -46,6 +47,7 @@ export const MetricsScreen = ({ onClose }: MetricsScreenProps) => {
   const [allTimeBlockedAttempts, setAllTimeBlockedAttempts] = useState(0);
   const [allTimeNotificationsBlocked, setAllTimeNotificationsBlocked] =
     useState(0);
+  const [todayNotificationsBlocked, setTodayNotificationsBlocked] = useState(0);
   const [hasUsagePermission, setHasUsagePermission] = useState(false);
   const [topApps, setTopApps] = useState<string[]>([]);
 
@@ -62,12 +64,15 @@ export const MetricsScreen = ({ onClose }: MetricsScreenProps) => {
   }, []);
 
   const refreshPeriod = useCallback(async () => {
-    const [nextSummary, nextSeries] = await Promise.all([
-      Tracking.getMetricsSummary(period),
-      Tracking.getMetricsSeries(period),
-    ]);
+    const [nextSummary, nextSeries, nextTodayNotificationsBlocked] =
+      await Promise.all([
+        Tracking.getMetricsSummary(period),
+        Tracking.getMetricsSeries(period),
+        AppBlocker.getNotificationsBlockedTodayTotal(),
+      ]);
     setSummary(nextSummary);
     setSeries(nextSeries);
+    setTodayNotificationsBlocked(nextTodayNotificationsBlocked);
   }, [period]);
 
   const refreshUsage = useCallback(async () => {
@@ -150,6 +155,10 @@ export const MetricsScreen = ({ onClose }: MetricsScreenProps) => {
             <Typography>
               {Math.round(summary?.notificationsBlocked ?? 0)}
             </Typography>
+          </View>
+          <View style={styles.row}>
+            <Typography>Notifications blocked today (live)</Typography>
+            <Typography>{todayNotificationsBlocked}</Typography>
           </View>
         </Card>
 

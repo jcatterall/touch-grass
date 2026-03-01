@@ -132,7 +132,9 @@ export const HomeScreen = () => {
     const check = async () => {
       const hasUsage = await AppBlocker.hasUsageStatsPermission();
       const hasOverlay = await AppBlocker.hasOverlayPermission();
-      setBlockerPermsGranted(hasUsage && hasOverlay);
+      const hasNotificationListener =
+        await AppBlocker.hasNotificationListenerPermission();
+      setBlockerPermsGranted(hasUsage && hasOverlay && hasNotificationListener);
     };
     check();
     const sub = AppState.addEventListener('change', state => {
@@ -150,6 +152,12 @@ export const HomeScreen = () => {
     const hasOverlay = await AppBlocker.hasOverlayPermission();
     if (!hasOverlay) {
       await AppBlocker.requestOverlayPermission();
+      return;
+    }
+    const hasNotificationListener =
+      await AppBlocker.hasNotificationListenerPermission();
+    if (!hasNotificationListener) {
+      await AppBlocker.requestNotificationListenerPermission();
     }
   };
 

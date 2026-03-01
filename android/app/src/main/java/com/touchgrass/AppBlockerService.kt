@@ -12,7 +12,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import androidx.core.content.ContextCompat
-import org.json.JSONArray
 import com.touchgrass.tracking.TrackingConstants
 import com.touchgrass.tracking.TrackingPermissionGate
 import com.touchgrass.tracking.TrackingService
@@ -60,39 +59,14 @@ class AppBlockerService : Service() {
     }
 
     private fun checkForegroundApp() {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        // Goals-reached is read from MMKV so it propagates within one poll cycle (<500ms)
-        // rather than waiting for the 15-second JS blocker sync interval.
-        val goalsReached = MMKVStore.getGoalsReached()
-        val hasPermanent = prefs.getBoolean(PREF_HAS_PERMANENT, false)
-
-        if (goalsReached && !hasPermanent) {
-            clearBlockedApp()
-            return
-        }
-
-        val blockedJson = prefs.getString(PREF_BLOCKED_PACKAGES, "[]") ?: "[]"
-        val blockedSet = mutableSetOf<String>()
-        try {
-            val arr = JSONArray(blockedJson)
-            for (i in 0 until arr.length()) {
-                blockedSet.add(arr.getString(i))
-            }
-        } catch (_: Exception) {}
-
-        if (blockedSet.isEmpty()) {
-            clearBlockedApp()
-            return
-        }
-
-        val currentlyBlocked = prefs.getString(PREF_CURRENTLY_BLOCKED, null)
         val foreground = getForegroundPackage()
 
         if (foreground == null || foreground == packageName) {
             return
         }
 
-        if (foreground in blockedSet) {
+        val decision = BlockPolicyEvaluator.evaluatePackage(this, foreground)
+        if (decision.shouldBlock) {
             launchBlockingScreen(foreground)
         } else {
             // User navigated to an unblocked app or home — clear the blocked state

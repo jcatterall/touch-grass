@@ -44,6 +44,9 @@ object MMKVStore {
         if (!kv.containsKey(KEY_LAST_AR_REPLAY_EVENT_NANOS)) kv.encode(KEY_LAST_AR_REPLAY_EVENT_NANOS, 0L)
         if (!kv.containsKey(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL)) kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL, 0)
         if (!kv.containsKey(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON)) kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON, "{}")
+        if (!kv.containsKey(KEY_NOTIF_LISTENER_CONNECTED_AT_MS)) kv.encode(KEY_NOTIF_LISTENER_CONNECTED_AT_MS, 0L)
+        if (!kv.containsKey(KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS)) kv.encode(KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS, 0L)
+        if (!kv.containsKey(KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS)) kv.encode(KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS, 0L)
     }
 
     // ---- Key constants (shared with JS side in src/storage.ts fastStorage) ----
@@ -85,6 +88,9 @@ object MMKVStore {
     const val KEY_LAST_AR_REPLAY_EVENT_NANOS = "last_ar_replay_event_nanos"
     const val KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL = "today_notifications_blocked_total"
     const val KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON = "today_notifications_blocked_by_app_json"
+    const val KEY_NOTIF_LISTENER_CONNECTED_AT_MS = "notif_listener_connected_at_ms"
+    const val KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS = "notif_listener_disconnected_at_ms"
+    const val KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS = "notif_listener_last_event_at_ms"
 
     // ---- Distance accumulation (called from TrackingService on each GPS fix) ----
 
@@ -179,6 +185,12 @@ object MMKVStore {
         }
     }
 
+    fun getNotificationListenerConnectedAtMs(): Long = kv.decodeLong(KEY_NOTIF_LISTENER_CONNECTED_AT_MS, 0L)
+
+    fun getNotificationListenerDisconnectedAtMs(): Long = kv.decodeLong(KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS, 0L)
+
+    fun getNotificationListenerLastEventAtMs(): Long = kv.decodeLong(KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS, 0L)
+
     // ---- Writers ----
 
     fun setGoalsReached(v: Boolean) = kv.encode(KEY_GOALS_REACHED, v)
@@ -194,6 +206,18 @@ object MMKVStore {
 
     fun setLastArReplayEventNanos(v: Long) {
         kv.encode(KEY_LAST_AR_REPLAY_EVENT_NANOS, v)
+    }
+
+    fun setNotificationListenerConnectedAtMs(v: Long) {
+        kv.encode(KEY_NOTIF_LISTENER_CONNECTED_AT_MS, v)
+    }
+
+    fun setNotificationListenerDisconnectedAtMs(v: Long) {
+        kv.encode(KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS, v)
+    }
+
+    fun setNotificationListenerLastEventAtMs(v: Long) {
+        kv.encode(KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS, v)
     }
 
     /**
