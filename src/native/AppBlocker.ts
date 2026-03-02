@@ -49,6 +49,11 @@ export const AppBlocker = {
     return AppBlockerModule.getNotificationsBlockedTodayTotal();
   },
 
+  async getBlockedAttemptsTodayForApp(packageName: string): Promise<number> {
+    if (!isAvailable) return 0;
+    return AppBlockerModule.getBlockedAttemptsTodayForApp(packageName);
+  },
+
   async updateBlockerConfig(
     blockedPackages: string[],
     goalsReached: boolean,

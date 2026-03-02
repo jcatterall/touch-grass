@@ -130,6 +130,7 @@ class AppBlockerService : Service() {
         }
 
         try {
+            MMKVStore.incrementTodayBlockedAttemptsForApp(blockedPackage)
             MMKVMetricsStore.incrementBlockedAttempt(blockedPackage)
         } catch (_: Exception) {
             // best-effort

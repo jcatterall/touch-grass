@@ -112,6 +112,7 @@ export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
     hasTimeGoal: false,
   });
   const [notificationsBlockedToday, setNotificationsBlockedToday] = useState(0);
+  const [blockedAttemptsToday, setBlockedAttemptsToday] = useState(0);
 
   const message = useMemo(
     () => MESSAGES[Math.floor(Math.random() * MESSAGES.length)],
@@ -139,14 +140,16 @@ export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
 
   // Read-only: load progress and goals from storage + native service
   const loadState = useCallback(async () => {
-    const [todayProgress, plans, blockedNotifications] = await Promise.all([
+    const [todayProgress, plans, blockedNotifications, blockedAttempts] = await Promise.all([
       Tracking.getProgress(),
       storage.getPlans(),
       AppBlocker.getNotificationsBlockedTodayForApp(blockedPackage),
+      AppBlocker.getBlockedAttemptsTodayForApp(blockedPackage),
     ]);
 
     setProgress(todayProgress);
     setNotificationsBlockedToday(blockedNotifications);
+    setBlockedAttemptsToday(blockedAttempts);
 
     const blockingPlans = findBlockingPlansForToday(plans);
     setGoals(aggregateUnmetGoals(blockingPlans, todayProgress));
@@ -239,6 +242,14 @@ export const BlockingScreen = ({ blockedPackage }: BlockingScreenProps) => {
           </Typography>
           <Typography variant="subtitle" style={styles.statValue}>
             {notificationsBlockedToday}
+          </Typography>
+        </View>
+        <View style={styles.statRow}>
+          <Typography variant="body" style={styles.statLabel}>
+            Blocked attempts today
+          </Typography>
+          <Typography variant="subtitle" style={styles.statValue}>
+            {blockedAttemptsToday}
           </Typography>
         </View>
         {!allMet && (remainingDistance > 0 || remainingTime > 0) && (

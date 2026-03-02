@@ -44,6 +44,7 @@ object MMKVStore {
         if (!kv.containsKey(KEY_LAST_AR_REPLAY_EVENT_NANOS)) kv.encode(KEY_LAST_AR_REPLAY_EVENT_NANOS, 0L)
         if (!kv.containsKey(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL)) kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL, 0)
         if (!kv.containsKey(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON)) kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON, "{}")
+        if (!kv.containsKey(KEY_TODAY_BLOCKED_ATTEMPTS_BY_APP_JSON)) kv.encode(KEY_TODAY_BLOCKED_ATTEMPTS_BY_APP_JSON, "{}")
         if (!kv.containsKey(KEY_NOTIF_LISTENER_CONNECTED_AT_MS)) kv.encode(KEY_NOTIF_LISTENER_CONNECTED_AT_MS, 0L)
         if (!kv.containsKey(KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS)) kv.encode(KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS, 0L)
         if (!kv.containsKey(KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS)) kv.encode(KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS, 0L)
@@ -88,6 +89,7 @@ object MMKVStore {
     const val KEY_LAST_AR_REPLAY_EVENT_NANOS = "last_ar_replay_event_nanos"
     const val KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL = "today_notifications_blocked_total"
     const val KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON = "today_notifications_blocked_by_app_json"
+    const val KEY_TODAY_BLOCKED_ATTEMPTS_BY_APP_JSON = "today_blocked_attempts_by_app_json"
     const val KEY_NOTIF_LISTENER_CONNECTED_AT_MS = "notif_listener_connected_at_ms"
     const val KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS = "notif_listener_disconnected_at_ms"
     const val KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS = "notif_listener_last_event_at_ms"
@@ -186,6 +188,17 @@ object MMKVStore {
         ensureTodayRollover()
         return try {
             val json = JSONObject(kv.decodeString(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON) ?: "{}")
+            json.optInt(packageName, 0)
+        } catch (_: Exception) {
+            0
+        }
+    }
+
+    fun getTodayBlockedAttemptsForApp(packageName: String): Int {
+        if (packageName.isBlank()) return 0
+        ensureTodayRollover()
+        return try {
+            val json = JSONObject(kv.decodeString(KEY_TODAY_BLOCKED_ATTEMPTS_BY_APP_JSON) ?: "{}")
             json.optInt(packageName, 0)
         } catch (_: Exception) {
             0
@@ -315,6 +328,21 @@ object MMKVStore {
         }
     }
 
+    fun incrementTodayBlockedAttemptsForApp(packageName: String) {
+        if (packageName.isBlank()) return
+        ensureTodayRollover()
+        try {
+            val json = JSONObject(kv.decodeString(KEY_TODAY_BLOCKED_ATTEMPTS_BY_APP_JSON) ?: "{}")
+            val next = json.optInt(packageName, 0) + 1
+            json.put(packageName, next)
+            kv.encode(KEY_TODAY_BLOCKED_ATTEMPTS_BY_APP_JSON, json.toString())
+        } catch (_: Exception) {
+            val json = JSONObject()
+            json.put(packageName, 1)
+            kv.encode(KEY_TODAY_BLOCKED_ATTEMPTS_BY_APP_JSON, json.toString())
+        }
+    }
+
     // ---- Helpers ----
 
     private fun todayDate(): String =
@@ -336,6 +364,7 @@ object MMKVStore {
         kv.encode(KEY_TODAY_LAST_UPDATE_MS, 0L)
         kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_TOTAL, 0)
         kv.encode(KEY_TODAY_NOTIFICATIONS_BLOCKED_BY_APP_JSON, "{}")
+        kv.encode(KEY_TODAY_BLOCKED_ATTEMPTS_BY_APP_JSON, "{}")
     }
 
     fun todayKey(): String = todayDate()

@@ -234,6 +234,15 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
     }
 
     @ReactMethod
+    fun getBlockedAttemptsTodayForApp(packageName: String, promise: Promise) {
+        try {
+            promise.resolve(MMKVStore.getTodayBlockedAttemptsForApp(packageName))
+        } catch (e: Exception) {
+            promise.resolve(0)
+        }
+    }
+
+    @ReactMethod
     fun setImmersiveMode(enabled: Boolean, promise: Promise) {
         UiThreadUtil.runOnUiThread {
             try {
