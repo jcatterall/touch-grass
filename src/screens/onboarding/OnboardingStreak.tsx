@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import DailyStreak from '../../components/DailyStreak';
+import { Streak } from '../../components/Streak';
 import { OnboardingContainer } from '../../components/onboarding/OnboardingContainer';
 import { Button, Typography } from '../../components';
 import { onboardingStyles } from './onboarding.styles';
@@ -10,14 +10,14 @@ export interface StreakProps {
   onBack?: () => void;
 }
 
-export const Streak = ({ onComplete }: StreakProps) => (
+export const OnboardingStreak = ({ onComplete }: StreakProps) => (
   <OnboardingContainer>
     <View style={[onboardingStyles.marginTopXxxl, onboardingStyles.gapXxl]}>
       <Illustration source="calendar" size="xs" />
       <Typography variant="heading" center>
         Create a consistent daily routine
       </Typography>
-      <DailyStreak currentStreak={1} isTodayComplete={true} />
+      <Streak hideStreakCount={true} />
     </View>
     <Button size="lg" onPress={onComplete}>
       Continue

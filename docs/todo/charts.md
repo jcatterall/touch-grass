@@ -7,7 +7,8 @@
 
 ## Core charting types
 - Streaks
-  - Weekly goal completion chart
+  - Weekly goal completion chart (rolling 7 days)
+  - Per-day streak state: `hit` / `miss` / `neutral`
   - Goal achievement total streak (all time)
 - Activity
   - Total activity for period: distance + elapsed time
@@ -44,11 +45,21 @@ Legend:
 ## Storage key schema (local)
 Canonical source of truth remains local DB/session history. MMKV metrics keys are derived projections for fast reads.
 
+Streak source-of-truth and semantics:
+- Canonical streak computation reads Room `daily_totals` rows.
+- First install day is seeded as a completed streak day (`hit`) even without a daily row.
+- `goalsReached=true` contributes to streak.
+- `goalsReached=false` breaks streak.
+- Missing day row is neutral (does not increment or break).
+- MMKV `metrics:alltime` streak values are cache projections derived from Room.
+
 - `metrics:daily:YYYY-MM-DD`
+- `metrics:plans:daily:YYYY-MM-DD`
 - `metrics:rolling:7d|30d|365d`
 - `metrics:monthly:YYYY-MM`
 - `metrics:alltime`
 - `metrics:index:daily`
+- `metrics:index:plans:daily`
 
 ### All-time payload (v1)
 - `distanceMeters`

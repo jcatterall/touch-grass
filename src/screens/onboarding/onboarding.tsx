@@ -7,7 +7,7 @@ import { Usage } from './usage/Usage';
 import { Home } from './Home';
 import { GoalsSplash } from './GoalsSplash';
 import { PlanSplash } from './PlanSplash';
-import { Streak } from './Streak';
+import { OnboardingStreak } from './OnboardingStreak';
 import { Paywall } from './Paywall';
 import { Notification } from './Notification';
 import { UsageReport } from './usage/UsageReport';
@@ -154,7 +154,7 @@ export const Onboarding = ({
     usageReport: (
       <UsageReport usage={usage} onComplete={handleNext} onBack={handleBack} />
     ),
-    streak: <Streak onComplete={handleNext} onBack={handleBack} />,
+    streak: <OnboardingStreak onComplete={handleNext} onBack={handleBack} />,
     paywall: <Paywall onComplete={handleNext} onBack={handleBack} />,
     notificationBlock: (
       <NotificationBlock onComplete={handleNext} onBack={handleBack} />

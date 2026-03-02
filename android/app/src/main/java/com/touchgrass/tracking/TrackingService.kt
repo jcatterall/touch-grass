@@ -12,6 +12,7 @@ import android.util.Log
 import androidx.lifecycle.LifecycleService
 import androidx.core.content.ContextCompat
 import com.touchgrass.MMKVStore
+import com.touchgrass.MMKVMetricsStore
 import com.touchgrass.motion.MotionEngine
 import com.touchgrass.motion.MotionSessionController
 import com.touchgrass.motion.MotionTrackingSink
@@ -122,6 +123,11 @@ class TrackingService : LifecycleService() {
         } catch (e: Exception) {
             Log.w(TAG, "Failed to init MMKVStore", e)
         }
+        try {
+            MMKVMetricsStore.init(applicationContext)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to init MMKVMetricsStore", e)
+        }
 
         notificationController = NotificationController(this)
         notificationController.ensureChannel()
@@ -151,6 +157,7 @@ class TrackingService : LifecycleService() {
 
         DayRolloverScheduler.scheduleNext(this)
         rolloverIfNeeded(source = "on_create", restartManualSession = false)
+        persistPlanActivitySnapshotFromMmkv("on_create")
 
         // Merge persisted daily totals into controller state before posting foreground
         applyCurrentDayBaseline(includeMmkvFallback = true)
@@ -232,8 +239,14 @@ class TrackingService : LifecycleService() {
         when (action) {
 
             TrackingConstants.ACTION_DAY_ROLLOVER -> {
+                persistPlanActivitySnapshotForDate(
+                    date = MMKVStore.getCurrentDay(),
+                    hasActivePlans = MMKVStore.isPlanActiveToday(),
+                    source = "action_day_rollover_before_reset",
+                )
                 DayRolloverScheduler.scheduleNext(this)
                 rolloverIfNeeded(source = "alarm_day_rollover", restartManualSession = true)
+                persistPlanActivitySnapshotFromMmkv("action_day_rollover_after_reset")
                 return START_STICKY
             }
 
@@ -313,6 +326,7 @@ class TrackingService : LifecycleService() {
             }
 
             TrackingConstants.ACTION_GOALS_UPDATED -> {
+                persistPlanActivitySnapshotFromMmkv("action_goals_updated")
                 Log.d(TAG, "ACTION_GOALS_UPDATED — refreshing notification")
                 refreshNotification()
                 return START_STICKY
@@ -331,6 +345,7 @@ class TrackingService : LifecycleService() {
                 // always reflects the aggregate of all active plans (never a sentinel).
 
                 rolloverIfNeeded(source = "manual_start", restartManualSession = false)
+                persistPlanActivitySnapshotFromMmkv("manual_start")
                 controller.startManualSession()
                 // Fast-path projection is published from handleStateChange().
                 Log.d(TAG, "Manual start requested")
@@ -499,6 +514,12 @@ class TrackingService : LifecycleService() {
             controller.stopActiveSession()
         }
 
+        persistPlanActivitySnapshotForDate(
+            date = previousDay,
+            hasActivePlans = MMKVStore.isPlanActiveToday(),
+            source = "rollover_before_reset",
+        )
+
         MMKVStore.rolloverToTodayIfNeeded()
         applyCurrentDayBaseline(includeMmkvFallback = false)
 
@@ -509,6 +530,26 @@ class TrackingService : LifecycleService() {
         refreshNotification()
         Log.d(TAG, "Day rollover applied source=$source previousDay=$previousDay today=$today")
         return true
+    }
+
+    private fun persistPlanActivitySnapshotFromMmkv(source: String) {
+        val date = MMKVStore.getPlanDay().ifBlank {
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        }
+        persistPlanActivitySnapshotForDate(
+            date = date,
+            hasActivePlans = MMKVStore.isPlanActiveToday(),
+            source = source,
+        )
+    }
+
+    private fun persistPlanActivitySnapshotForDate(date: String, hasActivePlans: Boolean, source: String) {
+        if (!date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) return
+        try {
+            MMKVMetricsStore.writePlanDayActivity(date, hasActivePlans)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to persist plan-day activity source=$source date=$date", e)
+        }
     }
 
     private fun applyCurrentDayBaseline(includeMmkvFallback: Boolean) {

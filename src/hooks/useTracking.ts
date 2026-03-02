@@ -386,9 +386,12 @@ export function useTracking(): TrackingState {
     try {
       const activeNow = findActivePlansForToday(plans);
       const hasActivePlanNow = activeNow.length > 0;
+      const planDate = todayYyyyMmDd();
 
       fastStorage.setPlanActiveToday(hasActivePlanNow);
-      fastStorage.setPlanDay(hasActivePlanNow ? todayYyyyMmDd() : '');
+      fastStorage.setPlanDay(planDate);
+
+      Tracking.writePlanDayActivity(hasActivePlanNow, planDate).catch(() => {});
 
       if (hasActivePlanNow) {
         const now = new Date();

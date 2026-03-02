@@ -9,6 +9,13 @@ const { TrackingModule } = NativeModules;
 
 const isAvailable = Platform.OS === 'android' && TrackingModule != null;
 
+function localYyyyMmDd(date: Date = new Date()): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export interface TrackingProgress {
   distanceMeters: number;
   elapsedSeconds: number;
@@ -51,6 +58,7 @@ export interface NativeMetricsPoint {
   distanceMeters: number;
   elapsedSeconds: number;
   goalsReached: boolean;
+  streakState: 'hit' | 'miss' | 'neutral';
   sessions: number;
   blockedAttempts: number;
   notificationsBlocked: number;
@@ -180,7 +188,7 @@ export const Tracking = {
     anchorDate?: string,
   ): Promise<NativeMetricsSummary> {
     if (!isAvailable) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localYyyyMmDd();
       return {
         period,
         startDate: today,
@@ -204,7 +212,7 @@ export const Tracking = {
     anchorDate?: string,
   ): Promise<NativeMetricsSeries> {
     if (!isAvailable) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localYyyyMmDd();
       return {
         period,
         startDate: today,
@@ -214,6 +222,22 @@ export const Tracking = {
       };
     }
     return TrackingModule.getMetricsSeriesNative(period, anchorDate ?? null);
+  },
+
+  async writePlanDayActivity(
+    hasActivePlans: boolean,
+    date?: string,
+  ): Promise<boolean> {
+    if (!isAvailable) return false;
+    return TrackingModule.writePlanDayActivityNative(
+      date ?? localYyyyMmDd(),
+      hasActivePlans,
+    );
+  },
+
+  async ensureInstallDaySeeded(date?: string): Promise<string> {
+    if (!isAvailable) return date ?? localYyyyMmDd();
+    return TrackingModule.ensureInstallDaySeededNative(date ?? localYyyyMmDd());
   },
 
   /**

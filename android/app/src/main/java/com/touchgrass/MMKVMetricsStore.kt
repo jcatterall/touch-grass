@@ -4,6 +4,7 @@ import android.content.Context
 import com.tencent.mmkv.MMKV
 import com.touchgrass.storage.DailyTotalEntity
 import com.touchgrass.storage.TrackingDao
+import com.touchgrass.storage.computeGoalStreaksInRange
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -23,6 +24,8 @@ object MMKVMetricsStore {
     private const val MMKV_ID = "touchgrass_metrics"
     private const val METRICS_SCHEMA_VERSION = 1
     private const val KEY_BLOCKING_INDEX_DAILY = "metrics:index:blocking:daily"
+    private const val KEY_PLAN_INDEX_DAILY = "metrics:index:plans:daily"
+    private const val KEY_INSTALL_DAY = "metrics:install:day"
 
     private lateinit var kv: MMKV
 
@@ -91,6 +94,9 @@ object MMKVMetricsStore {
     suspend fun recomputeAndWriteAllTime(dao: TrackingDao, endDate: String) {
         ensureInit()
         val rows = dao.getDailyTotalsBetween("1970-01-01", endDate)
+        val activePlanDays = getActivePlanDaysBetween("1970-01-01", endDate)
+        val installDay = ensureInstallDaySeeded()
+        val seededHitDays = if (installDay in "1970-01-01"..endDate) setOf(installDay) else emptySet()
 
         val blocking = getBlockingTotalsBetween("1970-01-01", endDate)
         val existing = try {
@@ -104,10 +110,6 @@ object MMKVMetricsStore {
         var totalSessions = 0
         var goalsReachedDays = 0
 
-        var currentStreakDays = 0
-        var longestStreakDays = 0
-        var streakRun = 0
-
         for (row in rows) {
             totalDistance += row.distanceMeters
             totalElapsed += row.elapsedSeconds
@@ -115,24 +117,24 @@ object MMKVMetricsStore {
 
             if (row.goalsReached) {
                 goalsReachedDays += 1
-                streakRun += 1
-                if (streakRun > longestStreakDays) {
-                    longestStreakDays = streakRun
-                }
-            } else {
-                streakRun = 0
             }
         }
 
-        currentStreakDays = streakRun
+        val streaks = computeGoalStreaksInRange(
+            startDate = "1970-01-01",
+            endDate = endDate,
+            rows = rows,
+            activePlanDays = activePlanDays,
+            seededHitDays = seededHitDays,
+        )
 
         val json = JSONObject()
             .put("distanceMeters", totalDistance)
             .put("elapsedSeconds", totalElapsed)
             .put("sessions", totalSessions)
             .put("goalsReachedDays", goalsReachedDays)
-            .put("currentGoalStreakDays", currentStreakDays)
-            .put("longestGoalStreakDays", longestStreakDays)
+            .put("currentGoalStreakDays", streaks.currentDays)
+            .put("longestGoalStreakDays", streaks.longestDays)
             .put("focusMinutes", existing?.opt("focusMinutes") ?: JSONObject.NULL)
             .put("notificationsBlockedTotal", blocking.notificationsBlocked)
             .put("blockedAttemptsTotal", blocking.blockedAttempts)
@@ -174,6 +176,76 @@ object MMKVMetricsStore {
         } catch (_: Exception) {
             null
         }
+    }
+
+    fun writePlanDayActivity(date: String, hasActivePlans: Boolean) {
+        ensureInit()
+        val key = "metrics:plans:daily:$date"
+        val existing = try {
+            kv.decodeString(key, null)?.let { JSONObject(it) }
+        } catch (_: Exception) {
+            null
+        }
+
+        val mergedHasActivePlans = (existing?.optBoolean("hasActivePlans", false) ?: false) || hasActivePlans
+        val payload = JSONObject()
+            .put("date", date)
+            .put("hasActivePlans", mergedHasActivePlans)
+            .put("lastUpdatedMs", System.currentTimeMillis())
+
+        updatePlanIndex(date)
+        kv.encode(key, payload.toString())
+    }
+
+    fun getPlanDayActivity(date: String): JSONObject? {
+        ensureInit()
+        val raw = kv.decodeString("metrics:plans:daily:$date", null) ?: return null
+        return try {
+            JSONObject(raw)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun getActivePlanDaysBetween(startDate: String, endDate: String): Set<String> {
+        ensureInit()
+        val out = mutableSetOf<String>()
+        val index = getPlanIndex()
+        for (date in index) {
+            if (date < startDate || date > endDate) continue
+            val row = getPlanDayActivity(date) ?: continue
+            if (row.optBoolean("hasActivePlans", false)) {
+                out.add(date)
+            }
+        }
+        return out
+    }
+
+    fun ensureInstallDaySeeded(date: String? = null): String {
+        ensureInit()
+        val fallbackToday = df.format(Date())
+        val normalized = if (!date.isNullOrBlank() && date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+            date
+        } else {
+            fallbackToday
+        }
+
+        val existing = kv.decodeString(KEY_INSTALL_DAY, null)
+        if (!existing.isNullOrBlank() && existing.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+            return existing
+        }
+
+        kv.encode(KEY_INSTALL_DAY, normalized)
+        return normalized
+    }
+
+    fun getInstallDay(): String? {
+        ensureInit()
+        val date = kv.decodeString(KEY_INSTALL_DAY, null)
+        if (date.isNullOrBlank() || !date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+            return null
+        }
+        return date
     }
 
     data class BlockingTotals(
@@ -290,6 +362,22 @@ object MMKVMetricsStore {
         return out
     }
 
+    private fun getPlanIndex(): List<String> {
+        val existing = kv.decodeString(KEY_PLAN_INDEX_DAILY, null)
+        val arr = try {
+            if (existing.isNullOrBlank()) JSONArray() else JSONArray(existing)
+        } catch (_: Exception) {
+            JSONArray()
+        }
+
+        val out = mutableListOf<String>()
+        for (i in 0 until arr.length()) {
+            val d = arr.optString(i)
+            if (d.isNotBlank()) out.add(d)
+        }
+        return out
+    }
+
     private fun updateBlockingIndex(date: String) {
         val existing = kv.decodeString(KEY_BLOCKING_INDEX_DAILY, null)
         val arr = try {
@@ -320,6 +408,38 @@ object MMKVMetricsStore {
         val out = JSONArray()
         for (d in bounded) out.put(d)
         kv.encode(KEY_BLOCKING_INDEX_DAILY, out.toString())
+    }
+
+    private fun updatePlanIndex(date: String) {
+        val existing = kv.decodeString(KEY_PLAN_INDEX_DAILY, null)
+        val arr = try {
+            if (existing.isNullOrBlank()) JSONArray() else JSONArray(existing)
+        } catch (_: Exception) {
+            JSONArray()
+        }
+
+        var has = false
+        for (i in 0 until arr.length()) {
+            if (arr.optString(i) == date) {
+                has = true
+                break
+            }
+        }
+        if (!has) {
+            arr.put(date)
+        }
+
+        val list = mutableListOf<String>()
+        for (i in 0 until arr.length()) {
+            val d = arr.optString(i)
+            if (d.isNotBlank()) list.add(d)
+        }
+        list.sort()
+        val bounded = if (list.size > 400) list.takeLast(400) else list
+
+        val out = JSONArray()
+        for (d in bounded) out.put(d)
+        kv.encode(KEY_PLAN_INDEX_DAILY, out.toString())
     }
 
     private suspend fun writeRollingWindow(dao: TrackingDao, windowDays: Int, endDate: String) {

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.touchgrass.MMKVStore
+import com.touchgrass.MMKVMetricsStore
 
 class DayRolloverReceiver : BroadcastReceiver() {
 
@@ -18,6 +19,16 @@ class DayRolloverReceiver : BroadcastReceiver() {
 
         try {
             MMKVStore.init(context.applicationContext)
+            MMKVMetricsStore.init(context.applicationContext)
+
+            val previousDay = MMKVStore.getCurrentDay()
+            if (previousDay.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+                MMKVMetricsStore.writePlanDayActivity(
+                    previousDay,
+                    MMKVStore.isPlanActiveToday(),
+                )
+            }
+
             MMKVStore.rolloverToTodayIfNeeded()
             DayRolloverScheduler.scheduleNext(context)
         } catch (e: Exception) {

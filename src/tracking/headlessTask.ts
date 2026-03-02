@@ -51,9 +51,11 @@ async function activityTask(data: TaskData): Promise<void> {
 
   const activePlans = findActivePlansForToday(plans);
   if (activePlans.length === 0) {
+    const planDate = todayYyyyMmDd();
     try {
       fastStorage.setPlanActiveToday(false);
-      fastStorage.setPlanDay('');
+      fastStorage.setPlanDay(planDate);
+      await Tracking.writePlanDayActivity(false, planDate);
     } catch {
       // best-effort
     }
@@ -100,8 +102,10 @@ async function activityTask(data: TaskData): Promise<void> {
 
   // Keep native notification in sync even when the UI process is not running.
   try {
+    const planDate = todayYyyyMmDd();
     fastStorage.setPlanActiveToday(true);
-    fastStorage.setPlanDay(todayYyyyMmDd());
+    fastStorage.setPlanDay(planDate);
+    await Tracking.writePlanDayActivity(true, planDate);
 
     if (goals.hasDistanceGoal && goals.hasTimeGoal) {
       fastStorage.setGoalDistance(goals.totalDistanceMeters, 'm');

@@ -26,6 +26,7 @@ import com.touchgrass.MMKVStore
 import com.touchgrass.MMKVMetricsStore
 import com.touchgrass.storage.TrackingDatabase
 import com.touchgrass.storage.DailyTotalEntity
+import com.touchgrass.storage.computeGoalStreaksInRange
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -325,6 +326,7 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 MMKVMetricsStore.init(reactApplicationContext)
+                val installDay = MMKVMetricsStore.ensureInstallDaySeeded()
                 val rows = dao.getDailyTotalsBetween(range.first, range.second)
                 val blocking = MMKVMetricsStore.getBlockingTotalsBetween(range.first, range.second)
                 val todayInRange = today in range.first..range.second
@@ -390,7 +392,16 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                     rows
                 }
 
-                val streaks = computeStreaks(range.first, range.second, streakRows)
+                val activePlanDays = MMKVMetricsStore.getActivePlanDaysBetween(range.first, range.second)
+                val seededHitDays = if (installDay in range.first..range.second) setOf(installDay) else emptySet()
+
+                val streaks = computeGoalStreaksInRange(
+                    startDate = range.first,
+                    endDate = range.second,
+                    rows = streakRows,
+                    activePlanDays = activePlanDays,
+                    seededHitDays = seededHitDays,
+                )
 
                 val result = Arguments.createMap().apply {
                     putString("period", normalizedPeriod)
@@ -402,8 +413,8 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                     putDouble("goalsReachedDays", goalsReachedDays.toDouble())
                     putDouble("blockedAttempts", blocking.blockedAttempts.toDouble())
                     putDouble("notificationsBlocked", blocking.notificationsBlocked.toDouble())
-                    putDouble("currentGoalStreakDays", streaks.first.toDouble())
-                    putDouble("longestGoalStreakDays", streaks.second.toDouble())
+                    putDouble("currentGoalStreakDays", streaks.currentDays.toDouble())
+                    putDouble("longestGoalStreakDays", streaks.longestDays.toDouble())
                     putDouble("computedAtMs", System.currentTimeMillis().toDouble())
                 }
                 promise.resolve(result)
@@ -429,8 +440,11 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 MMKVMetricsStore.init(reactApplicationContext)
+                val installDay = MMKVMetricsStore.ensureInstallDaySeeded()
                 val rows = dao.getDailyTotalsBetween(range.first, range.second)
                 val byDate = rows.associateBy { it.date }
+                val activePlanDays = MMKVMetricsStore.getActivePlanDaysBetween(range.first, range.second)
+                val seededHitDays = if (installDay in range.first..range.second) setOf(installDay) else emptySet()
                 val todayInRange = today in range.first..range.second
                 val reconciledToday = if (todayInRange) {
                     getCurrentTotalsForDate(today, includeMmkvTodayFallback = true)
@@ -442,6 +456,19 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                 var cursor = range.first
                 while (cursor <= range.second) {
                     val row = byDate[cursor]
+                    val hasReconciledTodaySignal =
+                        reconciledToday != null &&
+                            (
+                                reconciledToday.distanceMeters > 0.0 ||
+                                    reconciledToday.elapsedSeconds > 0L ||
+                                    reconciledToday.goalReached ||
+                                    reconciledToday.sessionCount > 0
+                                )
+                    val hasPersistedRowForDay = if (cursor == today && reconciledToday != null) {
+                        row != null || hasReconciledTodaySignal
+                    } else {
+                        row != null
+                    }
                     val pointDistance = if (cursor == today && reconciledToday != null) {
                         reconciledToday.distanceMeters
                     } else {
@@ -457,6 +484,8 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                     } else {
                         row?.goalsReached ?: false
                     }
+                    val pointSeededHit = seededHitDays.contains(cursor)
+                    val pointHasActivePlans = activePlanDays.contains(cursor)
                     val pointSessions = if (cursor == today && reconciledToday != null) {
                         reconciledToday.sessionCount
                     } else {
@@ -468,6 +497,15 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                         putDouble("distanceMeters", pointDistance)
                         putDouble("elapsedSeconds", pointElapsed.toDouble())
                         putBoolean("goalsReached", pointGoalsReached)
+                        putString(
+                            "streakState",
+                            when {
+                                pointSeededHit || pointGoalsReached -> "hit"
+                                pointHasActivePlans -> "miss"
+                                !hasPersistedRowForDay -> "neutral"
+                                else -> "miss"
+                            },
+                        )
                         putDouble("sessions", pointSessions.toDouble())
                         putDouble(
                             "blockedAttempts",
@@ -492,6 +530,36 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                 promise.resolve(result)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to compute metrics series", e)
+                promise.reject("ERROR", e.message)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun ensureInstallDaySeededNative(date: String?, promise: Promise) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                MMKVMetricsStore.init(reactApplicationContext)
+                val normalizedDate = normalizeDateOrToday(date)
+                val installDay = MMKVMetricsStore.ensureInstallDaySeeded(normalizedDate)
+                promise.resolve(installDay)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to seed install day", e)
+                promise.reject("ERROR", e.message)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun writePlanDayActivityNative(date: String?, hasActivePlans: Boolean, promise: Promise) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val normalizedDate = normalizeDateOrToday(date)
+                MMKVMetricsStore.init(reactApplicationContext)
+                MMKVMetricsStore.writePlanDayActivity(normalizedDate, hasActivePlans)
+                promise.resolve(true)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to persist plan-day activity", e)
                 promise.reject("ERROR", e.message)
             }
         }
@@ -773,39 +841,6 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
             "alltime" -> Pair("1970-01-01", endDate)
             else -> Pair(endDate, endDate)
         }
-    }
-
-    private fun computeStreaks(
-        startDate: String,
-        endDate: String,
-        rows: List<DailyTotalEntity>,
-    ): Pair<Int, Int> {
-        val byDate = rows.associateBy { it.date }
-        var current = 0
-        var longest = 0
-        var run = 0
-        var cursor = startDate
-
-        while (cursor <= endDate) {
-            val reached = byDate[cursor]?.goalsReached ?: false
-            if (reached) {
-                run += 1
-                if (run > longest) longest = run
-            } else {
-                run = 0
-            }
-            cursor = addDays(cursor, 1)
-        }
-
-        cursor = endDate
-        while (cursor >= startDate) {
-            val reached = byDate[cursor]?.goalsReached ?: false
-            if (!reached) break
-            current += 1
-            cursor = addDays(cursor, -1)
-        }
-
-        return Pair(current, longest)
     }
 
     private fun addDays(date: String, delta: Int): String {

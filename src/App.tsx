@@ -7,6 +7,7 @@ import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import { colors } from './theme';
 import { storage } from './storage';
 import { BuildConfig } from './native/BuildConfig';
+import { Tracking } from './tracking/Tracking';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -20,8 +21,9 @@ function App() {
   useEffect(() => {
     const minDelay = new Promise<void>(resolve => setTimeout(resolve, 1000));
     const loadData = storage.getOnboardingComplete();
+    const seedInstallDay = Tracking.ensureInstallDaySeeded().catch(() => '');
 
-    Promise.all([minDelay, loadData]).then(([, complete]) => {
+    Promise.all([minDelay, loadData, seedInstallDay]).then(([, complete]) => {
       setOnboardingComplete(complete);
       setIsLoading(false);
     });

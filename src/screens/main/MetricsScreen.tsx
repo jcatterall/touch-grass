@@ -11,6 +11,7 @@ import {
 } from '../../tracking/Tracking';
 import UsageStats from '../../native/UsageStats';
 import { AppBlocker } from '../../native/AppBlocker';
+import { Streak } from '../../components/Streak';
 
 interface MetricsScreenProps {
   onClose: () => void;
@@ -42,9 +43,8 @@ export const MetricsScreen = ({ onClose }: MetricsScreenProps) => {
   const [series, setSeries] = useState<NativeMetricsSeries | null>(null);
   const [allTimeDistance, setAllTimeDistance] = useState(0);
   const [allTimeElapsed, setAllTimeElapsed] = useState(0);
-  const [allTimeStreak, setAllTimeStreak] = useState(0);
-  const [allTimeLongestStreak, setAllTimeLongestStreak] = useState(0);
   const [allTimeBlockedAttempts, setAllTimeBlockedAttempts] = useState(0);
+  const [streakRefreshKey, setStreakRefreshKey] = useState(0);
   const [allTimeNotificationsBlocked, setAllTimeNotificationsBlocked] =
     useState(0);
   const [todayNotificationsBlocked, setTodayNotificationsBlocked] = useState(0);
@@ -57,8 +57,6 @@ export const MetricsScreen = ({ onClose }: MetricsScreenProps) => {
     const allTime = await Tracking.getMetricsSummary('alltime');
     setAllTimeDistance(allTime.distanceMeters);
     setAllTimeElapsed(allTime.elapsedSeconds);
-    setAllTimeStreak(allTime.currentGoalStreakDays);
-    setAllTimeLongestStreak(allTime.longestGoalStreakDays);
     setAllTimeBlockedAttempts(allTime.blockedAttempts ?? 0);
     setAllTimeNotificationsBlocked(allTime.notificationsBlocked ?? 0);
   }, []);
@@ -99,6 +97,7 @@ export const MetricsScreen = ({ onClose }: MetricsScreenProps) => {
     const sub = Tracking.onTrackingStopped(() => {
       refreshPeriod().catch(() => {});
       refreshAllTime().catch(() => {});
+      setStreakRefreshKey(k => k + 1);
     });
     return () => sub?.remove();
   }, [refreshAllTime, refreshPeriod]);
@@ -166,18 +165,7 @@ export const MetricsScreen = ({ onClose }: MetricsScreenProps) => {
           <Typography color="accent" variant="subtitle">
             Streaks
           </Typography>
-          <View style={styles.row}>
-            <Typography>Current streak</Typography>
-            <Typography>
-              {Math.round(summary?.currentGoalStreakDays ?? 0)} days
-            </Typography>
-          </View>
-          <View style={styles.row}>
-            <Typography>Longest streak</Typography>
-            <Typography>
-              {Math.round(summary?.longestGoalStreakDays ?? 0)} days
-            </Typography>
-          </View>
+          <Streak refreshKey={streakRefreshKey} />
         </Card>
 
         <Card style={styles.card} hideChevron>
@@ -191,12 +179,6 @@ export const MetricsScreen = ({ onClose }: MetricsScreenProps) => {
           <View style={styles.row}>
             <Typography>Elapsed</Typography>
             <Typography>{formatElapsed(allTimeElapsed)}</Typography>
-          </View>
-          <View style={styles.row}>
-            <Typography>Current / longest streak</Typography>
-            <Typography>
-              {allTimeStreak} / {allTimeLongestStreak}
-            </Typography>
           </View>
           <View style={styles.row}>
             <Typography>Blocked attempts</Typography>
