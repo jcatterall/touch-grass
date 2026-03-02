@@ -28,6 +28,7 @@ class BootReceiver : BroadcastReceiver() {
             // Boot receivers can run in a fresh process where Application hasn't
             // initialized MMKV yet.
             MMKVStore.init(context.applicationContext)
+            DayRolloverScheduler.scheduleNext(context)
         } catch (e: Exception) {
             Log.w(TAG, "Receiver action=$actionName failed to init MMKV", e)
             return

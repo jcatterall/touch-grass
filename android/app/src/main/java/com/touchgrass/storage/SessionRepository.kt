@@ -71,6 +71,7 @@ class SessionRepository(context: Context) {
         val today = todayDate()
         scope.launch {
             val existing = dao.getSession(id)
+            val sessionDate = existing?.date ?: today
 
             // Idempotency: if closeSession is invoked multiple times for the same
             // session id (e.g., rapid stop+destroy), only accumulate the delta.
@@ -101,7 +102,7 @@ class SessionRepository(context: Context) {
                 dao.upsertSession(
                     SessionEntity(
                         id = id,
-                        date = today,
+                        date = sessionDate,
                         mode = sessionMode,
                         startMs = startMs,
                         endMs = endMs,
@@ -115,21 +116,21 @@ class SessionRepository(context: Context) {
             // Accumulate for the closed session. Also allow a 0-delta write to
             // flip goalsReached from false -> true at the daily level.
             if (deltaDistance > 0.0 || deltaElapsed > 0L || (nextGoalReached && !prevGoalReached)) {
-                dao.accumulateDaily(today, deltaDistance, deltaElapsed, nextGoalReached)
+                dao.accumulateDaily(sessionDate, deltaDistance, deltaElapsed, nextGoalReached)
             }
 
             // Derived snapshots (MMKV metrics) are written from Room once per close.
             // This keeps Room canonical while allowing fast snapshot reads.
             try {
-                val daily = dao.getDailyTotal(today)
+                val daily = dao.getDailyTotal(sessionDate)
                 if (daily != null) {
                     MMKVMetricsStore.writeDailySnapshot(daily)
-                    MMKVMetricsStore.recomputeAndWriteRolling(dao, endDate = today)
-                    MMKVMetricsStore.recomputeAndWriteMonthly(dao, date = today)
-                    MMKVMetricsStore.recomputeAndWriteAllTime(dao, endDate = today)
+                    MMKVMetricsStore.recomputeAndWriteRolling(dao, endDate = sessionDate)
+                    MMKVMetricsStore.recomputeAndWriteMonthly(dao, date = sessionDate)
+                    MMKVMetricsStore.recomputeAndWriteAllTime(dao, endDate = sessionDate)
                     Log.d(
                         TAG,
-                        "closeSession recompute complete day=$today distance=${daily.distanceMeters} elapsed=${daily.elapsedSeconds} goals=${daily.goalsReached}",
+                        "closeSession recompute complete day=$sessionDate distance=${daily.distanceMeters} elapsed=${daily.elapsedSeconds} goals=${daily.goalsReached}",
                     )
                 }
             } catch (_: Exception) {
@@ -147,7 +148,7 @@ class SessionRepository(context: Context) {
             if (existing != null) {
                 dao.upsertSession(
                     existing.copy(
-                        date = today,
+                        date = existing.date,
                         mode = sessionMode,
                         endMs = null,
                         distanceMeters = maxOf(existing.distanceMeters, distanceMeters),

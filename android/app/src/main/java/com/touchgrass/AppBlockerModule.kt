@@ -84,6 +84,30 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
                 .putLong(AppBlockerService.PREF_CONFIG_UPDATED_AT_MS, System.currentTimeMillis())
                 .apply()
 
+            // If the app currently displayed as blocked was removed from the blocklist,
+            // clear it immediately so UI can dismiss without waiting for poll lag.
+            try {
+                val prefs = reactApplicationContext.getSharedPreferences(
+                    AppBlockerService.PREFS_NAME,
+                    Context.MODE_PRIVATE
+                )
+                val currentlyBlocked = prefs.getString(AppBlockerService.PREF_CURRENTLY_BLOCKED, null)
+                if (currentlyBlocked != null) {
+                    var stillBlocked = false
+                    for (i in 0 until blockedPackages.size()) {
+                        if (blockedPackages.getString(i) == currentlyBlocked) {
+                            stillBlocked = true
+                            break
+                        }
+                    }
+                    if (!stillBlocked) {
+                        prefs.edit().remove(AppBlockerService.PREF_CURRENTLY_BLOCKED).apply()
+                    }
+                }
+            } catch (_: Exception) {
+                // best-effort
+            }
+
             // Mirror the blocked package count into MMKV so native notifications
             // can synchronously read the number of blocked apps without bridge overhead.
             try {

@@ -21,10 +21,11 @@ fun computeStartupBaseline(
     mmkvDistanceMeters: Double,
     mmkvElapsedSeconds: Long,
     mmkvGoalReached: Boolean,
+    includeMmkvFallback: Boolean,
 ): StartupBaseline? {
-    val distance = max(roomDistanceMeters, mmkvDistanceMeters)
-    val elapsed = max(roomElapsedSeconds, mmkvElapsedSeconds)
-    val goalReached = roomGoalReached || mmkvGoalReached
+    val distance = if (includeMmkvFallback) max(roomDistanceMeters, mmkvDistanceMeters) else roomDistanceMeters
+    val elapsed = if (includeMmkvFallback) max(roomElapsedSeconds, mmkvElapsedSeconds) else roomElapsedSeconds
+    val goalReached = if (includeMmkvFallback) roomGoalReached || mmkvGoalReached else roomGoalReached
     if (distance <= 0.0 && elapsed <= 0L && !goalReached) return null
     return StartupBaseline(
         distanceMeters = distance,

@@ -73,6 +73,15 @@
           android:enabled="true"
           android:exported="true" />
 
+      <receiver
+          android:name=".tracking.DayRolloverReceiver"
+          android:enabled="true"
+          android:exported="false">
+          <intent-filter>
+              <action android:name="com.touchgrass.action.DAY_ROLLOVER" />
+          </intent-filter>
+      </receiver>
+
             <receiver
                     android:name=".tracking.BootReceiver"
                     android:enabled="true"

@@ -58,6 +58,7 @@ class TrackingRecoveryTest {
             mmkvDistanceMeters = 1200.0,
             mmkvElapsedSeconds = 600L,
             mmkvGoalReached = false,
+            includeMmkvFallback = true,
         )
 
         assertNotNull(baseline)
@@ -75,6 +76,7 @@ class TrackingRecoveryTest {
             mmkvDistanceMeters = 2200.0,
             mmkvElapsedSeconds = 900L,
             mmkvGoalReached = true,
+            includeMmkvFallback = true,
         )
 
         assertNotNull(baseline)
@@ -92,6 +94,22 @@ class TrackingRecoveryTest {
             mmkvDistanceMeters = 0.0,
             mmkvElapsedSeconds = 0L,
             mmkvGoalReached = false,
+            includeMmkvFallback = true,
+        )
+
+        assertNull(baseline)
+    }
+
+    @Test
+    fun `computeStartupBaseline ignores mmkv when fallback disabled`() {
+        val baseline = computeStartupBaseline(
+            roomDistanceMeters = 0.0,
+            roomElapsedSeconds = 0L,
+            roomGoalReached = false,
+            mmkvDistanceMeters = 2200.0,
+            mmkvElapsedSeconds = 900L,
+            mmkvGoalReached = true,
+            includeMmkvFallback = false,
         )
 
         assertNull(baseline)

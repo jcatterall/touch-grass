@@ -126,6 +126,13 @@ object MMKVStore {
 
     fun isCurrentDayToday(): Boolean = getCurrentDay() == todayDate()
 
+    fun rolloverToTodayIfNeeded(): Boolean {
+        val today = todayDate()
+        if (kv.decodeString(KEY_CURRENT_DAY) == today) return false
+        resetForNewDay(today)
+        return true
+    }
+
     fun getTodayDistance(): Double = kv.decodeDouble(KEY_TODAY_DISTANCE, 0.0)
     fun getTodayElapsed(): Long    = kv.decodeLong(KEY_TODAY_ELAPSED, 0L)
     fun getGoalsReached(): Boolean = kv.decodeBool(KEY_GOALS_REACHED, false)

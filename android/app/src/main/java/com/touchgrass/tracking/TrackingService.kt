@@ -149,49 +149,11 @@ class TrackingService : LifecycleService() {
             }
         )
 
+        DayRolloverScheduler.scheduleNext(this)
+        rolloverIfNeeded(source = "on_create", restartManualSession = false)
+
         // Merge persisted daily totals into controller state before posting foreground
-        if (!baselineMerged) {
-            runBlocking {
-                try {
-                    val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-                    val daily = repo.getDailyTotal(today)
-                    val openSession = repo.getLatestOpenSessionForDate(today)
-                    val roomDistance = (daily?.distanceMeters ?: 0.0) + (openSession?.distanceMeters ?: 0.0)
-                    val roomElapsed = (daily?.elapsedSeconds ?: 0L) + (openSession?.elapsedSeconds ?: 0L)
-                    val roomGoalReached = (daily?.goalsReached ?: false) || (openSession?.goalReached ?: false)
-
-                    val mmkvDay = MMKVStore.getCurrentDay()
-                    val mmkvDist = MMKVStore.getTodayDistanceSafe()
-                    val mmkvElapsed = MMKVStore.getTodayElapsedSafe()
-                    val mmkvGoalsReached = MMKVStore.getGoalsReachedSafe()
-
-                    val baseline = computeStartupBaseline(
-                        roomDistanceMeters = roomDistance,
-                        roomElapsedSeconds = roomElapsed,
-                        roomGoalReached = roomGoalReached,
-                        mmkvDistanceMeters = mmkvDist,
-                        mmkvElapsedSeconds = mmkvElapsed,
-                        mmkvGoalReached = mmkvGoalsReached,
-                    )
-
-                    if (baseline != null) {
-                        Log.d(
-                            TAG,
-                            "Merging startup baseline: roomDistance=$roomDistance roomElapsed=$roomElapsed openSession=${openSession != null} mmkvDay=$mmkvDay mmkvDistance=$mmkvDist mmkvElapsed=$mmkvElapsed",
-                        )
-                        controller.applyBaseline(baseline.distanceMeters, baseline.elapsedSeconds)
-                        if (daily == null && (mmkvDist > 0.0 || mmkvElapsed > 0L || mmkvGoalsReached)) {
-                            repo.seedDailyTotalIfMissing(today, mmkvDist, mmkvElapsed, mmkvGoalsReached)
-                        }
-                        baselineMerged = true
-                    } else if (!MMKVStore.isCurrentDayToday() && (MMKVStore.getTodayDistance() > 0.0 || MMKVStore.getTodayElapsed() > 0L)) {
-                        Log.d(TAG, "Skipping MMKV baseline merge due to stale day: current_day=$mmkvDay today=$today")
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed merging persisted totals: ${e.message}")
-                }
-            }
-        }
+        applyCurrentDayBaseline(includeMmkvFallback = true)
 
         // Must call startForeground before returning from onCreate.
         postForeground(controller.currentState().toLegacyTrackingState())
@@ -229,6 +191,8 @@ class TrackingService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        DayRolloverScheduler.scheduleNext(this)
+        rolloverIfNeeded(source = "on_start_command", restartManualSession = true)
 
         // Stage 1: START_STICKY restart can deliver a null intent.
         // Never interpret that as a user-initiated manual start.
@@ -258,13 +222,20 @@ class TrackingService : LifecycleService() {
             action != TrackingConstants.ACTION_AR_TRANSITION_REPLAY &&
             action != TrackingConstants.ACTION_BLOCKER_STARTED &&
             action != TrackingConstants.ACTION_BLOCKER_STOPPED &&
-            action != TrackingConstants.ACTION_GOALS_UPDATED
+            action != TrackingConstants.ACTION_GOALS_UPDATED &&
+            action != TrackingConstants.ACTION_DAY_ROLLOVER
         ) {
             Log.w(TAG, "Unknown action=$action — ignoring")
             return START_STICKY
         }
 
         when (action) {
+
+            TrackingConstants.ACTION_DAY_ROLLOVER -> {
+                DayRolloverScheduler.scheduleNext(this)
+                rolloverIfNeeded(source = "alarm_day_rollover", restartManualSession = true)
+                return START_STICKY
+            }
 
             // ── Idle lifecycle (background tracking enabled from JS) ──────────
 
@@ -359,6 +330,7 @@ class TrackingService : LifecycleService() {
                 // Those keys are owned by the JS aggregation layer so the notification
                 // always reflects the aggregate of all active plans (never a sentinel).
 
+                rolloverIfNeeded(source = "manual_start", restartManualSession = false)
                 controller.startManualSession()
                 // Fast-path projection is published from handleStateChange().
                 Log.d(TAG, "Manual start requested")
@@ -511,6 +483,77 @@ class TrackingService : LifecycleService() {
         lastSessionCheckpointMs = now
         lastSessionCheckpointDistance = s.sessionDistanceMeters
         lastSessionCheckpointElapsed = s.sessionElapsedSeconds
+    }
+
+    private fun rolloverIfNeeded(source: String, restartManualSession: Boolean): Boolean {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val previousDay = MMKVStore.getCurrentDay()
+        if (previousDay == today) {
+            return false
+        }
+
+        val wasManual = controller.currentState().mode == TrackingMode.TRACKING_MANUAL
+        val wasActive = wasManual || controller.currentState().mode == TrackingMode.TRACKING_AUTO
+
+        if (wasActive) {
+            controller.stopActiveSession()
+        }
+
+        MMKVStore.rolloverToTodayIfNeeded()
+        applyCurrentDayBaseline(includeMmkvFallback = false)
+
+        if (restartManualSession && wasManual) {
+            controller.startManualSession()
+        }
+
+        refreshNotification()
+        Log.d(TAG, "Day rollover applied source=$source previousDay=$previousDay today=$today")
+        return true
+    }
+
+    private fun applyCurrentDayBaseline(includeMmkvFallback: Boolean) {
+        if (baselineMerged && includeMmkvFallback) return
+
+        runBlocking {
+            try {
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                val daily = repo.getDailyTotal(today)
+                val openSession = repo.getLatestOpenSessionForDate(today)
+                val roomDistance = (daily?.distanceMeters ?: 0.0) + (openSession?.distanceMeters ?: 0.0)
+                val roomElapsed = (daily?.elapsedSeconds ?: 0L) + (openSession?.elapsedSeconds ?: 0L)
+                val roomGoalReached = (daily?.goalsReached ?: false) || (openSession?.goalReached ?: false)
+
+                val mmkvDay = MMKVStore.getCurrentDay()
+                val mmkvDist = MMKVStore.getTodayDistanceSafe()
+                val mmkvElapsed = MMKVStore.getTodayElapsedSafe()
+                val mmkvGoalsReached = MMKVStore.getGoalsReachedSafe()
+
+                val baseline = computeStartupBaseline(
+                    roomDistanceMeters = roomDistance,
+                    roomElapsedSeconds = roomElapsed,
+                    roomGoalReached = roomGoalReached,
+                    mmkvDistanceMeters = mmkvDist,
+                    mmkvElapsedSeconds = mmkvElapsed,
+                    mmkvGoalReached = mmkvGoalsReached,
+                    includeMmkvFallback = includeMmkvFallback && mmkvDay == today,
+                )
+
+                if (baseline != null) {
+                    controller.applyBaseline(baseline.distanceMeters, baseline.elapsedSeconds)
+                    if (includeMmkvFallback && daily == null && (mmkvDist > 0.0 || mmkvElapsed > 0L || mmkvGoalsReached)) {
+                        repo.seedDailyTotalIfMissing(today, mmkvDist, mmkvElapsed, mmkvGoalsReached)
+                    }
+                } else {
+                    controller.applyBaseline(0.0, 0L)
+                }
+
+                if (includeMmkvFallback) {
+                    baselineMerged = true
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed merging persisted totals: ${e.message}")
+            }
+        }
     }
 
     /** Call startForeground immediately — required before any async work. */

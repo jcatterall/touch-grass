@@ -234,6 +234,12 @@ export function useTracking(): TrackingState {
 
   const progressSub = useRef<EmitterSubscription | null>(null);
   const trackingStarted = useRef(false);
+  const plansRef = useRef<BlockingPlan[]>([]);
+  const blockerSyncInFlightRef = useRef(false);
+  const lastBlockerSignatureRef = useRef<string>('');
+  const blockerSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const tickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef = useRef(AppState.currentState ?? 'active');
@@ -435,13 +441,98 @@ export function useTracking(): TrackingState {
     [goals, progress],
   );
 
+  // Sync blocker service with current plan/progress state.
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
+
+  const syncBlocker = useCallback(
+    async (plansOverride?: BlockingPlan[]) => {
+      if (blockerSyncInFlightRef.current) return;
+      blockerSyncInFlightRef.current = true;
+
+      try {
+        const plans = plansOverride ?? (await storage.getPlans());
+        plansRef.current = plans;
+        syncNativePlanActivity(plans);
+
+        const blockingPlans = findBlockingPlansForToday(plans);
+        const currentProgress = progressRef.current;
+
+        if (blockingPlans.length === 0) {
+          const signature = 'none';
+          if (lastBlockerSignatureRef.current !== signature) {
+            try {
+              await AppBlocker.updateBlockerConfig([], true, false);
+            } catch {
+              // best-effort
+            }
+            await AppBlocker.stopBlocker();
+            lastBlockerSignatureRef.current = signature;
+          }
+          return;
+        }
+
+        const unmetPlans = blockingPlans.filter(plan => {
+          if (plan.criteria.type === 'permanent') return true;
+          if (plan.criteria.type === 'distance') {
+            const goalMeters =
+              plan.criteria.unit === 'mi'
+                ? plan.criteria.value * 1609.34
+                : plan.criteria.value * 1000;
+            return currentProgress.distanceMeters < goalMeters;
+          }
+          if (plan.criteria.type === 'time') {
+            return currentProgress.elapsedSeconds < plan.criteria.value * 60;
+          }
+          return false;
+        });
+
+        if (unmetPlans.length === 0) {
+          const signature = 'goals-met';
+          if (lastBlockerSignatureRef.current !== signature) {
+            await AppBlocker.updateBlockerConfig([], true, false);
+            lastBlockerSignatureRef.current = signature;
+          }
+          return;
+        }
+
+        const blockedPackages = [
+          ...new Set(unmetPlans.flatMap(p => p.blockedApps.map(a => a.id))),
+        ];
+        const hasPermanent = unmetPlans.some(
+          p => p.criteria.type === 'permanent',
+        );
+        const signature = `${blockedPackages.sort().join(',')}|${
+          hasPermanent ? 1 : 0
+        }`;
+
+        if (lastBlockerSignatureRef.current === signature) {
+          return;
+        }
+
+        await AppBlocker.updateBlockerConfig(
+          blockedPackages,
+          false,
+          hasPermanent,
+        );
+        await AppBlocker.startBlocker();
+        lastBlockerSignatureRef.current = signature;
+      } finally {
+        blockerSyncInFlightRef.current = false;
+      }
+    },
+    [syncNativePlanActivity],
+  );
+
   // Load active plans
   useEffect(() => {
     const load = async () => {
       const plans = await storage.getPlans();
+      plansRef.current = plans;
       const active = findActivePlansForToday(plans);
       setActivePlans(active);
       syncNativePlanActivity(plans);
+      syncBlocker(plans).catch(() => {});
     };
     load();
 
@@ -451,70 +542,38 @@ export function useTracking(): TrackingState {
       sub.remove();
       clearInterval(interval);
     };
-  }, [syncNativePlanActivity]);
-
-  // Sync blocker service with current plan/progress state.
-  const progressRef = useRef(progress);
-  progressRef.current = progress;
+  }, [syncBlocker, syncNativePlanActivity]);
 
   useEffect(() => {
-    const syncBlocker = async () => {
-      const plans = await storage.getPlans();
-      syncNativePlanActivity(plans);
-      const blockingPlans = findBlockingPlansForToday(plans);
-      const currentProgress = progressRef.current;
-
-      if (blockingPlans.length === 0) {
-        // No active blocking plans today — clear native blocker config
-        // so native notification reflects that there are no active blocks.
-        try {
-          await AppBlocker.updateBlockerConfig([], true, false);
-        } catch {
-          // best-effort
-        }
-        await AppBlocker.stopBlocker();
-        return;
-      }
-
-      const unmetPlans = blockingPlans.filter(plan => {
-        if (plan.criteria.type === 'permanent') return true;
-        if (plan.criteria.type === 'distance') {
-          const goalMeters =
-            plan.criteria.unit === 'mi'
-              ? plan.criteria.value * 1609.34
-              : plan.criteria.value * 1000;
-          return currentProgress.distanceMeters < goalMeters;
-        }
-        if (plan.criteria.type === 'time') {
-          return currentProgress.elapsedSeconds < plan.criteria.value * 60;
-        }
-        return false;
-      });
-
-      if (unmetPlans.length === 0) {
-        await AppBlocker.updateBlockerConfig([], true, false);
-        return;
-      }
-
-      const blockedPackages = [
-        ...new Set(unmetPlans.flatMap(p => p.blockedApps.map(a => a.id))),
-      ];
-      const hasPermanent = unmetPlans.some(
-        p => p.criteria.type === 'permanent',
-      );
-
-      await AppBlocker.updateBlockerConfig(
-        blockedPackages,
-        false,
-        hasPermanent,
-      );
-      await AppBlocker.startBlocker();
-    };
-
-    syncBlocker();
-    const interval = setInterval(syncBlocker, 15_000);
+    syncBlocker().catch(() => {});
+    const interval = setInterval(() => {
+      syncBlocker().catch(() => {});
+    }, 15_000);
     return () => clearInterval(interval);
-  }, [syncNativePlanActivity]);
+  }, [syncBlocker]);
+
+  useEffect(() => {
+    if (plansRef.current.length === 0) return;
+    if (blockerSyncDebounceRef.current) {
+      clearTimeout(blockerSyncDebounceRef.current);
+    }
+    blockerSyncDebounceRef.current = setTimeout(() => {
+      syncBlocker(plansRef.current).catch(() => {});
+      blockerSyncDebounceRef.current = null;
+    }, 300);
+
+    return () => {
+      if (blockerSyncDebounceRef.current) {
+        clearTimeout(blockerSyncDebounceRef.current);
+        blockerSyncDebounceRef.current = null;
+      }
+    };
+  }, [
+    progress.distanceMeters,
+    progress.elapsedSeconds,
+    progress.goalReached,
+    syncBlocker,
+  ]);
 
   // Check permissions + load background tracking state on mount
   useEffect(() => {
