@@ -2,8 +2,14 @@
  * DailyStreak - Displays current streak with weekly progress indicators
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withDelay,
+} from 'react-native-reanimated';
 import { BadgeCheck } from 'lucide-react-native';
 import { colors, spacing, borderRadius, shadows } from '../theme/tokens';
 import { Typography } from './Typography';
@@ -12,12 +18,15 @@ import { Typography } from './Typography';
 export interface DailyStreakProps {
   currentStreak: number;
   isTodayComplete: boolean;
+  shouldAnimateHitToday?: boolean;
+  completedWeekdays?: string[];
 }
 
 interface DayIndicatorProps {
   day: string;
   isCompleted: boolean;
   isToday: boolean;
+  animateIn?: boolean;
 }
 
 // Constants
@@ -32,7 +41,22 @@ export const getTodayIndex = (): number => {
 export const getCompletedDays = (
   currentStreak: number,
   isTodayComplete: boolean,
+  completedWeekdays?: string[],
 ): Set<string> => {
+  if (completedWeekdays) {
+    const completed = new Set(
+      completedWeekdays.filter(day =>
+        (DAYS_OF_WEEK as readonly string[]).includes(day),
+      ),
+    );
+
+    if (isTodayComplete) {
+      completed.add(DAYS_OF_WEEK[getTodayIndex()]);
+    }
+
+    return completed;
+  }
+
   const todayIndex = getTodayIndex();
   const completed = new Set<string>();
 
@@ -59,7 +83,23 @@ const DayIndicator: React.FC<DayIndicatorProps> = ({
   day,
   isCompleted,
   isToday,
+  animateIn,
 }) => {
+  const scale = useSharedValue(animateIn ? 0 : 1);
+
+  useEffect(() => {
+    if (animateIn) {
+      scale.value = withDelay(
+        100,
+        withSpring(1, { damping: 12, stiffness: 150 }),
+      );
+    }
+  }, [animateIn, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   const containerStyle = [
     styles.dayContainer,
     isCompleted && styles.dayContainerCompleted,
@@ -78,12 +118,14 @@ const DayIndicator: React.FC<DayIndicatorProps> = ({
       </Typography>
       <View style={containerStyle}>
         {isCompleted ? (
-          <BadgeCheck
-            size={32}
-            color={colors.white}
-            fill={colors.terracotta}
-            strokeWidth={2}
-          />
+          <Animated.View style={animateIn ? animatedStyle : undefined}>
+            <BadgeCheck
+              size={32}
+              color={colors.white}
+              fill={colors.terracotta}
+              strokeWidth={2}
+            />
+          </Animated.View>
         ) : (
           <></>
         )}
@@ -96,10 +138,16 @@ const DayIndicator: React.FC<DayIndicatorProps> = ({
 export const DailyStreak: React.FC<DailyStreakProps> = ({
   currentStreak,
   isTodayComplete,
+  shouldAnimateHitToday = false,
+  completedWeekdays,
 }) => {
   const todayIndex = getTodayIndex();
   const today = DAYS_OF_WEEK[todayIndex];
-  const completedDays = getCompletedDays(currentStreak, isTodayComplete);
+  const completedDays = getCompletedDays(
+    currentStreak,
+    isTodayComplete,
+    completedWeekdays,
+  );
 
   return (
     <View style={styles.card}>
@@ -110,6 +158,7 @@ export const DailyStreak: React.FC<DailyStreakProps> = ({
             day={day}
             isCompleted={completedDays.has(day)}
             isToday={day === today}
+            animateIn={day === today && shouldAnimateHitToday}
           />
         ))}
       </View>

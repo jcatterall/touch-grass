@@ -44,6 +44,7 @@ object TrackingConstants {
     // Lifecycle actions driven by JS / user
     const val ACTION_START_IDLE      = "com.touchgrass.action.START_IDLE"
     const val ACTION_STOP_BACKGROUND = "com.touchgrass.action.STOP_BACKGROUND"
+    const val ACTION_STOP_SESSION_ONLY = "com.touchgrass.action.STOP_SESSION_ONLY"
     const val ACTION_AR_TRANSITION_REPLAY = "com.touchgrass.action.AR_TRANSITION_REPLAY"
 
     // Goal extras for manual tracking start

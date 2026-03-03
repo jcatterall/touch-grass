@@ -18,6 +18,8 @@ export const Streak = ({ refreshKey, hideStreakCount }: StreakProps) => {
       <DailyStreak
         currentStreak={streak.current}
         isTodayComplete={streak.isTodayComplete}
+        shouldAnimateHitToday={streak.shouldAnimateHitToday}
+        completedWeekdays={streak.completedWeekdays}
       />
 
       {!hideStreakCount && (

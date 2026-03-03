@@ -178,8 +178,14 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
         try {
             Log.d(TAG, "Stopping tracking")
 
+            val context = reactApplicationContext
             val svc = trackingService
             svc?.stopTracking()
+
+            val stopIntent = Intent(context, TrackingService::class.java).apply {
+                action = TrackingConstants.ACTION_STOP_SESSION_ONLY
+            }
+            context.startForegroundService(stopIntent)
 
             // Keep TrackingService alive so a single sticky notification can
             // continue showing current day plan status, even when no session is active.
@@ -503,7 +509,7 @@ class TrackingModule(reactContext: ReactApplicationContext) : ReactContextBaseJa
                                 pointSeededHit || pointGoalsReached -> "hit"
                                 pointHasActivePlans -> "miss"
                                 !hasPersistedRowForDay -> "neutral"
-                                else -> "miss"
+                                else -> "neutral"
                             },
                         )
                         putDouble("sessions", pointSessions.toDouble())

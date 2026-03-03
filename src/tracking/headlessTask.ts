@@ -68,36 +68,6 @@ async function activityTask(data: TaskData): Promise<void> {
     `[HeadlessTask] Found ${activePlans.length} active plans for today.`,
   );
 
-  // Read today's already-completed activity so we pass the REMAINING goal to the
-  // native service. This lets TrackingService stop itself when the goal is reached,
-  // even while the app stays closed.
-  // Primary: Room (native SQLite) — faster cold-start, no AsyncStorage bridge overhead.
-  // Fallback: AsyncStorage — used on first install before Room has any data.
-  let todayDistanceMeters = 0;
-  let todayElapsedSeconds = 0;
-  try {
-    const nativeTotal = await Tracking.getDailyTotalNative();
-    if (nativeTotal) {
-      todayDistanceMeters = nativeTotal.distanceMeters;
-      todayElapsedSeconds = nativeTotal.elapsedSeconds;
-      console.log(
-        `[HeadlessTask] Today from Room: dist=${todayDistanceMeters}m elapsed=${todayElapsedSeconds}s`,
-      );
-    } else {
-      const asyncTotal = await storage.getTodayActivity();
-      todayDistanceMeters = asyncTotal.distanceMeters;
-      todayElapsedSeconds = asyncTotal.elapsedSeconds;
-      console.log(
-        `[HeadlessTask] Today from AsyncStorage: dist=${todayDistanceMeters}m elapsed=${todayElapsedSeconds}s`,
-      );
-    }
-  } catch (e) {
-    console.error(
-      '[HeadlessTask] Failed to read today activity, using zero baseline.',
-      e,
-    );
-  }
-
   const goals = aggregateGoals(activePlans);
 
   // Keep native notification in sync even when the UI process is not running.
@@ -130,33 +100,15 @@ async function activityTask(data: TaskData): Promise<void> {
 
   try {
     if (goals.hasDistanceGoal) {
-      const remainingMeters = Math.max(
-        0,
-        goals.totalDistanceMeters - todayDistanceMeters,
-      );
-      if (remainingMeters <= 0) {
-        console.log(
-          '[HeadlessTask] Distance goal already met today. Aborting.',
-        );
-        return;
-      }
       console.log(
-        `[HeadlessTask] Starting distance tracking: ${remainingMeters}m remaining.`,
+        `[HeadlessTask] Starting distance tracking with active goal total: ${goals.totalDistanceMeters}m.`,
       );
-      await Tracking.startTracking('distance', remainingMeters, 'm');
+      await Tracking.startTracking('distance', goals.totalDistanceMeters, 'm');
     } else if (goals.hasTimeGoal) {
-      const remainingSeconds = Math.max(
-        0,
-        goals.totalTimeSeconds - todayElapsedSeconds,
-      );
-      if (remainingSeconds <= 0) {
-        console.log('[HeadlessTask] Time goal already met today. Aborting.');
-        return;
-      }
       console.log(
-        `[HeadlessTask] Starting time tracking: ${remainingSeconds}s remaining.`,
+        `[HeadlessTask] Starting time tracking with active goal total: ${goals.totalTimeSeconds}s.`,
       );
-      await Tracking.startTracking('time', remainingSeconds, 's');
+      await Tracking.startTracking('time', goals.totalTimeSeconds, 's');
     } else {
       console.log('[HeadlessTask] No trackable goal found. Aborting.');
       return;

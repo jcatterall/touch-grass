@@ -149,6 +149,9 @@ class TrackingService : LifecycleService() {
                 _state.value = legacy
                 handleStateChange(newSessionState = newState, newLegacyState = legacy)
             },
+            goalReachedEvaluator = { todayDistanceMeters, todayElapsedSeconds ->
+                computeGoalsReachedFromTotals(todayDistanceMeters, todayElapsedSeconds)
+            },
             onSessionFinalised = { distanceMeters, elapsedSeconds, goalReached ->
                 // Persist the just-finished session using session-scoped values.
                 repo.closeSession(distanceMeters, elapsedSeconds, goalReached)
@@ -226,6 +229,7 @@ class TrackingService : LifecycleService() {
         if (action != null && action.isNotBlank() &&
             action != TrackingConstants.ACTION_START_IDLE &&
             action != TrackingConstants.ACTION_STOP_BACKGROUND &&
+            action != TrackingConstants.ACTION_STOP_SESSION_ONLY &&
             action != TrackingConstants.ACTION_AR_TRANSITION_REPLAY &&
             action != TrackingConstants.ACTION_BLOCKER_STARTED &&
             action != TrackingConstants.ACTION_BLOCKER_STOPPED &&
@@ -277,6 +281,18 @@ class TrackingService : LifecycleService() {
                 }
 
                 stopMotionIfRunning()
+                refreshNotification()
+                return START_STICKY
+            }
+
+            TrackingConstants.ACTION_STOP_SESSION_ONLY -> {
+                Log.d(TAG, "ACTION_STOP_SESSION_ONLY — stopping active session only")
+                val currentMode = controller.currentState().mode
+                val isActive = currentMode == TrackingMode.TRACKING_AUTO ||
+                        currentMode == TrackingMode.TRACKING_MANUAL
+                if (isActive) {
+                    controller.stopActiveSession()
+                }
                 refreshNotification()
                 return START_STICKY
             }
@@ -401,6 +417,23 @@ class TrackingService : LifecycleService() {
      *  · MMKV sync so JS can read state without a bound service.
      */
     private fun handleStateChange(newSessionState: TrackingSessionState, newLegacyState: TrackingState) {
+        val projectedGoalsReached =
+            computeGoalsReachedFromTotals(newLegacyState.distanceMeters, newLegacyState.elapsedSeconds) ||
+                newLegacyState.goalReached
+        val projectedSessionState = if (newSessionState.goalReached == projectedGoalsReached) {
+            newSessionState
+        } else {
+            newSessionState.copy(goalReached = projectedGoalsReached)
+        }
+        val projectedLegacyState = if (newLegacyState.goalReached == projectedGoalsReached) {
+            newLegacyState
+        } else {
+            newLegacyState.copy(goalReached = projectedGoalsReached)
+        }
+
+        _sessionState.value = projectedSessionState
+        _state.value = projectedLegacyState
+
         val nowTracking = newSessionState.mode == TrackingMode.TRACKING_AUTO ||
                           newSessionState.mode == TrackingMode.TRACKING_MANUAL
         val wasTracking = prevMode == TrackingMode.TRACKING_AUTO ||
@@ -409,7 +442,7 @@ class TrackingService : LifecycleService() {
 
         // ── Session lifecycle → Room ──────────────────────────────────────────
         if (wasIdle && nowTracking) {
-            val mode = if (newSessionState.mode == TrackingMode.TRACKING_MANUAL) "manual" else "auto"
+            val mode = if (projectedSessionState.mode == TrackingMode.TRACKING_MANUAL) "manual" else "auto"
             repo.startSession(mode)
             lastSessionCheckpointMs = 0L
             lastSessionCheckpointDistance = 0.0
@@ -418,14 +451,14 @@ class TrackingService : LifecycleService() {
         // Session close is handled by TrackingController.onSessionFinalised.
 
         if (nowTracking) {
-            maybeCheckpointSession(newSessionState, force = wasIdle)
+            maybeCheckpointSession(projectedSessionState, force = wasIdle)
         } else if (wasTracking) {
             lastSessionCheckpointMs = 0L
             lastSessionCheckpointDistance = 0.0
             lastSessionCheckpointElapsed = 0L
         }
 
-        prevMode = newSessionState.mode
+        prevMode = projectedSessionState.mode
 
         // Stage 6: in-process runtime snapshot (avoid MMKV reads for in-process consumers)
         TrackingRuntimeState.isTrackingActive = nowTracking
@@ -438,9 +471,8 @@ class TrackingService : LifecycleService() {
             else -> "idle"
         }
         MMKVStore.setTrackingMode(trackingMode)
-        val projectedDistance = newLegacyState.distanceMeters
-        val projectedElapsed = newLegacyState.elapsedSeconds
-        val projectedGoalsReached = newLegacyState.goalReached
+        val projectedDistance = projectedLegacyState.distanceMeters
+        val projectedElapsed = projectedLegacyState.elapsedSeconds
         // Project canonical totals into MMKV as absolute values.
         // This makes Room the single source of truth while keeping JS reads synchronous.
         MMKVStore.setTodayDistance(projectedDistance)
@@ -451,23 +483,61 @@ class TrackingService : LifecycleService() {
         MMKVStore.setTodayLastUpdateMs(System.currentTimeMillis())
 
         // Forward to bound module
-        onProgressUpdate?.invoke(newLegacyState.distanceMeters, newLegacyState.elapsedSeconds, newLegacyState.goalReached)
-        onSessionStateUpdate?.invoke(newSessionState)
+        onProgressUpdate?.invoke(projectedLegacyState.distanceMeters, projectedLegacyState.elapsedSeconds, projectedLegacyState.goalReached)
+        onSessionStateUpdate?.invoke(projectedSessionState)
 
         if (projectedGoalsReached) {
             onGoalReachedCallback?.invoke()
         }
 
-        if (newSessionState.mode == TrackingMode.IDLE) {
+        if (projectedSessionState.mode == TrackingMode.IDLE) {
             onTrackingStoppedCallback?.invoke()
         }
 
         // Throttled notification update
         val now = System.currentTimeMillis()
-        if (now - lastNotificationMs >= TrackingConstants.NOTIFICATION_THROTTLE_MS || newLegacyState.goalReached) {
+        if (now - lastNotificationMs >= TrackingConstants.NOTIFICATION_THROTTLE_MS || projectedLegacyState.goalReached) {
             lastNotificationMs = now
-            refreshNotification(newLegacyState)
+            refreshNotification(projectedLegacyState)
         }
+    }
+
+    private fun computeGoalsReachedFromTotals(distanceMeters: Double, elapsedSeconds: Long): Boolean {
+        val distanceGoalMeters = goalDistanceMetersOrNull()
+        val timeGoalSeconds = goalTimeSecondsOrNull()
+
+        val hasDistanceGoal = distanceGoalMeters != null
+        val hasTimeGoal = timeGoalSeconds != null
+        if (!hasDistanceGoal && !hasTimeGoal) return false
+
+        val distanceMet = !hasDistanceGoal || distanceMeters >= (distanceGoalMeters ?: 0.0)
+        val timeMet = !hasTimeGoal || elapsedSeconds >= (timeGoalSeconds ?: 0L)
+        return distanceMet && timeMet
+    }
+
+    private fun goalDistanceMetersOrNull(): Double? {
+        val raw = MMKVStore.getGoalDistanceValue()
+        if (raw <= 0.0) return null
+        val unit = MMKVStore.getGoalDistanceUnit().lowercase(Locale.US)
+        return when (unit) {
+            "m", "meter", "meters" -> raw
+            "km", "kilometer", "kilometers" -> raw * 1000.0
+            "mi", "mile", "miles" -> raw * 1609.34
+            else -> raw
+        }
+    }
+
+    private fun goalTimeSecondsOrNull(): Long? {
+        val raw = MMKVStore.getGoalTimeValue()
+        if (raw <= 0.0) return null
+        val unit = MMKVStore.getGoalTimeUnit().lowercase(Locale.US)
+        val seconds = when (unit) {
+            "s", "sec", "secs", "second", "seconds" -> raw
+            "m", "min", "mins", "minute", "minutes" -> raw * 60.0
+            "h", "hr", "hrs", "hour", "hours" -> raw * 3600.0
+            else -> raw
+        }
+        return seconds.toLong()
     }
 
     private fun refreshNotification(s: TrackingState = _state.value) {

@@ -11,6 +11,7 @@ data class GoalStreaks(
  * Streak semantics:
  * - goalsReached=true  => contributes to streak run
  * - goalsReached=false with active plan day => breaks streak run
+ * - goalsReached=false without active plan day => neutral (does not increment or break)
  * - missing day row + active plan day => breaks streak run
  * - missing day row + no active plan marker => neutral (does not increment or break)
  */
@@ -38,7 +39,7 @@ fun computeGoalStreaksInRange(
         val isMiss = if (isHit) {
             false
         } else if (row != null) {
-            !row.goalsReached || hasActivePlans
+            hasActivePlans
         } else {
             hasActivePlans
         }

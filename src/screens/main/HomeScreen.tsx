@@ -90,9 +90,9 @@ export const HomeScreen = () => {
   const hasPlans = activePlans.length > 0;
 
   // In background-tracking mode the play button is hidden — the service handles start/stop.
-  // In manual mode it's available whenever there are plans and goals aren't met.
-  const showPlayButton =
-    hasPlans && !allGoalsReached && !backgroundTrackingEnabled;
+  // In manual mode it's available whenever there are active plans, including after goals
+  // are met so the user can continue with a bonus walk.
+  const showPlayButton = hasPlans && !backgroundTrackingEnabled;
 
   const motionMode = isTracking ? 'moving' : 'idle';
 
@@ -111,7 +111,9 @@ export const HomeScreen = () => {
   const statusText = !hasPlans
     ? 'No active plan for today'
     : allGoalsReached
-    ? 'Goal reached! Apps unlocked'
+    ? isTracking
+      ? 'Bonus walk in progress'
+      : 'Goal reached! Apps unlocked'
     : backgroundTrackingEnabled
     ? isActivelyTracking
       ? 'Activity detected, automatically tracking'

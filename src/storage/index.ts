@@ -195,6 +195,14 @@ export const metricsStorage = {
       return null;
     }
   },
+
+  getStreakHitSeen(date: string): boolean {
+    return _mmkvMetrics.getBoolean(`metrics:streak_hit_seen:${date}`) ?? false;
+  },
+
+  setStreakHitSeen(date: string): void {
+    _mmkvMetrics.set(`metrics:streak_hit_seen:${date}`, true);
+  },
 };
 
 export const PLANS_CHANGED_EVENT = 'plans_changed';

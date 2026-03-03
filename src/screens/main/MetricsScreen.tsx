@@ -97,7 +97,9 @@ export const MetricsScreen = ({ onClose }: MetricsScreenProps) => {
     const sub = Tracking.onTrackingStopped(() => {
       refreshPeriod().catch(() => {});
       refreshAllTime().catch(() => {});
-      setStreakRefreshKey(k => k + 1);
+      // Delay streak refresh to allow native Room writes to settle before
+      // querying — the 300ms post-stop sync grace period isn't always enough.
+      setTimeout(() => setStreakRefreshKey(k => k + 1), 600);
     });
     return () => sub?.remove();
   }, [refreshAllTime, refreshPeriod]);

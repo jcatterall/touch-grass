@@ -808,20 +808,8 @@ export function useTracking(): TrackingState {
     [activePlans, goals, syncFromNativeService],
   );
 
-  // Auto-stop when all goals reached
-  useEffect(() => {
-    if (allGoalsReached && isTracking) {
-      Tracking.stopTracking();
-      setIsTracking(false);
-      setTrackingMode('idle');
-      trackingStarted.current = false;
-      setDebugNativeRunning(false);
-
-      stopUiTick();
-      anchorRef.current = null;
-      schedulePostStopSync();
-    }
-  }, [allGoalsReached, isTracking, schedulePostStopSync, stopUiTick]);
+  // Do not auto-stop at goal completion.
+  // Users can continue active sessions beyond goals for bonus progress.
 
   const stop = useCallback(async () => {
     stopUiTick();

@@ -37,6 +37,7 @@ class TrackingController(
     private val processor: LocationProcessor,
     private val sessions: SessionManager,
     private val onStateChanged: (TrackingSessionState) -> Unit,
+    private val goalReachedEvaluator: (todayDistanceMeters: Double, todayElapsedSeconds: Long) -> Boolean = { _, _ -> false },
     private val onSessionFinalised: (distanceMeters: Double, elapsedSeconds: Long, goalReached: Boolean) -> Unit = { _, _, _ -> }
 ) {
 
@@ -74,11 +75,14 @@ class TrackingController(
 
             val sessionElapsed = sessions.elapsedSeconds()
             val sessionDistance = sessions.currentDistance()
+            val todayElapsed = baseElapsedSeconds + sessionElapsed
+            val todayDistance = baseDistanceMeters + sessionDistance
             state = state.copy(
                 sessionElapsedSeconds = sessionElapsed,
                 sessionDistanceMeters = sessionDistance,
-                todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
-                todayDistanceMeters = baseDistanceMeters + sessionDistance,
+                todayElapsedSeconds = todayElapsed,
+                todayDistanceMeters = todayDistance,
+                goalReached = evaluateGoalReached(todayDistance, todayElapsed),
                 isTimeEligible = eligible,
                 lastUpdateMs = System.currentTimeMillis()
             )
@@ -227,11 +231,14 @@ class TrackingController(
             lastLocation = location
             val sessionDistance = sessions.currentDistance()
             val sessionElapsed = sessions.elapsedSeconds()
+            val todayDistance = baseDistanceMeters + sessionDistance
+            val todayElapsed = baseElapsedSeconds + sessionElapsed
             state = state.copy(
                 sessionDistanceMeters = sessionDistance,
                 sessionElapsedSeconds = sessionElapsed,
-                todayDistanceMeters = baseDistanceMeters + sessionDistance,
-                todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
+                todayDistanceMeters = todayDistance,
+                todayElapsedSeconds = todayElapsed,
+                goalReached = evaluateGoalReached(todayDistance, todayElapsed),
                 isTimeEligible = false,
                 lastUpdateMs = System.currentTimeMillis()
             )
@@ -263,11 +270,14 @@ class TrackingController(
 
             val sessionDistance = sessions.currentDistance()
             val sessionElapsed = sessions.elapsedSeconds()
+            val todayDistance = baseDistanceMeters + sessionDistance
+            val todayElapsed = baseElapsedSeconds + sessionElapsed
             state = state.copy(
                 sessionDistanceMeters = sessionDistance,
                 sessionElapsedSeconds = sessionElapsed,
-                todayDistanceMeters = baseDistanceMeters + sessionDistance,
-                todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
+                todayDistanceMeters = todayDistance,
+                todayElapsedSeconds = todayElapsed,
+                goalReached = evaluateGoalReached(todayDistance, todayElapsed),
                 isTimeEligible = eligible,
                 lastUpdateMs = System.currentTimeMillis()
             )
@@ -276,11 +286,14 @@ class TrackingController(
             // Even if no distance delta was accepted, elapsed may have advanced.
             val sessionDistance = sessions.currentDistance()
             val sessionElapsed = sessions.elapsedSeconds()
+            val todayDistance = baseDistanceMeters + sessionDistance
+            val todayElapsed = baseElapsedSeconds + sessionElapsed
             state = state.copy(
                 sessionDistanceMeters = sessionDistance,
                 sessionElapsedSeconds = sessionElapsed,
-                todayDistanceMeters = baseDistanceMeters + sessionDistance,
-                todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
+                todayDistanceMeters = todayDistance,
+                todayElapsedSeconds = todayElapsed,
+                goalReached = evaluateGoalReached(todayDistance, todayElapsed),
                 isTimeEligible = eligible,
                 lastUpdateMs = System.currentTimeMillis()
             )
@@ -293,14 +306,16 @@ class TrackingController(
         handler.removeCallbacks(stationaryBufferRunnable)
         if (state.mode == TrackingMode.TRACKING_MANUAL || state.mode == TrackingMode.TRACKING_AUTO) return
         sessions.start()
+        val todayDistance = baseDistanceMeters
+        val todayElapsed = baseElapsedSeconds
         state = state.copy(
             mode = TrackingMode.TRACKING_MANUAL,
             sessionDistanceMeters = 0.0,
             sessionElapsedSeconds = 0L,
-            todayDistanceMeters = baseDistanceMeters,
-            todayElapsedSeconds = baseElapsedSeconds,
+            todayDistanceMeters = todayDistance,
+            todayElapsedSeconds = todayElapsed,
             isTimeEligible = true,
-            goalReached = false,
+            goalReached = evaluateGoalReached(todayDistance, todayElapsed),
             gpsMode = GpsMode.HIGH_ACCURACY,
             lastUpdateMs = System.currentTimeMillis()
         )
@@ -345,14 +360,16 @@ class TrackingController(
         // Cancel any ticker before switching modes.
         handler.removeCallbacks(sessionTickerRunnable)
         sessions.start()
+        val todayDistance = baseDistanceMeters
+        val todayElapsed = baseElapsedSeconds
         state = state.copy(
             mode = TrackingMode.TRACKING_AUTO,
             sessionDistanceMeters = 0.0,
             sessionElapsedSeconds = 0L,
-            todayDistanceMeters = baseDistanceMeters,
-            todayElapsedSeconds = baseElapsedSeconds,
+            todayDistanceMeters = todayDistance,
+            todayElapsedSeconds = todayElapsed,
             isTimeEligible = isTimeEligible(),
-            goalReached = false,
+            goalReached = evaluateGoalReached(todayDistance, todayElapsed),
             lastUpdateMs = System.currentTimeMillis()
         )
         handler.postDelayed(sessionTickerRunnable, 1000L)
@@ -385,10 +402,15 @@ class TrackingController(
             finalElapsed = elapsed
             Log.d(TAG, "Session finalised: distance=${distance}m elapsed=${elapsed}s")
 
+            val finalTodayDistance = baseDistanceMeters + finalDistance
+            val finalTodayElapsed = baseElapsedSeconds + finalElapsed
+            val finalGoalReached = evaluateGoalReached(finalTodayDistance, finalTodayElapsed)
+
             // Update the daily base and notify the owner so persistence can record session-scoped values.
             baseDistanceMeters += finalDistance
             baseElapsedSeconds += finalElapsed
-            onSessionFinalised(finalDistance, finalElapsed, state.goalReached)
+            onSessionFinalised(finalDistance, finalElapsed, finalGoalReached)
+            state = state.copy(goalReached = finalGoalReached)
         }
 
         gps.setMode(GpsMode.OFF)
@@ -433,6 +455,11 @@ class TrackingController(
         onStateChanged(state)
     }
 
+    private fun evaluateGoalReached(todayDistanceMeters: Double, todayElapsedSeconds: Long): Boolean {
+        if (state.goalReached) return true
+        return goalReachedEvaluator(todayDistanceMeters, todayElapsedSeconds)
+    }
+
     /**
      * Apply a persisted daily baseline so the controller reports `baseline + session`.
      * This is idempotent and can be called once at service startup.
@@ -444,11 +471,14 @@ class TrackingController(
         // Recompute state to include the baseline.
         val sessionDistance = if (sessions.isActive()) sessions.currentDistance() else 0.0
         val sessionElapsed = if (sessions.isActive()) sessions.elapsedSeconds() else 0L
+        val todayDistance = baseDistanceMeters + sessionDistance
+        val todayElapsed = baseElapsedSeconds + sessionElapsed
         state = state.copy(
             sessionDistanceMeters = sessionDistance,
             sessionElapsedSeconds = sessionElapsed,
-            todayDistanceMeters = baseDistanceMeters + sessionDistance,
-            todayElapsedSeconds = baseElapsedSeconds + sessionElapsed,
+            todayDistanceMeters = todayDistance,
+            todayElapsedSeconds = todayElapsed,
+            goalReached = goalReachedEvaluator(todayDistance, todayElapsed),
             isTimeEligible = isTimeEligible(),
             lastUpdateMs = System.currentTimeMillis()
         )

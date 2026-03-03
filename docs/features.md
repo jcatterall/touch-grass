@@ -413,6 +413,7 @@ Empty state shows illustration with prompt to create first plan.
 
 - Queries `getMetricsSummary('alltime')` and `getMetricsSeries('week')`
 - Returns: `currentStreak`, `longestStreak`, `todayComplete`
+- Weekly day chips are derived from the current calendar week (Monday-Sunday) only
 - Supports manual refresh via `refreshKey` prop (triggered on tracking stop)
 
 **Streak computation rules:**
