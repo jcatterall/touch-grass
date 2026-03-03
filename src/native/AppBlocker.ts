@@ -4,8 +4,29 @@ const { AppBlockerModule } = NativeModules;
 
 const isAvailable = Platform.OS === 'android' && AppBlockerModule != null;
 
+export type EmergencyUnblockMode = 'none' | '5m' | '30m' | 'today';
+
+export interface EmergencyUnblockStatus {
+  active: boolean;
+  mode: EmergencyUnblockMode;
+  untilMs: number;
+  remainingMs: number;
+}
+
+const EMERGENCY_UNBLOCK_DURATION_5M_MS = 5 * 60 * 1000;
+const EMERGENCY_UNBLOCK_DURATION_30M_MS = 30 * 60 * 1000;
+
+const DEFAULT_EMERGENCY_STATUS: EmergencyUnblockStatus = {
+  active: false,
+  mode: 'none',
+  untilMs: 0,
+  remainingMs: 0,
+};
+
 export const AppBlocker = {
   isAvailable,
+  EMERGENCY_UNBLOCK_DURATION_5M_MS,
+  EMERGENCY_UNBLOCK_DURATION_30M_MS,
 
   async hasOverlayPermission(): Promise<boolean> {
     if (!isAvailable) return false;
@@ -95,5 +116,38 @@ export const AppBlocker = {
   async dismissBlockingScreen(): Promise<boolean> {
     if (!isAvailable) return false;
     return AppBlockerModule.dismissBlockingScreen();
+  },
+
+  async startEmergencyUnblock(
+    mode: EmergencyUnblockMode,
+    durationMs: number,
+  ): Promise<EmergencyUnblockStatus> {
+    if (!isAvailable) return DEFAULT_EMERGENCY_STATUS;
+    const status = await AppBlockerModule.startEmergencyUnblock(
+      mode,
+      durationMs,
+    );
+    return {
+      active: !!status?.active,
+      mode: (status?.mode ?? 'none') as EmergencyUnblockMode,
+      untilMs: Number(status?.untilMs ?? 0),
+      remainingMs: Number(status?.remainingMs ?? 0),
+    };
+  },
+
+  async getEmergencyUnblockStatus(): Promise<EmergencyUnblockStatus> {
+    if (!isAvailable) return DEFAULT_EMERGENCY_STATUS;
+    const status = await AppBlockerModule.getEmergencyUnblockStatus();
+    return {
+      active: !!status?.active,
+      mode: (status?.mode ?? 'none') as EmergencyUnblockMode,
+      untilMs: Number(status?.untilMs ?? 0),
+      remainingMs: Number(status?.remainingMs ?? 0),
+    };
+  },
+
+  async clearEmergencyUnblock(): Promise<boolean> {
+    if (!isAvailable) return false;
+    return AppBlockerModule.clearEmergencyUnblock();
   },
 };

@@ -41,6 +41,7 @@ function buildPlan(
 
   return {
     id: id || generateUUID(),
+    active: true,
     days,
     duration:
       durationType === 'entire_day'

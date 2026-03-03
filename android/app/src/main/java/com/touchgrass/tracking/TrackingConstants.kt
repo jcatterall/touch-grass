@@ -63,4 +63,5 @@ object TrackingConstants {
     // Notification / goals update — JS/native notify to refresh persistent notification
     const val ACTION_GOALS_UPDATED = "com.touchgrass.action.GOALS_UPDATED"
     const val ACTION_DAY_ROLLOVER = "com.touchgrass.action.DAY_ROLLOVER"
+    const val ACTION_EMERGENCY_UNBLOCK_EXPIRED = "com.touchgrass.action.EMERGENCY_UNBLOCK_EXPIRED"
 }

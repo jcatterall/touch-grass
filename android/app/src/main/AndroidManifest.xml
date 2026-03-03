@@ -82,6 +82,15 @@
           </intent-filter>
       </receiver>
 
+      <receiver
+          android:name=".tracking.EmergencyUnblockExpiryReceiver"
+          android:enabled="true"
+          android:exported="false">
+          <intent-filter>
+              <action android:name="com.touchgrass.action.EMERGENCY_UNBLOCK_EXPIRED" />
+          </intent-filter>
+      </receiver>
+
             <receiver
                     android:name=".tracking.BootReceiver"
                     android:enabled="true"

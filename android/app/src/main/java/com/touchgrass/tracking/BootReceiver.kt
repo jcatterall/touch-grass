@@ -29,6 +29,7 @@ class BootReceiver : BroadcastReceiver() {
             // initialized MMKV yet.
             MMKVStore.init(context.applicationContext)
             DayRolloverScheduler.scheduleNext(context)
+            EmergencyUnblockScheduler.syncWithStore(context)
         } catch (e: Exception) {
             Log.w(TAG, "Receiver action=$actionName failed to init MMKV", e)
             return

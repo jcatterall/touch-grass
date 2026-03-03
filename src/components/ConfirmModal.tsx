@@ -1,7 +1,14 @@
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import type { ReactNode } from 'react';
 import { Typography } from './Typography';
 import { Button } from './Button';
 import { borderRadius, colors, spacing } from '../theme';
+
+type ConfirmModalAction = {
+  label: string;
+  onPress: () => void;
+  variant?: 'primary' | 'secondary' | 'tertiary' | 'link';
+};
 
 export interface ConfirmModalProps {
   visible: boolean;
@@ -10,7 +17,9 @@ export interface ConfirmModalProps {
   subtitle?: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  onConfirm: () => void;
+  onConfirm?: () => void;
+  actions?: ConfirmModalAction[];
+  customActions?: ReactNode;
 }
 
 export const ConfirmModal = ({
@@ -21,7 +30,12 @@ export const ConfirmModal = ({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   onConfirm,
+  actions,
+  customActions,
 }: ConfirmModalProps) => {
+  const hasCustomActions =
+    !!customActions || (Array.isArray(actions) && actions.length > 0);
+
   return (
     <Modal
       visible={visible}
@@ -39,25 +53,47 @@ export const ConfirmModal = ({
               {subtitle}
             </Typography>
           )}
-          <View style={styles.actions}>
-            <View style={styles.buttonWrapper}>
+          {hasCustomActions ? (
+            <View style={styles.customActionsContainer}>
+              {customActions}
+              {actions?.map(action => (
+                <Button
+                  key={action.label}
+                  variant={action.variant ?? 'secondary'}
+                  size="sm"
+                  onPress={() => {
+                    action.onPress();
+                    onClose();
+                  }}
+                >
+                  {action.label}
+                </Button>
+              ))}
               <Button variant="secondary" size="sm" onPress={onClose}>
                 {cancelLabel}
               </Button>
             </View>
-            <View style={styles.buttonWrapper}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onPress={() => {
-                  onConfirm();
-                  onClose();
-                }}
-              >
-                {confirmLabel}
-              </Button>
+          ) : (
+            <View style={styles.actions}>
+              <View style={styles.buttonWrapper}>
+                <Button variant="secondary" size="sm" onPress={onClose}>
+                  {cancelLabel}
+                </Button>
+              </View>
+              <View style={styles.buttonWrapper}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onPress={() => {
+                    onConfirm?.();
+                    onClose();
+                  }}
+                >
+                  {confirmLabel}
+                </Button>
+              </View>
             </View>
-          </View>
+          )}
         </View>
       </Pressable>
     </Modal>
@@ -85,5 +121,9 @@ const styles = StyleSheet.create({
   },
   buttonWrapper: {
     flex: 1,
+  },
+  customActionsContainer: {
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
 });

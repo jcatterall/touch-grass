@@ -10,6 +10,17 @@ object BlockPolicyEvaluator {
         val reason: String,
     )
 
+    fun evaluateTargetPackagePolicy(
+        hasPermanent: Boolean,
+        emergencyActive: Boolean,
+        goalsReached: Boolean,
+    ): Decision {
+        if (hasPermanent) return Decision(true, "permanent_plan")
+        if (emergencyActive) return Decision(false, "emergency_unblock_active")
+        if (goalsReached) return Decision(false, "goals_reached")
+        return Decision(true, "active_day_unmet_goals")
+    }
+
     fun evaluatePackage(context: Context, packageName: String): Decision {
         if (packageName.isBlank()) return Decision(false, "blank_package")
 
@@ -29,11 +40,15 @@ object BlockPolicyEvaluator {
         if (packageName !in blockedPackages) return Decision(false, "not_target_package")
 
         val hasPermanent = prefs.getBoolean(AppBlockerService.PREF_HAS_PERMANENT, false)
-        val goalsReached = MMKVStore.getGoalsReachedSafe()
+        val configDay = prefs.getString(AppBlockerService.PREF_CONFIG_DAY, "")
+        val isConfigForToday = configDay == MMKVStore.todayKey()
+        val goalsReached = isConfigForToday && prefs.getBoolean(AppBlockerService.PREF_GOALS_REACHED, false)
+        val emergencyActive = MMKVStore.getEmergencyUnblockRemainingMs() > 0L
 
-        if (hasPermanent) return Decision(true, "permanent_plan")
-        if (goalsReached) return Decision(false, "goals_reached")
-
-        return Decision(true, "active_day_unmet_goals")
+        return evaluateTargetPackagePolicy(
+            hasPermanent = hasPermanent,
+            emergencyActive = emergencyActive,
+            goalsReached = goalsReached,
+        )
     }
 }

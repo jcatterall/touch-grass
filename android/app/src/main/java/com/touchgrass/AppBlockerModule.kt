@@ -15,13 +15,30 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.UiThreadUtil
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.WritableMap
 import androidx.core.content.ContextCompat
+import com.touchgrass.tracking.EmergencyUnblockScheduler
 import com.touchgrass.tracking.TrackingPermissionGate
 import org.json.JSONArray
+import java.util.Calendar
 
 class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
     override fun getName(): String = "AppBlockerModule"
+
+    private fun requestTrackingNotificationRefresh() {
+        try {
+            if (canStartTrackingForeground()) {
+                val intent = Intent(reactApplicationContext, com.touchgrass.tracking.TrackingService::class.java).apply {
+                    action = com.touchgrass.tracking.TrackingConstants.ACTION_GOALS_UPDATED
+                }
+                ContextCompat.startForegroundService(reactApplicationContext, intent)
+            }
+        } catch (_: Exception) {
+            // best-effort
+        }
+    }
 
     @ReactMethod
     fun hasOverlayPermission(promise: Promise) {
@@ -243,6 +260,81 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
     }
 
     @ReactMethod
+    fun startEmergencyUnblock(mode: String, durationMs: Double, promise: Promise) {
+        try {
+            val nowMs = System.currentTimeMillis()
+            val resolvedMode = when (mode) {
+                MMKVStore.EMERGENCY_UNBLOCK_MODE_5M,
+                MMKVStore.EMERGENCY_UNBLOCK_MODE_30M,
+                MMKVStore.EMERGENCY_UNBLOCK_MODE_TODAY -> mode
+                else -> MMKVStore.EMERGENCY_UNBLOCK_MODE_NONE
+            }
+
+            if (resolvedMode == MMKVStore.EMERGENCY_UNBLOCK_MODE_NONE) {
+                MMKVStore.clearEmergencyUnblock()
+                EmergencyUnblockScheduler.cancel(reactApplicationContext)
+                requestTrackingNotificationRefresh()
+                promise.resolve(statusToMap(MMKVStore.getEmergencyUnblockStatus(nowMs)))
+                return
+            }
+
+            val untilMs = if (resolvedMode == MMKVStore.EMERGENCY_UNBLOCK_MODE_TODAY) {
+                val endOfDay = Calendar.getInstance().apply {
+                    timeInMillis = nowMs
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }
+                endOfDay.timeInMillis
+            } else {
+                val safeDurationMs = durationMs.toLong().coerceAtLeast(0L)
+                if (safeDurationMs <= 0L) {
+                    MMKVStore.clearEmergencyUnblock()
+                    EmergencyUnblockScheduler.cancel(reactApplicationContext)
+                    requestTrackingNotificationRefresh()
+                    promise.resolve(statusToMap(MMKVStore.getEmergencyUnblockStatus(nowMs)))
+                    return
+                }
+                nowMs + safeDurationMs
+            }
+
+            MMKVStore.setEmergencyUnblock(resolvedMode, untilMs)
+            EmergencyUnblockScheduler.schedule(reactApplicationContext, untilMs)
+            requestTrackingNotificationRefresh()
+            promise.resolve(statusToMap(MMKVStore.getEmergencyUnblockStatus(nowMs)))
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun getEmergencyUnblockStatus(promise: Promise) {
+        try {
+            promise.resolve(statusToMap(MMKVStore.getEmergencyUnblockStatus()))
+        } catch (_: Exception) {
+            promise.resolve(statusToMap(MMKVStore.EmergencyUnblockStatus(
+                active = false,
+                mode = MMKVStore.EMERGENCY_UNBLOCK_MODE_NONE,
+                untilMs = 0L,
+                remainingMs = 0L,
+            )))
+        }
+    }
+
+    @ReactMethod
+    fun clearEmergencyUnblock(promise: Promise) {
+        try {
+            MMKVStore.clearEmergencyUnblock()
+            EmergencyUnblockScheduler.cancel(reactApplicationContext)
+            requestTrackingNotificationRefresh()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun setImmersiveMode(enabled: Boolean, promise: Promise) {
         UiThreadUtil.runOnUiThread {
             try {
@@ -291,5 +383,14 @@ class AppBlockerModule(reactContext: ReactApplicationContext) : ReactContextBase
 
     private fun canStartTrackingForeground(): Boolean {
         return TrackingPermissionGate.canStartForegroundTracking(reactApplicationContext)
+    }
+
+    private fun statusToMap(status: MMKVStore.EmergencyUnblockStatus): WritableMap {
+        return Arguments.createMap().apply {
+            putBoolean("active", status.active)
+            putString("mode", status.mode)
+            putDouble("untilMs", status.untilMs.toDouble())
+            putDouble("remainingMs", status.remainingMs.toDouble())
+        }
     }
 }

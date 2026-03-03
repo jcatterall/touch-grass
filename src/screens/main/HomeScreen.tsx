@@ -1,18 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   AppState,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 import { Footprints, Play, Shield, Square } from 'lucide-react-native';
-import { Typography } from '../../components';
+import { ConfirmModal, Typography } from '../../components';
 import { ProgressRing } from '../../components/ProgressRing';
 import { useTracking, AggregatedGoals } from '../../hooks/useTracking';
 import { TrackingProgress } from '../../tracking/Tracking';
-import { AppBlocker } from '../../native/AppBlocker';
+import {
+  AppBlocker,
+  EmergencyUnblockMode,
+  EmergencyUnblockStatus,
+} from '../../native/AppBlocker';
 import { colors, spacing } from '../../theme';
+import { triggerHaptic } from '../../utils';
 
 function getOverallFraction(
   goals: AggregatedGoals,
@@ -69,6 +75,13 @@ function formatTrackingBlockedReason(reason: string | null): string {
     default:
       return reason.replace(/_/g, ' ');
   }
+}
+
+function formatCountdown(remainingMs: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 export const HomeScreen = () => {
@@ -129,6 +142,21 @@ export const HomeScreen = () => {
   const footprintActive = backgroundTrackingEnabled && permissionsGranted;
 
   const [blockerPermsGranted, setBlockerPermsGranted] = useState(false);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [emergencyStatus, setEmergencyStatus] =
+    useState<EmergencyUnblockStatus>({
+      active: false,
+      mode: 'none',
+      untilMs: 0,
+      remainingMs: 0,
+    });
+  const emergencyActive = emergencyStatus.active;
+
+  const refreshEmergencyStatus = useCallback(async () => {
+    if (Platform.OS !== 'android') return;
+    const status = await AppBlocker.getEmergencyUnblockStatus();
+    setEmergencyStatus(status);
+  }, []);
 
   useEffect(() => {
     const check = async () => {
@@ -140,10 +168,25 @@ export const HomeScreen = () => {
     };
     check();
     const sub = AppState.addEventListener('change', state => {
-      if (state === 'active') check();
+      if (state === 'active') {
+        check();
+        refreshEmergencyStatus();
+      }
     });
     return () => sub.remove();
-  }, []);
+  }, [refreshEmergencyStatus]);
+
+  useEffect(() => {
+    refreshEmergencyStatus();
+  }, [refreshEmergencyStatus]);
+
+  useEffect(() => {
+    if (!emergencyActive) return;
+    const timer = setInterval(() => {
+      refreshEmergencyStatus();
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [emergencyActive, refreshEmergencyStatus]);
 
   const requestBlockerPermissions = async () => {
     const hasUsage = await AppBlocker.hasUsageStatsPermission();
@@ -162,6 +205,29 @@ export const HomeScreen = () => {
       await AppBlocker.requestNotificationListenerPermission();
     }
   };
+
+  const startEmergencyUnblock = async (
+    mode: EmergencyUnblockMode,
+    durationMs: number,
+  ) => {
+    if (Platform.OS !== 'android') return;
+    const nextStatus = await AppBlocker.startEmergencyUnblock(mode, durationMs);
+    setEmergencyStatus(nextStatus);
+    if (nextStatus.active) {
+      triggerHaptic('selection');
+    }
+  };
+
+  const reactivateBlocking = async () => {
+    if (Platform.OS !== 'android') return;
+    await AppBlocker.clearEmergencyUnblock();
+    await refreshEmergencyStatus();
+  };
+
+  const emergencyStatusText =
+    emergencyStatus.mode === 'today'
+      ? 'Today'
+      : formatCountdown(emergencyStatus.remainingMs);
 
   return (
     <ScrollView contentContainerStyle={styles.container} style={styles.scroll}>
@@ -225,6 +291,70 @@ export const HomeScreen = () => {
           </Pressable>
         )}
       </View>
+
+      {Platform.OS === 'android' && (
+        <View style={styles.emergencyRow}>
+          {emergencyActive ? (
+            <Pressable
+              style={styles.emergencyButton}
+              onPress={reactivateBlocking}
+              hitSlop={12}
+            >
+              <Typography variant="body" style={styles.emergencyButtonText}>
+                Reactivate blocking
+              </Typography>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={styles.emergencyButton}
+              onPress={() => setShowEmergencyModal(true)}
+              hitSlop={12}
+            >
+              <Typography variant="body" style={styles.emergencyButtonText}>
+                Emergency Unblock
+              </Typography>
+            </Pressable>
+          )}
+          {emergencyActive && (
+            <Typography variant="body" style={styles.emergencyCountdownText}>
+              {emergencyStatusText}
+            </Typography>
+          )}
+        </View>
+      )}
+
+      <ConfirmModal
+        visible={showEmergencyModal}
+        onClose={() => setShowEmergencyModal(false)}
+        title="Emergency Unblock"
+        subtitle="Choose how long to unblock apps"
+        cancelLabel="Cancel"
+        actions={[
+          {
+            label: '5 minutes',
+            onPress: () =>
+              startEmergencyUnblock(
+                '5m',
+                AppBlocker.EMERGENCY_UNBLOCK_DURATION_5M_MS,
+              ),
+            variant: 'secondary',
+          },
+          {
+            label: '30 minutes',
+            onPress: () =>
+              startEmergencyUnblock(
+                '30m',
+                AppBlocker.EMERGENCY_UNBLOCK_DURATION_30M_MS,
+              ),
+            variant: 'secondary',
+          },
+          {
+            label: 'Today',
+            onPress: () => startEmergencyUnblock('today', 0),
+            variant: 'secondary',
+          },
+        ]}
+      />
 
       <View style={styles.debugPanel}>
         <Typography variant="body" style={styles.debugTitle}>
@@ -290,6 +420,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     alignItems: 'center',
   },
+  emergencyRow: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   actionButton: {
     width: 48,
     height: 48,
@@ -303,6 +437,22 @@ const styles = StyleSheet.create({
   },
   actionButtonHighlight: {
     backgroundColor: colors.terracotta,
+  },
+  emergencyButton: {
+    minHeight: 40,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 20,
+    backgroundColor: colors.terracotta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emergencyButtonText: {
+    color: colors.white,
+    fontWeight: '600',
+  },
+  emergencyCountdownText: {
+    color: colors.backgroundTertiary,
+    fontWeight: '600',
   },
   debugPanel: {
     width: '100%',

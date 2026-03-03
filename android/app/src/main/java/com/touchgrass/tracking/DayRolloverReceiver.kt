@@ -30,6 +30,8 @@ class DayRolloverReceiver : BroadcastReceiver() {
             }
 
             MMKVStore.rolloverToTodayIfNeeded()
+            MMKVStore.clearEmergencyUnblock()
+            EmergencyUnblockScheduler.cancel(context)
             DayRolloverScheduler.scheduleNext(context)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to prime MMKV on rollover", e)

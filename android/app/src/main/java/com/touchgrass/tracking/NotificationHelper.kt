@@ -26,6 +26,7 @@ class NotificationHelper(private val context: Context) {
     companion object {
         internal fun computeText(
             blockedCount: Int,
+            emergencyBypassActive: Boolean,
             todayKey: String,
             planDay: String,
             planActiveFlag: Boolean,
@@ -50,12 +51,18 @@ class NotificationHelper(private val context: Context) {
             val hasDistance = planActiveToday && goalDistanceUnit == "m" && goalDistanceValue > 0.0
             val hasTime = planActiveToday && goalTimeUnit == "s" && goalTimeValue > 0.0
 
-            val title = if (!planActiveToday) {
+            val normalTitle = if (!planActiveToday) {
                 "No active plans for today"
             } else if (blockedCount == 1) {
                 "1 application blocked"
             } else {
                 "${blockedCount} applications blocked"
+            }
+
+            val title = if (emergencyBypassActive) {
+                "Emergency unblocking enabled"
+            } else {
+                normalTitle
             }
 
             val body = if (!planActiveToday) {
@@ -113,6 +120,7 @@ class NotificationHelper(private val context: Context) {
         val blockedCount = try { MMKVStore.getBlockedCount() } catch (e: Exception) { 0 }
 
         val nowMs = System.currentTimeMillis()
+        val emergencyBypassActive = try { MMKVStore.getEmergencyUnblockStatus(nowMs).active } catch (e: Exception) { false }
         val today = try { MMKVStore.todayKey() } catch (e: Exception) { "" }
         val planDay = try { MMKVStore.getPlanDay() } catch (e: Exception) { "" }
         val planActiveFlag = try { MMKVStore.isPlanActiveToday() } catch (e: Exception) { false }
@@ -124,6 +132,7 @@ class NotificationHelper(private val context: Context) {
 
         val text = computeText(
             blockedCount = blockedCount,
+            emergencyBypassActive = emergencyBypassActive,
             todayKey = today,
             planDay = planDay,
             planActiveFlag = planActiveFlag,

@@ -48,6 +48,8 @@ object MMKVStore {
         if (!kv.containsKey(KEY_NOTIF_LISTENER_CONNECTED_AT_MS)) kv.encode(KEY_NOTIF_LISTENER_CONNECTED_AT_MS, 0L)
         if (!kv.containsKey(KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS)) kv.encode(KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS, 0L)
         if (!kv.containsKey(KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS)) kv.encode(KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS, 0L)
+        if (!kv.containsKey(KEY_EMERGENCY_UNBLOCK_UNTIL_MS)) kv.encode(KEY_EMERGENCY_UNBLOCK_UNTIL_MS, 0L)
+        if (!kv.containsKey(KEY_EMERGENCY_UNBLOCK_MODE)) kv.encode(KEY_EMERGENCY_UNBLOCK_MODE, EMERGENCY_UNBLOCK_MODE_NONE)
     }
 
     // ---- Key constants (shared with JS side in src/storage.ts fastStorage) ----
@@ -93,6 +95,20 @@ object MMKVStore {
     const val KEY_NOTIF_LISTENER_CONNECTED_AT_MS = "notif_listener_connected_at_ms"
     const val KEY_NOTIF_LISTENER_DISCONNECTED_AT_MS = "notif_listener_disconnected_at_ms"
     const val KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS = "notif_listener_last_event_at_ms"
+    const val KEY_EMERGENCY_UNBLOCK_UNTIL_MS = "emergency_unblock_until_ms"
+    const val KEY_EMERGENCY_UNBLOCK_MODE = "emergency_unblock_mode"
+
+    const val EMERGENCY_UNBLOCK_MODE_NONE = "none"
+    const val EMERGENCY_UNBLOCK_MODE_5M = "5m"
+    const val EMERGENCY_UNBLOCK_MODE_30M = "30m"
+    const val EMERGENCY_UNBLOCK_MODE_TODAY = "today"
+
+    data class EmergencyUnblockStatus(
+        val active: Boolean,
+        val mode: String,
+        val untilMs: Long,
+        val remainingMs: Long,
+    )
 
     // ---- Distance accumulation (called from TrackingService on each GPS fix) ----
 
@@ -211,6 +227,39 @@ object MMKVStore {
 
     fun getNotificationListenerLastEventAtMs(): Long = kv.decodeLong(KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS, 0L)
 
+    fun getEmergencyUnblockUntilMs(): Long = kv.decodeLong(KEY_EMERGENCY_UNBLOCK_UNTIL_MS, 0L)
+
+    fun getEmergencyUnblockMode(): String =
+        kv.decodeString(KEY_EMERGENCY_UNBLOCK_MODE) ?: EMERGENCY_UNBLOCK_MODE_NONE
+
+    fun getEmergencyUnblockStatus(nowMs: Long = System.currentTimeMillis()): EmergencyUnblockStatus {
+        val untilMs = getEmergencyUnblockUntilMs()
+        val mode = getEmergencyUnblockMode()
+
+        if (untilMs <= nowMs || mode == EMERGENCY_UNBLOCK_MODE_NONE) {
+            if (untilMs != 0L || mode != EMERGENCY_UNBLOCK_MODE_NONE) {
+                clearEmergencyUnblock()
+            }
+            return EmergencyUnblockStatus(
+                active = false,
+                mode = EMERGENCY_UNBLOCK_MODE_NONE,
+                untilMs = 0L,
+                remainingMs = 0L,
+            )
+        }
+
+        return EmergencyUnblockStatus(
+            active = true,
+            mode = mode,
+            untilMs = untilMs,
+            remainingMs = untilMs - nowMs,
+        )
+    }
+
+    fun getEmergencyUnblockRemainingMs(nowMs: Long = System.currentTimeMillis()): Long {
+        return getEmergencyUnblockStatus(nowMs).remainingMs
+    }
+
     // ---- Writers ----
 
     fun setGoalsReached(v: Boolean) = kv.encode(KEY_GOALS_REACHED, v)
@@ -238,6 +287,24 @@ object MMKVStore {
 
     fun setNotificationListenerLastEventAtMs(v: Long) {
         kv.encode(KEY_NOTIF_LISTENER_LAST_EVENT_AT_MS, v)
+    }
+
+    fun setEmergencyUnblockUntilMs(v: Long) {
+        kv.encode(KEY_EMERGENCY_UNBLOCK_UNTIL_MS, v)
+    }
+
+    fun setEmergencyUnblockMode(v: String) {
+        kv.encode(KEY_EMERGENCY_UNBLOCK_MODE, v)
+    }
+
+    fun setEmergencyUnblock(mode: String, untilMs: Long) {
+        kv.encode(KEY_EMERGENCY_UNBLOCK_MODE, mode)
+        kv.encode(KEY_EMERGENCY_UNBLOCK_UNTIL_MS, untilMs)
+    }
+
+    fun clearEmergencyUnblock() {
+        kv.encode(KEY_EMERGENCY_UNBLOCK_UNTIL_MS, 0L)
+        kv.encode(KEY_EMERGENCY_UNBLOCK_MODE, EMERGENCY_UNBLOCK_MODE_NONE)
     }
 
     /**

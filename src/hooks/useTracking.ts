@@ -491,9 +491,12 @@ export function useTracking(): TrackingState {
         });
 
         if (unmetPlans.length === 0) {
-          const signature = 'goals-met';
+          const allBlockedPackages = [
+            ...new Set(blockingPlans.flatMap(p => p.blockedApps.map(a => a.id))),
+          ];
+          const signature = `goals-met|${allBlockedPackages.sort().join(',')}`;
           if (lastBlockerSignatureRef.current !== signature) {
-            await AppBlocker.updateBlockerConfig([], true, false);
+            await AppBlocker.updateBlockerConfig(allBlockedPackages, true, false);
             lastBlockerSignatureRef.current = signature;
           }
           return;
